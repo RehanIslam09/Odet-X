@@ -25,9 +25,17 @@ export const login = asyncHandler(
     const result = await loginUser(req.body);
 
     sendSuccessResponse(res, {
-      statusCode: 200,
       message: "Login successful.",
       data: result,
+    });
+  },
+);
+
+export const me = asyncHandler(
+  async (req: Request, res: Response) => {
+    sendSuccessResponse(res, {
+      message: "User retrieved successfully.",
+      data: req.user,
     });
   },
 );

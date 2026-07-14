@@ -5,3 +5,4 @@ export { default as DashboardSidebar } from "./DashboardSidebar";
 export { default as SidebarItem } from "./SidebarItem";
 export { default as ThemeToggle } from "./ThemeToggle";
 export { default as MobileSidebar } from "./MobileSidebar";
+export { default as UserMenu } from "./UserMenu";

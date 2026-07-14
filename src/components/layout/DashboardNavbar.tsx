@@ -1,9 +1,8 @@
 import {
   MobileSidebar,
   ThemeToggle,
+  UserMenu,
 } from "@/components/layout";
-
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export default function DashboardNavbar() {
   return (
@@ -19,9 +18,7 @@ export default function DashboardNavbar() {
       <div className="flex items-center gap-3">
         <ThemeToggle />
 
-        <Avatar>
-          <AvatarFallback>R</AvatarFallback>
-        </Avatar>
+        <UserMenu />
       </div>
     </header>
   );

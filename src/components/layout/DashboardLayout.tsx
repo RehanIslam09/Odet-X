@@ -8,7 +8,9 @@ import {
 export default function DashboardLayout() {
   return (
     <div className="flex h-screen bg-background">
-      <DashboardSidebar />
+      <aside className="hidden w-64 border-r bg-background md:flex md:flex-col">
+        <DashboardSidebar />
+      </aside>
 
       <div className="flex flex-1 flex-col">
         <DashboardNavbar />

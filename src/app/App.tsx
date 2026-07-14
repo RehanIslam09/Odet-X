@@ -1,11 +1,7 @@
-import React from "react";
+import { AppProviders } from "@/app/providers";
 
-const App = () => {
-  return (
-    <div>
-      <h1 className="text-3xl font-bold underline">Hello world!</h1>
-    </div>
-  );
-};
+function App() {
+  return <AppProviders />;
+}
 
 export default App;

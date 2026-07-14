@@ -1,9 +1,12 @@
 import { Request, Response } from "express";
 
-import { registerUser } from "../services/auth.service";
+import {
+  loginUser,
+  registerUser,
+} from "@/services/auth.service.js";
 
-import { sendSuccessResponse } from "../utils/api-response";
-import { asyncHandler } from "../utils/async-handler";
+import { asyncHandler } from "@/utils/async-handler.js";
+import { sendSuccessResponse } from "@/utils/api-response.js";
 
 export const register = asyncHandler(
   async (req: Request, res: Response) => {
@@ -13,6 +16,18 @@ export const register = asyncHandler(
       statusCode: 201,
       message: "User registered successfully.",
       data: user,
+    });
+  },
+);
+
+export const login = asyncHandler(
+  async (req: Request, res: Response) => {
+    const result = await loginUser(req.body);
+
+    sendSuccessResponse(res, {
+      statusCode: 200,
+      message: "Login successful.",
+      data: result,
     });
   },
 );

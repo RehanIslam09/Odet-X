@@ -1,13 +1,17 @@
-# AI Project Manager Roadmap
+# AI Project Manager — Roadmap
+
+## Current Status
+
+**Current Phase:** Phase 7 — Production Authentication (complete)
+
+**Branch:** `feat/authentication`
+
+---
 
 ## ✅ Phase 1 — Project Bootstrap
 
-Completed
-
 ### Tech Stack
-
-- React 19
-- React Compiler
+- React 19 + React Compiler
 - TypeScript
 - Vite
 - Tailwind CSS v4
@@ -20,14 +24,9 @@ Completed
 - Framer Motion
 
 ### Tooling
+- ESLint, Prettier, Husky, lint-staged
 
-- ESLint
-- Prettier
-- Husky
-- lint-staged
-
-### Project Structure
-
+### Completed
 - Feature-first architecture
 - Shared layout components
 - Shared UI components
@@ -37,10 +36,6 @@ Completed
 
 ## ✅ Phase 2 — Application Bootstrap
 
-Completed
-
-### Implemented
-
 - QueryClient configuration
 - Router configuration
 - AppProviders
@@ -49,304 +44,190 @@ Completed
 - Dashboard placeholder page
 - Auth placeholder pages
 
-Application startup flow:
-
-Browser
-
-↓
-
-main.tsx
-
-↓
-
-App.tsx
-
-↓
-
-AppProviders
-
-↓
-
-RouterProvider
-
-↓
-
-DashboardLayout
-
-↓
-
-DashboardPage
-
----
-
-## 🚧 Phase 3 — Application Shell
-
-In Progress
-
-- Navigation configuration
-- Navigation types
-- SidebarItem component
-- DashboardSidebar component
-
-Remaining
-
-- DashboardNavbar
-- DashboardLayout
-- Responsive layout
-- Theme support
-
-### ✅ Completed
-
-- Navigation configuration
-- Sidebar component
-- Responsive mobile sidebar
-- Dashboard navbar
-- Theme support
-
 ---
 
 ## ✅ Phase 3 — Application Shell
 
-Completed
-
-### Implemented
-
-#### Layout
-
 - DashboardLayout
 - DashboardNavbar
-- DashboardSidebar
-- Responsive mobile sidebar
-
-#### Navigation
-
-- Navigation configuration
-- Navigation types
-- SidebarItem component
-- Active route highlighting
+- DashboardSidebar (responsive)
+- Navigation configuration and types
+- SidebarItem component with active route highlighting
 - Mobile navigation drawer
-
-#### Providers
-
-- ThemeProvider
-- Light / Dark mode
-- Theme persistence
-- QueryClientProvider
-
-#### User Experience
-
+- ThemeProvider (light / dark mode, persistence)
 - User dropdown menu
 - 404 page
 - Protected route skeleton
-- Responsive dashboard layout
-
----
-
-## 🚧 Phase 4 — Authentication
-
-Planned
-
-### Frontend
-
-- Login page
-- Register page
-- Forgot password page
-- React Hook Form integration
-- Zod validation
-- Authentication state (Zustand)
-- API integration
-- Protected routes
-
-### Backend
-
-- Express server
-- MongoDB
-- Mongoose
-- User model
-- Authentication routes
-- JWT access tokens
-- Refresh tokens
-- Password hashing
-- Authentication middleware
-
-### Integration
-
-- Persistent login
-- Automatic token refresh
-- Logout
-- Error handling
-- Loading states
-
----
-
-## 📋 Future Phases
-
-### Phase 5 — Project Management
-
-- Project CRUD
-- Project dashboard
-- Project members
-- Project settings
-
-### Phase 6 — Task Management
-
-- Kanban board
-- Drag & Drop
-- Task CRUD
-- Due dates
-- Priorities
-- Labels
-
-### Phase 7 — AI Features
-
-- AI task generation
-- AI project planning
-- AI summaries
-- Smart suggestions
-
-### Phase 8 — Real-time Collaboration
-
-- Live updates
-- Presence indicators
-- Comments
-- Notifications
-
-### Phase 9 — Analytics
-
-- Productivity dashboard
-- Charts
-- Reports
-- Activity history
-
-### Phase 10 — Deployment
-
-- Docker
-- CI/CD
-- Production deployment
-- Monitoring
-- Logging
-- Performance optimization
-
-# Project Status
-
-Current Phase: **Phase 4 — Authentication**
-
-Completed Phases:
-
-- ✅ Project Bootstrap
-- ✅ Application Bootstrap
-- ✅ Application Shell
-
-Current Branch:
-
-`feat/authentication`
 
 ---
 
 ## ✅ Phase 4 — Backend Foundation
 
-Completed
-
-### Backend Stack
-
-- Node.js
-- Express
-- TypeScript
-- MongoDB
-- Mongoose
-
-### Infrastructure
-
-- Environment configuration
-- Centralized configuration management
-- Express application bootstrap
-- Database connection layer
+- Express + TypeScript server
+- MongoDB + Mongoose
+- Centralized environment configuration (`config/env.ts`)
+- Database connection layer (`config/database.ts`)
 - Health check endpoint
 - API versioning (`/api/v1`)
 - Global 404 middleware
-- Global error middleware
-
-### Authentication Foundation
-
-- User model
-- Password hashing with bcrypt
-- Password comparison method
-- Automatic email normalization
-- Hidden password & refresh token fields
-- Automatic timestamps
-- Safe JSON serialization
-- Authentication constants
+- Global error handler
+- Async error handler utility
+- AppError class hierarchy
 
 ---
 
 ## ✅ Phase 5 — User Registration
 
-Completed
-
-### Architecture
-
-Authentication flow follows:
-
-Request
-
-↓
-
-Route
-
-↓
-
-Controller
-
-↓
-
-Service
-
-↓
-
-Model
-
-↓
-
-MongoDB
-
-↓
-
-Response
-
-### Implemented
-
-- Authentication module
-- Registration endpoint
-- Registration service
+- User model with bcrypt password hashing
 - Duplicate email detection
-- User creation
-- Automatic password hashing
-- Standard API response
-- Successful registration flow
-- Duplicate registration handling
-
-### Endpoint
-
-POST `/api/v1/auth/register`
-
-### Tested
-
-- Successful user registration
-- Duplicate email registration
-- MongoDB persistence
-- Password hashing
-- Safe user serialization
+- Safe JSON serialization (password excluded from responses)
+- `POST /api/v1/auth/register`
 
 ---
 
-## 🚧 Phase 6 — Authentication
+## ✅ Phase 6 — Core Authentication
 
-Next
-
-- Login endpoint
-- JWT utilities
-- Access tokens
-- Refresh tokens
+- JWT access token generation and verification
+- JWT refresh token generation and verification
 - Authentication middleware
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
+
+---
+
+## ✅ Phase 7 — Production Authentication
+
+### Security Hardening
+- Refresh tokens hashed with SHA-256 before DB storage (never stored plaintext)
+- Refresh token transmitted exclusively as HTTP-only cookie (never in JSON body)
+- Token rotation on every refresh (old token immediately invalidated)
+- Reuse detection: suspected replay triggers full session invalidation
+- Generic authentication error messages (prevents account enumeration)
+- `isActive` account check on every authenticated request
+
+### Validation Layer
+- Zod validation middleware factory (`validate()`)
+- Auth schemas (`registerSchema`, `loginSchema`)
+- Field-level error responses compatible with frontend form libraries
+- DTOs inferred from Zod schemas — single source of truth
+
+### New Endpoints
+- `POST /api/v1/auth/refresh` — token rotation
+- `POST /api/v1/auth/logout` — session invalidation
+
+### Error Handling Improvements
+- Error handler distinguishes operational vs programmer errors
+- Mongoose `ValidationError` and `CastError` handled gracefully
+- Duplicate key (11000) errors translated to 409
+- Only true unexpected errors logged to console
+
+### Code Quality
+- Removed empty `IUserModel` interface
+- `refreshTokenHash` field (renamed from `refreshToken`) with null semantics
+- `cookies.ts` uses centralized `env` config
+- Cookie `maxAge` derived from `REFRESH_TOKEN_MAX_AGE_MS` constant
+- `req.user` typed as optional in Express augmentation
+- Process-level unhandled rejection and uncaught exception handlers
+- Morgan uses `combined` in production, `dev` in development
+- Meaningful stubs for `lib/` clients (cloudinary, mailer, redis, openai)
+
+### Endpoints
+
+| Method | Path | Auth | Status |
+|--------|------|------|--------|
+| POST | `/api/v1/auth/register` | None | ✅ |
+| POST | `/api/v1/auth/login` | None | ✅ |
+| POST | `/api/v1/auth/refresh` | Cookie | ✅ |
+| POST | `/api/v1/auth/logout` | Bearer | ✅ |
+| GET | `/api/v1/auth/me` | Bearer | ✅ |
+
+---
+
+## 📋 Phase 8 — Project Management
+
+- Project model (Mongoose)
+- CRUD endpoints
+- Member management
+- Project validation schemas
+- Project service layer
+
+---
+
+## 📋 Phase 9 — Task Management
+
+- Task model
+- Kanban board data model
+- Drag & Drop ordering
+- Task CRUD endpoints
+- Due dates, priorities, labels
+
+---
+
+## 📋 Phase 10 — AI Features
+
+- OpenAI client integration
+- AI task generation from project description
+- AI project planning / sprint estimation
+- Smart summaries of project activity
+
+---
+
+## 📋 Phase 11 — Frontend Authentication
+
+- Login page (React Hook Form + Zod)
+- Register page
+- Forgot password page
+- Auth store (Zustand)
+- API integration with TanStack Query
+- Automatic token refresh (axios interceptor / fetch wrapper)
+- Protected routes
+
+---
+
+## 📋 Phase 12 — Real-time Collaboration
+
+- WebSocket / Socket.io integration
+- Live task updates
+- Presence indicators
+- Comments
+- In-app notifications
+
+---
+
+## 📋 Phase 13 — Analytics
+
+- Productivity dashboard
+- Charts (Recharts / Nivo)
+- Activity history
+- Reports
+
+---
+
+## 📋 Phase 14 — Deployment
+
+- Docker + docker-compose
+- CI/CD pipeline (GitHub Actions)
+- Production deployment (Railway / Render / AWS)
+- Redis for rate limiting and caching
+- Monitoring (Sentry)
+- Structured logging
+
+
+## ✅ Phase 4 — Backend Authentication
+
+Completed
+
+### Authentication
+
+- User registration
+- Login
+- Logout
+- JWT authentication
+- Refresh token rotation
+- HTTP-only cookie sessions
+- Protected routes
 - Current user endpoint
-- Logout endpoint
+- Validation middleware
+- Secure password hashing
+- Refresh token hashing
+- Global error handling

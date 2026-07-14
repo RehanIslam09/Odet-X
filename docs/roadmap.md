@@ -240,3 +240,113 @@ Completed Phases:
 Current Branch:
 
 `feat/authentication`
+
+---
+
+## ✅ Phase 4 — Backend Foundation
+
+Completed
+
+### Backend Stack
+
+- Node.js
+- Express
+- TypeScript
+- MongoDB
+- Mongoose
+
+### Infrastructure
+
+- Environment configuration
+- Centralized configuration management
+- Express application bootstrap
+- Database connection layer
+- Health check endpoint
+- API versioning (`/api/v1`)
+- Global 404 middleware
+- Global error middleware
+
+### Authentication Foundation
+
+- User model
+- Password hashing with bcrypt
+- Password comparison method
+- Automatic email normalization
+- Hidden password & refresh token fields
+- Automatic timestamps
+- Safe JSON serialization
+- Authentication constants
+
+---
+
+## ✅ Phase 5 — User Registration
+
+Completed
+
+### Architecture
+
+Authentication flow follows:
+
+Request
+
+↓
+
+Route
+
+↓
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Model
+
+↓
+
+MongoDB
+
+↓
+
+Response
+
+### Implemented
+
+- Authentication module
+- Registration endpoint
+- Registration service
+- Duplicate email detection
+- User creation
+- Automatic password hashing
+- Standard API response
+- Successful registration flow
+- Duplicate registration handling
+
+### Endpoint
+
+POST `/api/v1/auth/register`
+
+### Tested
+
+- Successful user registration
+- Duplicate email registration
+- MongoDB persistence
+- Password hashing
+- Safe user serialization
+
+---
+
+## 🚧 Phase 6 — Authentication
+
+Next
+
+- Login endpoint
+- JWT utilities
+- Access tokens
+- Refresh tokens
+- Authentication middleware
+- Current user endpoint
+- Logout endpoint

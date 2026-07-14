@@ -188,3 +188,66 @@ Planned
 - Backend API
 - Real-time Collaboration
 - AI Features
+
+# Backend Request Flow
+
+```
+Incoming Request
+        │
+        ▼
+Express Router
+        │
+        ▼
+Controller
+        │
+        ▼
+Service
+        │
+        ▼
+Mongoose Model
+        │
+        ▼
+MongoDB
+        │
+        ▼
+Controller
+        │
+        ▼
+HTTP Response
+```
+
+## Current Backend Structure
+
+```
+src
+├── config
+│   ├── database.ts
+│   └── env.ts
+│
+├── controllers
+│   └── auth.controller.ts
+│
+├── middleware
+│   ├── error-handler.ts
+│   └── not-found.ts
+│
+├── models
+│   └── user.model.ts
+│
+├── routes
+│   ├── auth.routes.ts
+│   └── index.ts
+│
+├── services
+│   └── auth.service.ts
+│
+├── constants
+│   └── auth.ts
+│
+├── utils
+│   ├── api-response.ts
+│   ├── async-handler.ts
+│   └── app-error.ts
+│
+└── types
+```

@@ -22,17 +22,18 @@ Register / Login
  Hash refresh token (SHA-256)      → stored in MongoDB
        │
        ▼
- Client stores access token in memory (NOT localStorage)
+ Client stores access token in module memory (NOT localStorage)
  Client uses access token for API requests (Authorization: Bearer <token>)
        │
        ▼ (access token expires after 15m)
- POST /api/v1/auth/refresh
-   └── reads refresh token from HTTP-only cookie
+ Axios response interceptor detects 401
+   └── acquires refresh lock (one in-flight refresh at a time)
+   └── POST /api/v1/auth/refresh (HTTP-only cookie sent automatically)
    └── verifies JWT signature and expiry
    └── compares hash against stored hash in DB
    └── rotates: new refresh token issued, old one invalidated
    └── returns new access token in JSON
-   └── sets new refresh token cookie
+   └── interceptor stores new token, retries original request
        │
        ▼
  POST /api/v1/auth/logout
@@ -80,6 +81,63 @@ The refresh token cookie is scoped to `path: "/api/v1/auth"`, meaning the browse
 ### Generic Error Messages
 
 Authentication errors never specify whether the email exists, the password was wrong, or the account is inactive. All such failures return the same `"Invalid email or password."` or `"Authentication required."` message, preventing account enumeration attacks.
+
+---
+
+## Frontend Authentication Architecture
+
+### Token Storage
+
+| Token | Storage | Rationale |
+|---|---|---|
+| Access Token | Module-level variable in `services/axios.ts` | Not in Zustand, not in localStorage — survives re-renders, cleared on tab close |
+| Refresh Token | HTTP-only cookie (server-managed) | Inaccessible to JavaScript |
+| User object | Zustand (`store/auth.store.ts`) | Synchronous access for UI components |
+
+### Axios Token Manager
+
+`client/src/services/axios.ts` is the single point of truth for token management:
+
+```typescript
+// In module scope — never in React state or localStorage
+let accessToken: string | null = null;
+
+export function setAccessToken(token: string): void { ... }
+export function clearAccessToken(): void { ... }
+```
+
+The request interceptor attaches `Authorization: Bearer <token>` automatically. Components never construct headers manually.
+
+### Refresh Lock
+
+A module-level `Promise<string> | null` prevents multiple concurrent 401 responses from each triggering their own refresh call:
+
+```
+Request A → 401 → starts refresh promise
+Request B → 401 → awaits same promise
+Request C → 401 → awaits same promise
+Refresh resolves → all three retry with new token
+```
+
+### Bootstrap Flow
+
+Authentication initialization is centralized in a single `<AuthBootstrap>` component that wraps the application routes. On page load:
+
+1. `AuthBootstrap` mounts and calls `useCurrentUser()` (which calls `GET /auth/me`).
+2. If the access token is missing or expired, the Axios interceptor transparently calls `POST /auth/refresh`.
+3. When the network request completes (success or failure), `AuthBootstrap` calls `finishBootstrap()` in Zustand.
+4. Route guards (`ProtectedRoute`, `PublicRoute`) only render *after* `isBootstrapping` becomes false, reading purely from the Zustand store. They never trigger network requests.
+
+### State Management
+
+| Layer | Owns |
+|---|---|
+| AuthBootstrap | Application initialization, session restoration coordination |
+| React Query | Server state: user data, loading, caching, invalidation |
+| Zustand | UI state: `isBootstrapping`, `isAuthenticated`, `user: User \| null` |
+| Module memory | Access token: `let accessToken: string \| null` |
+
+Zustand is never used for tokens. React Query is never bypassed for user data fetching. Route guards never make network requests.
 
 ---
 
@@ -134,14 +192,6 @@ Creates a new user account.
 ### `POST /api/v1/auth/login`
 
 Authenticates a user, issues an access token (JSON) and refresh token (cookie).
-
-**Request body:**
-```json
-{
-  "email": "john@example.com",
-  "password": "password123"
-}
-```
 
 **Response (200):**
 ```json

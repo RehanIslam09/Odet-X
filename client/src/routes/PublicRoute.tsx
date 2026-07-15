@@ -3,22 +3,21 @@ import { Navigate, useLocation } from "react-router-dom";
 import { AppLoader } from "@/components/common/AppLoader";
 import { useAuthStore } from "@/store/auth.store";
 
-interface ProtectedRouteProps {
+interface PublicRouteProps {
   children: React.ReactNode;
 }
 
 /**
- * Route guard for authenticated routes.
+ * Route guard for public routes (e.g. login, register).
  *
  * Behavior:
  * - Reads `isAuthenticated` and `isBootstrapping` from Zustand.
  * - Does NOT trigger any network requests (AuthBootstrap handles that).
- * - If still bootstrapping (failsafe, though AuthBootstrap should prevent this),
- *   renders AppLoader.
- * - If not authenticated, redirects to login, preserving destination.
- * - Otherwise, renders the protected content.
+ * - If still bootstrapping (failsafe), renders AppLoader.
+ * - If authenticated, redirects to the dashboard (or intended destination).
+ * - Otherwise, renders the public content.
  */
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+export default function PublicRoute({ children }: PublicRouteProps) {
   const location = useLocation();
   const isBootstrapping = useAuthStore((s) => s.isBootstrapping);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -27,14 +26,10 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <AppLoader />;
   }
 
-  if (!isAuthenticated) {
-    return (
-      <Navigate
-        to="/auth/login"
-        state={{ from: location.pathname }}
-        replace
-      />
-    );
+  if (isAuthenticated) {
+    // If there's a `from` destination in state, return there, else go to `/`
+    const from = (location.state as { from?: string } | null)?.from ?? "/";
+    return <Navigate to={from} replace />;
   }
 
   return children;

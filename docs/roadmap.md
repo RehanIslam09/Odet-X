@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Current Phase:** Phase 7 — Production Authentication (complete)
+**Current Phase:** Phase 8 — Frontend Authentication (complete)
 
 **Branch:** `feat/authentication`
 
@@ -95,7 +95,7 @@
 
 ---
 
-## ✅ Phase 7 — Production Authentication
+## ✅ Phase 7 — Production Authentication (Backend)
 
 ### Security Hardening
 - Refresh tokens hashed with SHA-256 before DB storage (never stored plaintext)
@@ -111,28 +111,7 @@
 - Field-level error responses compatible with frontend form libraries
 - DTOs inferred from Zod schemas — single source of truth
 
-### New Endpoints
-- `POST /api/v1/auth/refresh` — token rotation
-- `POST /api/v1/auth/logout` — session invalidation
-
-### Error Handling Improvements
-- Error handler distinguishes operational vs programmer errors
-- Mongoose `ValidationError` and `CastError` handled gracefully
-- Duplicate key (11000) errors translated to 409
-- Only true unexpected errors logged to console
-
-### Code Quality
-- Removed empty `IUserModel` interface
-- `refreshTokenHash` field (renamed from `refreshToken`) with null semantics
-- `cookies.ts` uses centralized `env` config
-- Cookie `maxAge` derived from `REFRESH_TOKEN_MAX_AGE_MS` constant
-- `req.user` typed as optional in Express augmentation
-- Process-level unhandled rejection and uncaught exception handlers
-- Morgan uses `combined` in production, `dev` in development
-- Meaningful stubs for `lib/` clients (cloudinary, mailer, redis, openai)
-
 ### Endpoints
-
 | Method | Path | Auth | Status |
 |--------|------|------|--------|
 | POST | `/api/v1/auth/register` | None | ✅ |
@@ -143,44 +122,95 @@
 
 ---
 
-## 📋 Phase 8 — Project Management
+## ✅ Phase 8 — Frontend Authentication
+
+### Infrastructure
+- Centralized Axios client (`services/axios.ts`)
+  - Token manager (module-level memory, never localStorage)
+  - Request interceptor: auto-attach Authorization header
+  - Response interceptor: transparent token refresh on 401
+  - Refresh lock: prevents concurrent refresh calls
+  - Auto-logout on refresh failure
+- Environment variable setup (`VITE_API_URL`)
+
+### State Management
+- Zustand auth store (`store/auth.store.ts`)
+  - `user: User | null` — the only auth UI state
+  - `setUser()`, `clearUser()` actions
+  - No tokens ever stored in Zustand
+- React Query configuration tuned for auth
+  - `retry: false` for 401/403 responses
+  - `refetchOnWindowFocus: false`
+
+### API Layer
+- Typed auth API module (`features/auth/services/auth.api.ts`)
+  - `authApi.register()`, `authApi.login()`, `authApi.logout()`, `authApi.refresh()`, `authApi.me()`
+
+### React Query Hooks
+- `useCurrentUser()` — bootstrap hook, `staleTime: Infinity`, syncs Zustand
+- `useLogin()` — sets token in memory, populates Zustand and query cache
+- `useRegister()` — navigates to login on success
+- `useLogout()` — clears token, Zustand, query cache
+
+### Routing
+- `ProtectedRoute` — real auth check with `AppLoader` during bootstrap
+- `PublicRoute` — redirects authenticated users, `AppLoader` during bootstrap
+- Full route structure: `/`, `/auth/login`, `/auth/register`, `/session-expired`, `/unauthorized`
+
+### Forms
+- `LoginForm` — RHF + Zod, server error application, password toggle, accessibility
+- `RegisterForm` — RHF + Zod, server error application, password toggle, accessibility
+- `applyServerErrors()` — reusable utility for mapping server validation errors to RHF
+- `getApiError()` — reusable utility for extracting API error messages
+
+### UI
+- `AuthLayout` — two-column (brand panel 40% + form panel 60%), Framer Motion animations
+- `AppLoader` — full-screen bootstrap spinner
+- `LoginPage`, `RegisterPage`, `SessionExpiredPage`, `UnauthorizedPage`
+- `UserMenu` — wired to real user state and logout
+
+### Shared Types & Validators
+- `features/auth/types/auth.types.ts` — User, DTOs, response shapes
+- `features/auth/validators/auth.schemas.ts` — Zod v4 schemas, inferred types
+
+### Documentation
+- `docs/authentication.md` — updated with frontend architecture
+- `docs/architecture.md` — updated with token isolation, state layers, bootstrap flow
+- `docs/roadmap.md` — this file
+
+---
+
+## 📋 Phase 9 — Project Management
 
 - Project model (Mongoose)
 - CRUD endpoints
 - Member management
 - Project validation schemas
 - Project service layer
+- Project list page
+- Project create/edit forms
+- Project detail page
 
 ---
 
-## 📋 Phase 9 — Task Management
+## 📋 Phase 10 — Task Management
 
 - Task model
 - Kanban board data model
 - Drag & Drop ordering
 - Task CRUD endpoints
 - Due dates, priorities, labels
+- Kanban board UI
+- Task detail drawer
 
 ---
 
-## 📋 Phase 10 — AI Features
+## 📋 Phase 11 — AI Features
 
 - OpenAI client integration
 - AI task generation from project description
 - AI project planning / sprint estimation
 - Smart summaries of project activity
-
----
-
-## 📋 Phase 11 — Frontend Authentication
-
-- Login page (React Hook Form + Zod)
-- Register page
-- Forgot password page
-- Auth store (Zustand)
-- API integration with TanStack Query
-- Automatic token refresh (axios interceptor / fetch wrapper)
-- Protected routes
 
 ---
 
@@ -211,23 +241,3 @@
 - Redis for rate limiting and caching
 - Monitoring (Sentry)
 - Structured logging
-
-
-## ✅ Phase 4 — Backend Authentication
-
-Completed
-
-### Authentication
-
-- User registration
-- Login
-- Logout
-- JWT authentication
-- Refresh token rotation
-- HTTP-only cookie sessions
-- Protected routes
-- Current user endpoint
-- Validation middleware
-- Secure password hashing
-- Refresh token hashing
-- Global error handling

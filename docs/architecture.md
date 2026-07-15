@@ -18,30 +18,78 @@ The client uses a **feature-first** organization. Business logic belongs inside 
 ```
 client/src/
 ├── app/             # Application bootstrap (router, providers, QueryClient)
-├── components/      # Shared, reusable UI components (no business logic)
-├── features/        # Feature modules (auth, projects, tasks, settings)
+├── components/
+│   ├── common/      # Shared utility components (AppLoader, etc.)
+│   ├── layout/      # Layout shells (AuthLayout, DashboardLayout, etc.)
+│   └── ui/          # shadcn/ui primitive components
+├── features/        # Feature modules — all business logic lives here
 │   └── auth/
-│       ├── pages/
-│       ├── components/
-│       ├── hooks/
-│       ├── services/
-│       └── types/
-├── hooks/           # Shared custom hooks
-├── lib/             # Third-party library configuration
-├── providers/       # Global React context providers
-├── routes/          # Route definitions and guards
-├── services/        # Shared API client
-├── store/           # Zustand global state (client-only state)
+│       ├── components/   # LoginForm, RegisterForm
+│       ├── hooks/        # useCurrentUser, useLogin, useRegister, useLogout
+│       ├── pages/        # LoginPage, RegisterPage, SessionExpiredPage, UnauthorizedPage
+│       ├── services/     # auth.api.ts — HTTP calls only
+│       ├── types/        # auth.types.ts — User, DTOs, response shapes
+│       └── validators/   # auth.schemas.ts — Zod schemas
+├── hooks/           # Shared custom hooks (none yet)
+├── lib/             # Third-party library configuration (utils.ts)
+├── providers/       # Global providers (ThemeProvider)
+├── routes/          # Route guards (ProtectedRoute, PublicRoute)
+├── services/        # Centralized Axios client (axios.ts)
+├── store/           # Zustand stores (auth.store.ts)
 ├── styles/          # Global styles
-├── types/           # Shared TypeScript types
-└── utils/           # Shared utility functions
+├── types/           # Shared TypeScript types (none yet — feature types stay in features)
+└── utils/           # Shared utilities (api-error.ts, form-errors.ts)
 ```
 
-### State Management Principle
+### State Management
 
-- **React Query** owns all server state (caching, invalidation, loading states)
-- **Zustand** is used only for client-only state that is not derived from server data
-- Avoid duplicating server data in Zustand
+Four distinct layers own state — they never overlap:
+
+| Layer | Owns | Never Owns |
+|---|---|---|
+| **AuthBootstrap** | Initialization: coordinates exactly one session restoration on startup | UI State, Network fetching |
+| **React Query** | Server state: user data, loading, caching, invalidation, retry | Tokens, client UI state |
+| **Zustand** | Client UI state: `isBootstrapping`, `isAuthenticated`, `user: User \| null` | Tokens, server data cache |
+| **Module memory** | Access token: `let accessToken` in `services/axios.ts` | Anything else |
+
+### Key Principle: Token Isolation
+
+Access tokens live exclusively in a module-level variable inside `services/axios.ts`. They are:
+- Never stored in `localStorage` or `sessionStorage`
+- Never stored in Zustand
+- Never stored in React state
+- Never manually attached to requests by components
+
+The Axios request interceptor attaches the token to every request automatically.
+
+### Bootstrap Flow
+
+```
+Page load
+    │
+    ▼
+AuthBootstrap (mounted inside React Router)
+    │
+    ├── useCurrentUser() [React Query]
+    │       │
+    │       ├── GET /auth/me (access token in memory? attach it)
+    │       │
+    │       ├── 401 → Axios interceptor fires
+    │       │         ├── POST /auth/refresh (HTTP-only cookie sent by browser)
+    │       │         ├── success → store new token → retry GET /auth/me
+    │       │         └── failure → clearToken() → clearZustand() → reject
+    │       │
+    │       └── 200 → return user
+    │
+    └── finishBootstrap() → updates Zustand (isBootstrapping = false)
+            │
+            ▼
+        Route Guards (ProtectedRoute / PublicRoute) read Zustand
+            │
+            ├── if isBootstrapping → render AppLoader
+            ├── if unauthenticated → Navigate(/auth/login)
+            └── if authenticated   → Render children
+```
 
 ---
 
@@ -154,10 +202,11 @@ server/src/
 See [authentication.md](./authentication.md) for the full authentication documentation.
 
 **Summary:**
-- Access tokens: 15-minute JWT, returned in JSON body
+- Access tokens: 15-minute JWT, returned in JSON body, stored in module memory only
 - Refresh tokens: 7-day JWT, HTTP-only cookie only, stored as SHA-256 hash in DB
 - Full token rotation on every refresh
 - Reuse detection: suspected replay triggers logout of all sessions
+- Axios interceptor handles refresh transparently — components never see 401s
 
 ---
 
@@ -168,6 +217,9 @@ Refresh tokens are hashed with SHA-256 before persisting. A database breach does
 
 ### Never return refresh tokens in JSON
 The refresh token is set exclusively as an HTTP-only cookie with `path: "/api/v1/auth"`. JavaScript cannot read it.
+
+### Access tokens in module memory only
+The access token lives in a module-level variable (`let accessToken: string | null`), not in `localStorage`, `sessionStorage`, Zustand, or React state. It is cleared on page refresh and restored via the bootstrap flow.
 
 ### Generic authentication errors
 All auth failures return the same message. Attackers cannot distinguish "wrong password" from "account doesn't exist."
@@ -183,6 +235,68 @@ Even if a sensitive field is accidentally selected, the `toJSON` transform remov
 
 ---
 
+## Routing
+
+### Frontend Route Structure
+
+```
+/                           ← ProtectedRoute → DashboardLayout
+  /                         ← DashboardPage
+  /projects                 ← (Phase 8)
+  /tasks                    ← (Phase 9)
+  /settings                 ← (future)
+
+/auth                       ← PublicRoute → AuthLayout
+  /auth/login               ← LoginPage
+  /auth/register            ← RegisterPage
+
+/session-expired            ← SessionExpiredPage (no guard)
+/unauthorized               ← UnauthorizedPage (no guard)
+
+*                           ← NotFoundPage
+```
+
+Route guards:
+- `ProtectedRoute` — shows `AppLoader` during bootstrap, redirects to `/auth/login` if unauthenticated, preserves the original destination in location state
+- `PublicRoute` — shows `AppLoader` during bootstrap, redirects to `/` (or original destination) if already authenticated
+
+### Backend
+All routes are prefixed `/api/v1`. A root `index.ts` router mounts sub-routers:
+```
+/api/v1/health
+/api/v1/auth/*
+/api/v1/projects/*  (Phase 8)
+/api/v1/tasks/*     (Phase 9)
+```
+
+---
+
+## Adding Future Features
+
+When adding a new feature (projects, tasks, AI, billing), follow this pattern:
+
+### Backend
+1. Define model in `models/`
+2. Define Zod schemas in `validators/`
+3. Implement service in `services/`
+4. Implement controller in `controllers/`
+5. Define routes in `routes/`
+
+### Frontend
+```
+features/<name>/
+├── types/<name>.types.ts     # Response shapes, DTOs
+├── validators/<name>.schemas.ts  # Zod schemas
+├── services/<name>.api.ts    # API functions using apiClient
+├── hooks/                    # useQuery/useMutation wrappers
+├── components/               # Feature-specific UI
+└── pages/                    # Route-level components
+```
+
+The `apiClient` from `services/axios.ts` is used for all HTTP calls. Never import axios directly.
+
+---
+
 ## Git Workflow
 
 Every feature is developed in its own branch:
@@ -190,32 +304,13 @@ Every feature is developed in its own branch:
 ```
 main
 ├── feat/application-shell
-├── feat/authentication
+├── feat/authentication      ← current
 ├── feat/projects
 ├── feat/tasks
 └── feat/ai-features
 ```
 
 Small, focused commits. Each commit should leave the build in a working state.
-
----
-
-## Routing
-
-### Frontend
-Routes are centralized and use nested layouts:
-- `DashboardLayout` wraps all authenticated pages
-- `AuthLayout` wraps all unauthenticated pages
-- Route guards redirect unauthenticated users to login
-
-### Backend
-All routes are prefixed `/api/v1`. A root `index.ts` router mounts sub-routers:
-```
-/api/v1/health
-/api/v1/auth/*
-/api/v1/projects/*  (planned)
-/api/v1/tasks/*     (planned)
-```
 
 ---
 

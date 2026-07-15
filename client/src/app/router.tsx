@@ -9,7 +9,7 @@ import { AuthBootstrap } from "@/features/auth/components/AuthBootstrap";
 import ProtectedRoute from "@/routes/ProtectedRoute";
 import PublicRoute from "@/routes/PublicRoute";
 
-import DashboardPage from "@/features/dashboard/pages/DashboardPage";
+import ProjectsDashboardPage from "@/features/projects/pages/ProjectsDashboardPage";
 import LoginPage from "@/features/auth/pages/LoginPage";
 import RegisterPage from "@/features/auth/pages/RegisterPage";
 import SessionExpiredPage from "@/features/auth/pages/SessionExpiredPage";
@@ -22,8 +22,8 @@ import NotFoundPage from "@/features/not-found/pages/NotFoundPage";
  * Route structure:
  *
  * ```
- * /               → AuthBootstrap
- *                     ↳ ProtectedRoute → DashboardLayout → DashboardPage
+ * /               → AuthBootstrap → ProtectedRoute → DashboardLayout → ProjectsDashboardPage
+ * /projects       → AuthBootstrap → ProtectedRoute → DashboardLayout → ProjectsDashboardPage
  *
  * /auth           → AuthBootstrap
  *                     ↳ PublicRoute → AuthLayout
@@ -60,7 +60,8 @@ export const router = createBrowserRouter(
             </ProtectedRoute>
           }
         >
-          <Route index element={<DashboardPage />} />
+          <Route index element={<ProjectsDashboardPage />} />
+          <Route path="projects" element={<ProjectsDashboardPage />} />
         </Route>
 
         {/* Public — redirects to / if already authenticated */}

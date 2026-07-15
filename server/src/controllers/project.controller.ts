@@ -1,0 +1,149 @@
+import { Request, Response } from "express";
+import { Types } from "mongoose";
+
+import {
+  createProject,
+  deleteProject,
+  getProjectById,
+  listProjects,
+  toggleProjectArchive,
+  updateProject,
+} from "@/services/project.service.js";
+
+import { sendSuccessResponse } from "@/utils/api-response.js";
+import { asyncHandler } from "@/utils/async-handler.js";
+import { BadRequestError } from "@/utils/app-error.js";
+
+import type { ProjectQueryDto } from "@/validators/project.validator.js";
+
+function getRequiredProjectId(req: Request): string {
+  const id = req.params.id;
+
+  if (typeof id !== "string" || id.length === 0) {
+    throw new BadRequestError("Project id is required.");
+  }
+
+  if (!Types.ObjectId.isValid(id)) {
+    throw new BadRequestError("Invalid project id.");
+  }
+
+  return id;
+}
+
+/**
+ * The validateQuery middleware has already parsed, coerced and validated
+ * the query string. Controllers should trust that output instead of
+ * validating a second time.
+ */
+function getValidatedProjectQuery(req: Request): ProjectQueryDto {
+  return req.validatedQuery as ProjectQueryDto;
+}
+
+// ---------------------------------------------------------------------------
+// GET /projects
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a paginated list of projects for the authenticated user.
+ */
+export const list = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id.toString();
+  const query = getValidatedProjectQuery(req);
+
+  const result = await listProjects(userId, query);
+
+  sendSuccessResponse(res, {
+    message: "Projects retrieved successfully.",
+    data: {
+      items: result.items.map((project) => project.toJSON()),
+      pagination: result.pagination,
+    },
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /projects/:id
+// ---------------------------------------------------------------------------
+
+export const getOne = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id.toString();
+  const id = getRequiredProjectId(req);
+
+  const project = await getProjectById(id, userId);
+
+  sendSuccessResponse(res, {
+    message: "Project retrieved successfully.",
+    data: {
+      project: project.toJSON(),
+    },
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /projects
+// ---------------------------------------------------------------------------
+
+export const create = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id.toString();
+
+  const project = await createProject(userId, req.body);
+
+  sendSuccessResponse(res, {
+    statusCode: 201,
+    message: "Project created successfully.",
+    data: {
+      project: project.toJSON(),
+    },
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /projects/:id
+// ---------------------------------------------------------------------------
+
+export const update = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id.toString();
+  const id = getRequiredProjectId(req);
+
+  const project = await updateProject(id, userId, req.body);
+
+  sendSuccessResponse(res, {
+    message: "Project updated successfully.",
+    data: {
+      project: project.toJSON(),
+    },
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /projects/:id/archive
+// ---------------------------------------------------------------------------
+
+export const archive = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id.toString();
+  const id = getRequiredProjectId(req);
+
+  const project = await toggleProjectArchive(id, userId);
+
+  sendSuccessResponse(res, {
+    message: `Project ${project.archived ? "archived" : "unarchived"} successfully.`,
+    data: {
+      project: project.toJSON(),
+    },
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /projects/:id
+// ---------------------------------------------------------------------------
+
+export const remove = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id.toString();
+  const id = getRequiredProjectId(req);
+
+  await deleteProject(id, userId);
+
+  sendSuccessResponse(res, {
+    message: "Project deleted successfully.",
+  });
+});

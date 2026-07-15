@@ -1,57 +1,53 @@
 import {
   createBrowserRouter,
   createRoutesFromElements,
+  Outlet as RouteOutlet,
   Route,
 } from "react-router-dom";
 
 import { AuthLayout, DashboardLayout } from "@/components/layout";
 import { AuthBootstrap } from "@/features/auth/components/AuthBootstrap";
-import ProtectedRoute from "@/routes/ProtectedRoute";
-import PublicRoute from "@/routes/PublicRoute";
-
-import ProjectsDashboardPage from "@/features/projects/pages/ProjectsDashboardPage";
 import LoginPage from "@/features/auth/pages/LoginPage";
 import RegisterPage from "@/features/auth/pages/RegisterPage";
 import SessionExpiredPage from "@/features/auth/pages/SessionExpiredPage";
 import UnauthorizedPage from "@/features/auth/pages/UnauthorizedPage";
+import DashboardPage from "@/features/dashboard/pages/DashboardPage";
 import NotFoundPage from "@/features/not-found/pages/NotFoundPage";
+import ProjectsDashboardPage from "@/features/projects/pages/ProjectsDashboardPage";
+import ProtectedRoute from "@/routes/ProtectedRoute";
+import PublicRoute from "@/routes/PublicRoute";
 
 /**
- * Application router.
+ * Application Router
  *
- * Route structure:
+ * Protected Routes
+ * ├── /
+ * │     └── DashboardPage
+ * ├── /projects
+ * │     └── ProjectsDashboardPage
  *
- * ```
- * /               → AuthBootstrap → ProtectedRoute → DashboardLayout → ProjectsDashboardPage
- * /projects       → AuthBootstrap → ProtectedRoute → DashboardLayout → ProjectsDashboardPage
+ * Public Routes
+ * ├── /auth/login
+ * └── /auth/register
  *
- * /auth           → AuthBootstrap
- *                     ↳ PublicRoute → AuthLayout
- *                         ↳ LoginPage
- *                         ↳ RegisterPage
- *
- * /session-expired → SessionExpiredPage   (no guard — must be reachable when unauthed)
- * /unauthorized    → UnauthorizedPage     (no guard — reachable when authed or not)
- *
- * *               → NotFoundPage
- * ```
- *
- * Route Guards:
- * - `ProtectedRoute` redirects to /auth/login if unauthed.
- * - `PublicRoute` redirects to / if already authed.
- * - Neither guard triggers network requests; they only read Zustand state.
- *
- * AuthBootstrap:
- * - Wraps all main routes.
- * - Fetches session once on startup.
- * - Renders AppLoader until the network request completes.
+ * Utility Routes
+ * ├── /session-expired
+ * ├── /unauthorized
+ * └── *
  */
+
 export const router = createBrowserRouter(
   createRoutesFromElements(
     <>
-      {/* Root layout for authenticated and public routes that need session state */}
-      <Route element={<AuthBootstrap><RouteOutlet /></AuthBootstrap>}>
-        {/* Protected — requires authentication */}
+      {/* Bootstrap authentication once for the entire app */}
+      <Route
+        element={
+          <AuthBootstrap>
+            <RouteOutlet />
+          </AuthBootstrap>
+        }
+      >
+        {/* Protected application */}
         <Route
           path="/"
           element={
@@ -60,11 +56,20 @@ export const router = createBrowserRouter(
             </ProtectedRoute>
           }
         >
-          <Route index element={<ProjectsDashboardPage />} />
-          <Route path="projects" element={<ProjectsDashboardPage />} />
+          {/* AI Dashboard */}
+          <Route
+            index
+            element={<DashboardPage />}
+          />
+
+          {/* Projects */}
+          <Route
+            path="projects"
+            element={<ProjectsDashboardPage />}
+          />
         </Route>
 
-        {/* Public — redirects to / if already authenticated */}
+        {/* Public authentication */}
         <Route
           path="auth"
           element={
@@ -73,20 +78,34 @@ export const router = createBrowserRouter(
             </PublicRoute>
           }
         >
-          <Route path="login" element={<LoginPage />} />
-          <Route path="register" element={<RegisterPage />} />
+          <Route
+            path="login"
+            element={<LoginPage />}
+          />
+
+          <Route
+            path="register"
+            element={<RegisterPage />}
+          />
         </Route>
       </Route>
 
-      {/* Utility pages — no route guard, bypasses AuthBootstrap */}
-      <Route path="session-expired" element={<SessionExpiredPage />} />
-      <Route path="unauthorized" element={<UnauthorizedPage />} />
+      {/* Unguarded pages */}
+      <Route
+        path="session-expired"
+        element={<SessionExpiredPage />}
+      />
 
-      {/* 404 fallback */}
-      <Route path="*" element={<NotFoundPage />} />
+      <Route
+        path="unauthorized"
+        element={<UnauthorizedPage />}
+      />
+
+      {/* 404 */}
+      <Route
+        path="*"
+        element={<NotFoundPage />}
+      />
     </>,
   ),
 );
-
-// We need an Outlet for the AuthBootstrap route wrapper
-import { Outlet as RouteOutlet } from "react-router-dom";

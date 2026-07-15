@@ -5,25 +5,31 @@ import { Toaster } from "sonner";
 
 import { queryClient } from "@/app/query-client";
 import { router } from "@/app/router";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 
 /**
  * Root application providers.
  *
  * Provider order (outer → inner):
- * 1. `QueryClientProvider` — React Query must wrap everything that uses queries.
- * 2. `ThemeProvider` — next-themes applies the theme class before paint.
- * 3. `RouterProvider` — renders the active route tree.
- * 4. `Toaster` — Sonner toast container, rendered outside the router so
- *    toasts persist across route navigations.
- * 5. `ReactQueryDevtools` — dev-only, no production bundle impact.
+ * 1. QueryClientProvider
+ * 2. ThemeProvider
+ * 3. TooltipProvider
+ * 4. RouterProvider
+ * 5. Toaster
+ * 6. ReactQueryDevtools
  */
 export function AppProviders() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <RouterProvider router={router} />
-        <Toaster richColors position="top-right" />
+        <TooltipProvider delayDuration={150}>
+          <RouterProvider router={router} />
+          <Toaster
+            richColors
+            position="top-right"
+          />
+        </TooltipProvider>
       </ThemeProvider>
 
       <ReactQueryDevtools initialIsOpen={false} />

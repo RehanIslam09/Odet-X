@@ -13,6 +13,13 @@ declare global {
        * is guaranteed to have run.
        */
       user?: IUserDocument;
+
+      /**
+       * Set by query validation middleware after parsing and coercing
+       * `req.query`. Express 5 exposes `req.query` as read-only, so validated
+       * query data lives here instead.
+       */
+      validatedQuery?: unknown;
     }
   }
 }

@@ -1,0 +1,45 @@
+import { Router } from "express";
+
+import {
+  archive,
+  create,
+  getOne,
+  list,
+  remove,
+  update,
+} from "@/controllers/task.controller.js";
+
+import { authenticate } from "@/middleware/auth.middleware.js";
+import { validate } from "@/middleware/validate.js";
+import { validateQuery } from "@/middleware/validate-query.js";
+
+import {
+  createTaskSchema,
+  taskQuerySchema,
+  updateTaskSchema,
+} from "@/validators/task.validator.js";
+
+const router = Router();
+
+// Enforce authentication for all task endpoints
+router.use(authenticate);
+
+// ---------------------------------------------------------------------------
+// Collection
+// ---------------------------------------------------------------------------
+router.get("/", validateQuery(taskQuerySchema), list);
+router.post("/", validate(createTaskSchema), create);
+
+// ---------------------------------------------------------------------------
+// Member
+// ---------------------------------------------------------------------------
+router.get("/:id", getOne);
+router.patch("/:id", validate(updateTaskSchema), update);
+router.delete("/:id", remove);
+
+// ---------------------------------------------------------------------------
+// Sub-actions
+// ---------------------------------------------------------------------------
+router.post("/:id/archive", archive);
+
+export default router;

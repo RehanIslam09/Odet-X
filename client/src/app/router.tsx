@@ -14,6 +14,7 @@ import UnauthorizedPage from "@/features/auth/pages/UnauthorizedPage";
 import DashboardPage from "@/features/dashboard/pages/DashboardPage";
 import NotFoundPage from "@/features/not-found/pages/NotFoundPage";
 import ProjectsDashboardPage from "@/features/projects/pages/ProjectsDashboardPage";
+import SettingsPage from "@/features/settings/pages/SettingsPage";
 import TasksPage from "@/features/tasks/pages/TasksPage";
 import ProtectedRoute from "@/routes/ProtectedRoute";
 import PublicRoute from "@/routes/PublicRoute";
@@ -73,6 +74,12 @@ export const router = createBrowserRouter(
           <Route
             path="tasks"
             element={<TasksPage />}
+          />
+
+          {/* Settings */}
+          <Route
+            path="settings"
+            element={<SettingsPage />}
           />
         </Route>
 

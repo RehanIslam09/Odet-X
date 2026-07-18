@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { authApi } from "@/features/auth/services/auth.api";
 import { useAuthStore } from "@/store/auth.store";
 import type { User } from "@/features/auth/types/auth.types";
+import { getAccessToken, setAccessToken } from "@/services/axios";
 
 // ---------------------------------------------------------------------------
 // Query Key Factory
@@ -23,11 +24,9 @@ export const authKeys = {
  * Bootstrap and session persistence hook.
  *
  * This is the single call responsible for restoring the user's session on
- * every page load. It calls `GET /auth/me` once per session.
- *
- * The Axios interceptor transparently handles the case where the access
- * token is expired: it calls `POST /auth/refresh` (using the HTTP-only
- * cookie) and retries the original request automatically.
+ * every page load. It first checks for an in-memory access token. If none
+ * exists, it proactively attempts to refresh the session before calling
+ * `GET /auth/me`. This eliminates unnecessary 401s on the `/auth/me` endpoint.
  *
  * Configuration:
  * - `staleTime: Infinity` — the session never goes stale on its own.
@@ -46,14 +45,47 @@ export const authKeys = {
 export function useCurrentUser() {
   const setUser = useAuthStore((s) => s.setUser);
 
-  return useQuery<User>({
+  return useQuery<User | null>({
     queryKey: authKeys.me(),
     queryFn: async () => {
-      const { user } = await authApi.me();
-      // Sync the user into Zustand so components can read it synchronously
-      // without re-triggering this query.
-      setUser(user);
-      return user;
+      let token = getAccessToken();
+
+      // If we don't have an access token (e.g. initial load or refresh),
+      // proactively attempt to get one using the HTTP-only refresh cookie.
+      if (!token) {
+        try {
+          const res = await authApi.refresh();
+          if (res.accessToken) {
+            setAccessToken(res.accessToken);
+            token = res.accessToken;
+          }
+        } catch {
+          // A 401 here is completely expected for logged-out users.
+          // Swallow the error, clear any stale state, and return null.
+          useAuthStore.getState().clearUser();
+          return null;
+        }
+      }
+
+      // If we STILL don't have a token, the user is logged out.
+      if (!token) {
+        useAuthStore.getState().clearUser();
+        return null;
+      }
+
+      // We have a token, so fetch the user profile.
+      try {
+        const { user } = await authApi.me();
+        // Sync the user into Zustand so components can read it synchronously
+        // without re-triggering this query.
+        setUser(user);
+        return user;
+      } catch {
+        // If /auth/me fails (e.g. token immediately expired and refresh failed),
+        // clear the state and throw the error so React Query handles it.
+        useAuthStore.getState().clearUser();
+        throw new Error("Failed to fetch user");
+      }
     },
     staleTime: Infinity,
     gcTime: Infinity,

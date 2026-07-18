@@ -14,14 +14,13 @@ import { useProjects } from "@/features/projects/hooks";
 export function ProductivityOverview() {
   const { data, isLoading } = useProjects();
 
-  const projects = data?.items ?? [];
-
   const { active, archived } = useMemo(() => {
+    const projects = data?.items ?? [];
     return {
       active: projects.filter((project) => !project.archived).length,
       archived: projects.filter((project) => project.archived).length,
     };
-  }, [projects]);
+  }, [data?.items]);
 
   return (
     <div className="flex h-full flex-col rounded-xl border bg-card p-6 shadow-sm">

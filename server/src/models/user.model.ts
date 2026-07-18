@@ -14,6 +14,7 @@ export interface IUser {
   name: string;
   email: string;
   password: string;
+  username: string;
 
   avatar?: string;
   bio?: string;
@@ -28,6 +29,25 @@ export interface IUser {
   isEmailVerified: boolean;
   isActive: boolean;
 
+  preferences: {
+    appearance: {
+      theme: "light" | "dark" | "system";
+      density: "comfortable" | "compact";
+    };
+    locale: {
+      timezone: string;
+      language: string;
+      dateFormat: string;
+    };
+    notifications: {
+      emailNotifications: boolean;
+      desktopNotifications: boolean;
+      weeklyAiSummary: boolean;
+      projectActivity: boolean;
+      taskReminders: boolean;
+    };
+  };
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +55,60 @@ export interface IUser {
 export interface IUserDocument extends IUser, Document {
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
+
+const preferencesSchema = new Schema(
+  {
+    appearance: {
+      theme: {
+        type: String,
+        enum: ["light", "dark", "system"],
+        default: "system",
+      },
+      density: {
+        type: String,
+        enum: ["comfortable", "compact"],
+        default: "comfortable",
+      },
+    },
+    locale: {
+      timezone: {
+        type: String,
+        default: "Asia/Kolkata",
+      },
+      language: {
+        type: String,
+        default: "en",
+      },
+      dateFormat: {
+        type: String,
+        default: "DD/MM/YYYY",
+      },
+    },
+    notifications: {
+      emailNotifications: {
+        type: Boolean,
+        default: true,
+      },
+      desktopNotifications: {
+        type: Boolean,
+        default: false,
+      },
+      weeklyAiSummary: {
+        type: Boolean,
+        default: true,
+      },
+      projectActivity: {
+        type: Boolean,
+        default: true,
+      },
+      taskReminders: {
+        type: Boolean,
+        default: true,
+      },
+    },
+  },
+  { _id: false }
+);
 
 const userSchema = new Schema<IUserDocument>(
   {
@@ -55,6 +129,17 @@ const userSchema = new Schema<IUserDocument>(
       trim: true,
     },
 
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+      lowercase: true,
+      trim: true,
+      minlength: 3,
+      maxlength: 20,
+    },
+
     password: {
       type: String,
       required: true,
@@ -72,6 +157,11 @@ const userSchema = new Schema<IUserDocument>(
       type: String,
       default: "",
       maxlength: MAX_BIO_LENGTH,
+    },
+
+    preferences: {
+      type: preferencesSchema,
+      default: () => ({}),
     },
 
     refreshTokenHash: {

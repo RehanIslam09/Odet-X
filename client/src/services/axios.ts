@@ -22,6 +22,13 @@ import type { ApiErrorResponse, RefreshResponseData } from "@/features/auth/type
 let accessToken: string | null = null;
 
 /**
+ * Retrieve the current access token.
+ */
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
+/**
  * Store a new access token in memory.
  * Called by the login hook and the refresh interceptor.
  */

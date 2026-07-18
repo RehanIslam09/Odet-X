@@ -20,10 +20,29 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  username: string;
   avatar: string;
   bio: string;
   isEmailVerified: boolean;
   isActive: boolean;
+  preferences: {
+    appearance: {
+      theme: "light" | "dark" | "system";
+      density: "comfortable" | "compact";
+    };
+    locale: {
+      timezone: string;
+      language: string;
+      dateFormat: string;
+    };
+    notifications: {
+      emailNotifications: boolean;
+      desktopNotifications: boolean;
+      weeklyAiSummary: boolean;
+      projectActivity: boolean;
+      taskReminders: boolean;
+    };
+  };
   createdAt: string;
   updatedAt: string;
 }

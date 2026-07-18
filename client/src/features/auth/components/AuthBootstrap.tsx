@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useTheme } from "next-themes";
 
 import { useCurrentUser } from "@/features/auth/hooks";
 import { useAuthStore } from "@/store/auth.store";
@@ -27,7 +28,15 @@ interface AuthBootstrapProps {
 export function AuthBootstrap({ children }: AuthBootstrapProps) {
   const { isLoading } = useCurrentUser();
   const isBootstrapping = useAuthStore((s) => s.isBootstrapping);
+  const userTheme = useAuthStore((s) => s.user?.preferences?.appearance?.theme);
   const finishBootstrap = useAuthStore((s) => s.finishBootstrap);
+  const { setTheme } = useTheme();
+
+  useEffect(() => {
+    if (userTheme) {
+      setTheme(userTheme);
+    }
+  }, [userTheme, setTheme]);
 
   useEffect(() => {
     // When React Query finishes loading (success or failure),

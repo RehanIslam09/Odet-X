@@ -1,5 +1,6 @@
 import { ChevronDown, LogOut, Settings, User } from "lucide-react";
 import { Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -65,14 +66,18 @@ export default function UserMenu() {
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem>
-          <User className="mr-2 h-4 w-4" />
-          Profile
+        <DropdownMenuItem asChild>
+          <Link to="/settings" className="w-full cursor-pointer flex items-center">
+            <User className="mr-2 h-4 w-4" />
+            Profile
+          </Link>
         </DropdownMenuItem>
 
-        <DropdownMenuItem>
-          <Settings className="mr-2 h-4 w-4" />
-          Settings
+        <DropdownMenuItem asChild>
+          <Link to="/settings" className="w-full cursor-pointer flex items-center">
+            <Settings className="mr-2 h-4 w-4" />
+            Settings
+          </Link>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />

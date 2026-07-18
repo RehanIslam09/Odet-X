@@ -22,7 +22,28 @@ export async function registerUser(data: RegisterUserDto) {
     throw new ConflictError("Email is already registered.");
   }
 
-  const user = await User.create(data);
+  // Generate collision-safe unique username in the service layer
+  const baseUsername = (data.email.split("@")[0] || "").toLowerCase().replace(/[^a-z0-9_]/g, "");
+  const candidate = baseUsername || "user";
+
+  let isUnique = false;
+  let counter = 1;
+  let username = candidate;
+
+  while (!isUnique) {
+    const existing = await User.findOne({ username });
+    if (!existing) {
+      isUnique = true;
+    } else {
+      counter++;
+      username = `${candidate}_${counter}`;
+    }
+  }
+
+  const user = await User.create({
+    ...data,
+    username,
+  });
 
   return user.toJSON();
 }

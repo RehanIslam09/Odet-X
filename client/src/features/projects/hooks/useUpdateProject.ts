@@ -22,6 +22,7 @@ export function useUpdateProject() {
     onSuccess: (_data, { id }) => {
       queryClient.invalidateQueries({ queryKey: projectKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: projectKeys.options() });
 
       toast.success("Project updated successfully.");
     },

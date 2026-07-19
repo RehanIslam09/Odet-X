@@ -4,6 +4,8 @@ import {
   archive,
   create,
   getOne,
+  getOptions,
+  getSummary,
   list,
   remove,
   update,
@@ -38,8 +40,14 @@ router.post("/", validate(createProjectSchema), create);
 // Member
 // ---------------------------------------------------------------------------
 
+// GET /projects/options
+router.get("/options", getOptions);
+
 // GET /projects/:id
 router.get("/:id", getOne);
+
+// GET /projects/:id/summary
+router.get("/:id/summary", getSummary);
 
 // PATCH /projects/:id
 router.patch("/:id", validate(updateProjectSchema), update);

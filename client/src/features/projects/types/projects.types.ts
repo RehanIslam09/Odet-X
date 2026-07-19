@@ -16,14 +16,21 @@
  */
 export interface Project {
   id: string;
-  owner: string;
   name: string;
   description: string;
   emoji: string;
   color: string;
   archived: boolean;
+  owner: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProjectOption {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,4 +88,13 @@ export interface ProjectResponseData {
 export interface ProjectsListResponseData {
   items: Project[];
   pagination: PaginationMeta;
+}
+
+export interface ProjectSummaryData {
+  total: number;
+  completed: number;
+  inProgress: number;
+  remaining: number;
+  overdue: number;
+  completionPercentage: number;
 }

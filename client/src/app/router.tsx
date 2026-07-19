@@ -14,6 +14,7 @@ import UnauthorizedPage from "@/features/auth/pages/UnauthorizedPage";
 import DashboardPage from "@/features/dashboard/pages/DashboardPage";
 import NotFoundPage from "@/features/not-found/pages/NotFoundPage";
 import ProjectsDashboardPage from "@/features/projects/pages/ProjectsDashboardPage";
+import ProjectDetailPage from "@/features/projects/pages/ProjectDetailPage";
 import SettingsPage from "@/features/settings/pages/SettingsPage";
 import TasksPage from "@/features/tasks/pages/TasksPage";
 import ProtectedRoute from "@/routes/ProtectedRoute";
@@ -67,8 +68,10 @@ export const router = createBrowserRouter(
           {/* Projects */}
           <Route
             path="projects"
-            element={<ProjectsDashboardPage />}
-          />
+          >
+            <Route index element={<ProjectsDashboardPage />} />
+            <Route path=":projectId" element={<ProjectDetailPage />} />
+          </Route>
 
           {/* Tasks */}
           <Route

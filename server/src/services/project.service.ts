@@ -1,4 +1,4 @@
-import { SortOrder, Types } from "mongoose";
+import mongoose, { SortOrder, Types } from "mongoose";
 
 import Project, { IProjectDocument } from "@/models/project.model.js";
 
@@ -55,15 +55,12 @@ async function assertProjectOwnership(
 ): Promise<IProjectDocument> {
   const project = await Project.findOne({
     _id: projectId,
+    owner: new Types.ObjectId(userId),
     isDeleted: false,
   });
 
   if (!project) {
     throw new NotFoundError("Project not found.");
-  }
-
-  if (project.owner.toString() !== userId) {
-    throw new ForbiddenError("You do not have access to this project.");
   }
 
   return project;
@@ -249,4 +246,143 @@ export async function deleteProject(
 
   project.isDeleted = true;
   await project.save();
+
+  // Phase 12.3: Lifecycle Policy - Unassign Tasks on Project Deletion
+  // This operation is performed sequentially. Transactions are avoided 
+  // to support standalone MongoDB deployments.
+  const TaskModel = mongoose.model("Task");
+  await TaskModel.updateMany(
+    {
+      projectId: project._id,
+      owner: new Types.ObjectId(userId), // Strict security scope
+      isDeleted: false,
+    },
+    {
+      $set: { projectId: null },
+    }
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Options
+// ---------------------------------------------------------------------------
+
+/**
+ * Retrieves a lightweight, unpaginated list of active projects for dropdown selectors.
+ * Excludes soft-deleted and archived projects.
+ * Returns only id, name, emoji, and color.
+ * Sorts alphabetically by name.
+ */
+export async function getProjectOptions(userId: string) {
+  const ProjectModel = mongoose.model("Project");
+
+  const projects = await ProjectModel.find(
+    {
+      owner: new Types.ObjectId(userId),
+      isDeleted: false,
+      archived: false,
+    },
+    // Projection: _id is included by default and mapped to id in the transform,
+    // but we explicitly select the fields we need. owner and other fields are excluded.
+    "name emoji color"
+  )
+    .sort({ name: 1 })
+    .exec();
+
+  // Mongoose documents need to be mapped to match the DTO expectations
+  // We use the same toJSON transform to ensure consistent `id` mapping
+  return projects.map((p) => {
+    const doc = p.toJSON();
+    return {
+      id: doc.id,
+      name: doc.name,
+      emoji: doc.emoji,
+      color: doc.color,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Summary
+// ---------------------------------------------------------------------------
+
+/**
+ * Calculates real-time progress metrics for a project using MongoDB Aggregation.
+ * Excludes soft-deleted and archived tasks from the LIVE workspace metrics.
+ */
+export async function getProjectSummary(
+  projectId: string,
+  userId: string,
+) {
+  // 1. Establish strict authorization boundary (404 on cross-tenant/non-existent)
+  await assertProjectOwnership(projectId, userId);
+
+  const TaskModel = mongoose.model("Task");
+  
+  // 2. Perform aggregation
+  const summary = await TaskModel.aggregate([
+    {
+      // Efficiently uses existing index: { owner: 1, isDeleted: 1, archived: 1, projectId: 1, updatedAt: -1 }
+      $match: {
+        projectId: new Types.ObjectId(projectId),
+        owner: new Types.ObjectId(userId),
+        isDeleted: false,
+        archived: false, // Live metrics exclude archived tasks
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+        completed: { $sum: { $cond: [{ $eq: ["$status", "done"] }, 1, 0] } },
+        inProgress: { $sum: { $cond: [{ $eq: ["$status", "in_progress"] }, 1, 0] } },
+        cancelled: { $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0] } },
+        overdue: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $ne: ["$dueDate", null] },
+                  { $lt: ["$dueDate", new Date()] },
+                  { $ne: ["$status", "done"] },
+                  { $ne: ["$status", "cancelled"] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ]);
+
+  // 3. Fallback for zero-task projects
+  if (summary.length === 0) {
+    return {
+      total: 0,
+      completed: 0,
+      inProgress: 0,
+      remaining: 0,
+      overdue: 0,
+      completionPercentage: 0,
+    };
+  }
+
+  // 4. Derived metrics (remaining and percentage)
+  const s = summary[0];
+  const remaining = s.total - s.completed - s.cancelled;
+  const actionableTotal = s.total - s.cancelled;
+  
+  // Guard against divide-by-zero if all tasks are cancelled
+  const completionPercentage = actionableTotal > 0 ? (s.completed / actionableTotal) * 100 : 0;
+
+  return {
+    total: s.total,
+    completed: s.completed,
+    inProgress: s.inProgress,
+    remaining,
+    overdue: s.overdue,
+    completionPercentage: Math.round(completionPercentage),
+  };
 }

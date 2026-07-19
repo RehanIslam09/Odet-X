@@ -3,12 +3,13 @@ import { toast } from "sonner";
 
 import { tasksApi } from "@/features/tasks/services/tasks.api.js";
 import { taskKeys } from "@/features/tasks/hooks/useTasks.js";
+import { projectKeys } from "@/features/projects/hooks/useProjects.js";
 
 /**
  * Create task mutation hook.
  *
  * On success: invalidates all task lists so the new task appears immediately
- * without a manual page refresh.
+ * without a manual page refresh. Also invalidates project summary if applicable.
  */
 export function useCreateTask() {
   const queryClient = useQueryClient();
@@ -16,9 +17,15 @@ export function useCreateTask() {
   return useMutation({
     mutationFn: tasksApi.create,
 
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Invalidate list queries to display the newly created task
       queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
+      
+      // Phase 12.3: Invalidate project summary if this task belongs to a project
+      if (data.task.projectId) {
+        queryClient.invalidateQueries({ queryKey: projectKeys.summary(data.task.projectId) });
+      }
+      
       toast.success("Task created successfully.");
     },
 

@@ -55,15 +55,12 @@ async function assertProjectOwnership(
 ): Promise<IProjectDocument> {
   const project = await Project.findOne({
     _id: projectId,
+    owner: new Types.ObjectId(userId),
     isDeleted: false,
   });
 
   if (!project) {
     throw new NotFoundError("Project not found.");
-  }
-
-  if (project.owner.toString() !== userId) {
-    throw new ForbiddenError("You do not have access to this project.");
   }
 
   return project;

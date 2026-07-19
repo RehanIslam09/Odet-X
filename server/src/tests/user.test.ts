@@ -142,7 +142,7 @@ async function runTests() {
     console.log("\n>> Running Profile Updates & Unique checks...");
 
     // Perform a valid profile change
-    const updatedA = await updateUserProfile(userA.id as string, {
+    const updatedA = await updateUserProfile((userA as any).id as string, {
       name: "Johnathan Doe",
       username: "john_doe_new",
       bio: "Full stack developer.",
@@ -154,7 +154,7 @@ async function runTests() {
     // Try to update userB to username "john_doe_new" (should fail due to uniqueness)
     let updateConflictBlocked = false;
     try {
-      await updateUserProfile(userB.id as string, {
+      await updateUserProfile((userB as any).id as string, {
         name: userB.name as string,
         username: "john_doe_new",
         bio: (userB.bio as string) || "",
@@ -166,7 +166,7 @@ async function runTests() {
     expect(updateConflictBlocked, "Blocks non-unique username updates");
 
     // Update with same username (should succeed, since user owns it)
-    const updatedASelf = await updateUserProfile(userA.id as string, {
+    const updatedASelf = await updateUserProfile((userA as any).id as string, {
       name: "Johnathan Doe",
       username: "john_doe_new",
       bio: "Self update.",
@@ -182,7 +182,7 @@ async function runTests() {
     expect(userA.preferences.locale.timezone === "Asia/Kolkata", "Default locale timezone initialized");
 
     // Patch theme preference only
-    const updatedPrefTheme = await updateUserPreferences(userA.id as string, {
+    const updatedPrefTheme = await updateUserPreferences((userA as any).id as string, {
       preferences: {
         appearance: { theme: "dark" },
       },
@@ -191,7 +191,7 @@ async function runTests() {
     expect(updatedPrefTheme.preferences.locale.timezone === "Asia/Kolkata", "Preserves timezone locale preference during theme update");
 
     // Patch timezone preference only
-    const updatedPrefTimezone = await updateUserPreferences(userA.id as string, {
+    const updatedPrefTimezone = await updateUserPreferences((userA as any).id as string, {
       preferences: {
         locale: { timezone: "America/New_York", language: "en", dateFormat: "YYYY-MM-DD" },
       },
@@ -200,7 +200,7 @@ async function runTests() {
     expect(updatedPrefTimezone.preferences.appearance.theme === "dark", "Preserves theme preference during timezone update");
 
     // Patch notifications only
-    const updatedPrefNotif = await updateUserPreferences(userA.id as string, {
+    const updatedPrefNotif = await updateUserPreferences((userA as any).id as string, {
       preferences: {
         notifications: { emailNotifications: false, desktopNotifications: true, weeklyAiSummary: false, projectActivity: true, taskReminders: false },
       },
@@ -217,7 +217,7 @@ async function runTests() {
     // Try to update password with incorrect current password (should fail)
     let passwordCheckBlocked = false;
     try {
-      await changeUserPassword(userA.id as string, {
+      await changeUserPassword((userA as any).id as string, {
         currentPassword: "wrong_current_password",
         newPassword: "NewSuperPassword123!",
         confirmPassword: "NewSuperPassword123!",
@@ -236,11 +236,11 @@ async function runTests() {
     expect(loginRes.accessToken !== undefined, "Successful login outputs active access token");
     
     // Check that refresh token hash is active in database
-    const userInDbBefore = await User.findById(userA.id as string).select("+refreshTokenHash");
+    const userInDbBefore = await User.findById((userA as any).id as string).select("+refreshTokenHash");
     expect(userInDbBefore?.refreshTokenHash !== null, "User has active refresh token hash in DB");
 
     // Perform successful password update
-    const passwordUpdateRes = await changeUserPassword(userA.id as string, {
+    const passwordUpdateRes = await changeUserPassword((userA as any).id as string, {
       currentPassword: "password123!",
       newPassword: "NewSuperPassword123!",
       confirmPassword: "NewSuperPassword123!",
@@ -248,7 +248,7 @@ async function runTests() {
     expect(passwordUpdateRes.success === true, "Successfully updates password");
 
     // Check that refresh token hash has been invalidated (set to null)
-    const userInDbAfter = await User.findById(userA.id as string).select("+refreshTokenHash");
+    const userInDbAfter = await User.findById((userA as any).id as string).select("+refreshTokenHash");
     expect(userInDbAfter?.refreshTokenHash === null, "Password update clears the stored refresh token hash in DB");
 
     // Verify user can login with new password

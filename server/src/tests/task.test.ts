@@ -182,7 +182,7 @@ async function runTests() {
       });
     } catch (err: any) {
       crossProjectFailed = true;
-      expect(err.name === "ForbiddenError", "Rejects assigning task to another user's project");
+      expect(err.name === "NotFoundError", "Rejects assigning task to another user's project (not found)");
     }
     expect(crossProjectFailed, "Ownership check blocks cross-project task injection");
 
@@ -197,9 +197,7 @@ async function runTests() {
       await getTaskById(taskB1._id.toString(), userA._id.toString());
     } catch (err: any) {
       enumerationBlocked = true;
-      expect(err.name === "ForbiddenError" || err.name === "NotFoundError", "Refuses to leak User B's task details");
-      // Prevent resource enumeration
-      expect(err.statusCode === 403 || err.statusCode === 404, "Returns secure HTTP error code for unauthorized task access");
+      expect(err.name === "NotFoundError", "Refuses to leak User B's task details");
     }
     expect(enumerationBlocked, "Security boundary prevents cross-user task retrieval");
 
@@ -211,9 +209,38 @@ async function runTests() {
       });
     } catch (err: any) {
       crossProjectUpdateBlocked = true;
-      expect(err.name === "ForbiddenError", "Rejects updating task to point to unauthorized project");
+      expect(err.name === "NotFoundError", "Rejects updating task to point to unauthorized project (not found)");
     }
     expect(crossProjectUpdateBlocked, "Security boundary prevents changing tasks to unauthorized projects");
+
+    // Assigning to a non-existent project
+    let nonExistentProjectBlocked = false;
+    try {
+      await updateTask(taskA1._id.toString(), userA._id.toString(), {
+        projectId: new Types.ObjectId().toString(),
+      });
+    } catch (err: any) {
+      nonExistentProjectBlocked = true;
+      expect(err.name === "NotFoundError", "Rejects assigning task to non-existent project (not found)");
+    }
+    expect(nonExistentProjectBlocked, "Security boundary prevents assigning tasks to non-existent projects");
+
+    // Assigning to a soft-deleted project
+    const projectC = await Project.create({
+      name: "Project C",
+      owner: userA._id,
+      isDeleted: true,
+    });
+    let softDeletedProjectBlocked = false;
+    try {
+      await updateTask(taskA1._id.toString(), userA._id.toString(), {
+        projectId: projectC._id.toString(),
+      });
+    } catch (err: any) {
+      softDeletedProjectBlocked = true;
+      expect(err.name === "NotFoundError", "Rejects assigning task to soft-deleted project (not found)");
+    }
+    expect(softDeletedProjectBlocked, "Security boundary prevents assigning tasks to soft-deleted projects");
 
     // Query listings (Search & Filtering)
     const taskA2 = await createTask(userA._id.toString(), {

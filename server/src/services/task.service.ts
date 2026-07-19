@@ -46,15 +46,12 @@ async function validateProjectOwnership(
 ): Promise<void> {
   const project = await Project.findOne({
     _id: projectId,
+    owner: new Types.ObjectId(userId),
     isDeleted: false,
   });
 
   if (!project) {
-    throw new NotFoundError("Referenced project not found.");
-  }
-
-  if (project.owner.toString() !== userId) {
-    throw new ForbiddenError("You do not have access to this project.");
+    throw new NotFoundError("Project not found.");
   }
 }
 
@@ -70,15 +67,12 @@ async function assertTaskOwnership(
 ): Promise<ITaskDocument> {
   const task = await Task.findOne({
     _id: taskId,
+    owner: new Types.ObjectId(userId),
     isDeleted: false,
   });
 
   if (!task) {
     throw new NotFoundError("Task not found.");
-  }
-
-  if (task.owner.toString() !== userId) {
-    throw new ForbiddenError("You do not have access to this task.");
   }
 
   return task;

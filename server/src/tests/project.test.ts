@@ -132,7 +132,7 @@ async function runTests() {
       await getProjectById(projectA1._id.toString(), userB._id.toString());
     } catch (err: any) {
       crossTenantFetchBlocked = true;
-      expect(err.name === "ForbiddenError" || err.name === "NotFoundError", "Refuses cross-tenant fetch");
+      expect(err.name === "NotFoundError", "Refuses cross-tenant fetch as not found");
     }
     expect(crossTenantFetchBlocked, "Cross-user project fetch is securely blocked");
 
@@ -156,6 +156,7 @@ async function runTests() {
       });
     } catch (err: any) {
       crossTenantUpdateBlocked = true;
+      expect(err.name === "NotFoundError", "Refuses cross-tenant update as not found");
     }
     expect(crossTenantUpdateBlocked, "Cross-user project update is securely blocked");
 

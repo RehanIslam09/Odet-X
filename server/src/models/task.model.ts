@@ -19,6 +19,7 @@ export interface ITask {
   projectId: Types.ObjectId | null;
   title: string;
   description: string;
+  notes: string;
   status: TaskStatus;
   priority: TaskPriority;
   dueDate: Date | null;
@@ -63,6 +64,12 @@ const taskSchema = new Schema<ITaskDocument>(
       default: "",
       trim: true,
       maxlength: MAX_TASK_DESCRIPTION_LENGTH,
+    },
+
+    notes: {
+      type: String,
+      default: "",
+      maxlength: 250000,
     },
 
     status: {

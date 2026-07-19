@@ -96,6 +96,12 @@ export const updateTaskSchema = z.object({
   labels: labelsSchema,
 });
 
+export const updateTaskNotesSchema = z.object({
+  notes: z
+    .string()
+    .max(250000, "Notes must be at most 250,000 characters."),
+});
+
 // ---------------------------------------------------------------------------
 // Query schema
 // ---------------------------------------------------------------------------
@@ -168,5 +174,6 @@ export const taskQuerySchema = z.object({
 
 export type CreateTaskDto = z.infer<typeof createTaskSchema>;
 export type UpdateTaskDto = z.infer<typeof updateTaskSchema>;
+export type UpdateTaskNotesDto = z.infer<typeof updateTaskNotesSchema>;
 export type TaskQueryDto = z.infer<typeof taskQuerySchema>;
 export type TaskParamDto = { id: string };

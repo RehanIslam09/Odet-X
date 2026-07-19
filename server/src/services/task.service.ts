@@ -7,6 +7,7 @@ import type {
   CreateTaskDto,
   TaskQueryDto,
   UpdateTaskDto,
+  UpdateTaskNotesDto,
 } from "@/validators/task.validator.js";
 
 import { BadRequestError, ForbiddenError, NotFoundError } from "@/utils/app-error.js";
@@ -208,7 +209,7 @@ export async function listTasks(
 
   const [total, items] = await Promise.all([
     Task.countDocuments(filter),
-    Task.find(filter).sort(sortExpression).skip(skip).limit(limit).exec(),
+    Task.find(filter).select("-notes").sort(sortExpression).skip(skip).limit(limit).exec(),
   ]);
 
   const totalPages = Math.ceil(total / limit);
@@ -354,7 +355,32 @@ export async function updateTask(
 
   return task;
 }
+/**
+ * Updates task notes.
+ * 
+ * This method specifically bypasses the standard `recordActivity` pipeline.
+ * Frequent autosaves should not generate "Task Updated" spam.
+ * Mongoose `save()` behavior preserves `__v` optimistic concurrency control.
+ */
+export async function updateTaskNotes(
+  taskId: string,
+  userId: string,
+  data: UpdateTaskNotesDto,
+): Promise<ITaskDocument> {
+  const task = await assertTaskOwnership(taskId, userId);
+  
+  // Update only notes
+  task.notes = data.notes;
+  
+  // Note: Optimistic concurrency control (__v) is automatically handled by task.save()
+  // if enabled in the schema. This provides basic stale-write protection, though
+  // full autosave conflict resolution is deferred to Phase 17.3.
+  await task.save();
 
+  // Explicitly ZERO Activity events generated here.
+  
+  return task;
+}
 /**
  * Toggles the archived state of a task.
  */

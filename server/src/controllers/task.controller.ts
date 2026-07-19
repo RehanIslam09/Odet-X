@@ -8,6 +8,7 @@ import {
   listTasks,
   toggleTaskArchive,
   updateTask,
+  updateTaskNotes,
 } from "@/services/task.service.js";
 
 import { sendSuccessResponse } from "@/utils/api-response.js";
@@ -101,7 +102,22 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
     },
   });
 });
+// ---------------------------------------------------------------------------
+// PATCH /tasks/:id/notes
+// ---------------------------------------------------------------------------
+export const updateNotes = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id.toString();
+  const id = getRequiredTaskId(req);
 
+  const task = await updateTaskNotes(id, userId, req.body);
+
+  sendSuccessResponse(res, {
+    message: "Task notes updated successfully.",
+    data: {
+      task: task.toJSON(),
+    },
+  });
+});
 // ---------------------------------------------------------------------------
 // POST /tasks/:id/archive
 // ---------------------------------------------------------------------------

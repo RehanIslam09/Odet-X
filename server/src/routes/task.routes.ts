@@ -7,6 +7,7 @@ import {
   list,
   remove,
   update,
+  updateNotes,
 } from "@/controllers/task.controller.js";
 
 import { authenticate } from "@/middleware/auth.middleware.js";
@@ -17,6 +18,7 @@ import {
   createTaskSchema,
   taskQuerySchema,
   updateTaskSchema,
+  updateTaskNotesSchema,
 } from "@/validators/task.validator.js";
 
 const router = Router();
@@ -40,6 +42,7 @@ router.delete("/:id", remove);
 // ---------------------------------------------------------------------------
 // Sub-actions
 // ---------------------------------------------------------------------------
+router.patch("/:id/notes", validate(updateTaskNotesSchema), updateNotes);
 router.post("/:id/archive", archive);
 
 export default router;

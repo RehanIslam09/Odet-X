@@ -282,6 +282,28 @@ All routes are prefixed `/api/v1`. A root `index.ts` router mounts sub-routers:
 
 ---
 
+## Task Notes Architecture (Phase 17)
+
+### Source of Truth
+- Each Task owns exactly ONE canonical Markdown document stored in `Task.notes`.
+- `description` remains a short task summary, while `notes` is the long-form task documentation.
+- The `notes` field allows up to 250,000 characters (approx. 50 pages) to prevent MongoDB payload inflation while supporting extensive docs.
+
+### API & Isolation
+- A dedicated endpoint (`PATCH /api/v1/tasks/:id/notes`) manages notes updates.
+- **Zero Activity:** Updating notes strictly bypasses the `TASK_UPDATED` Activity feed. This prevents history spam during future autosaves.
+- **Zero Notification:** Notes updates are isolated from Notification worker deduplication.
+- **Collection Projection:** List endpoints (like `/tasks` or dashboard aggregations) explicitly exclude the `notes` field (`.select("-notes")`) to prevent 12MB+ payload sizes. Notes are only fetched individually via `/tasks/:id`.
+
+### Markdown Security Policy
+- Rendered exclusively using `react-markdown` and `remark-gfm`.
+- Raw HTML is explicitly disabled (no `rehype-raw`).
+- The native `urlTransform` drops unsafe `javascript:` URIs.
+- Remote images are disabled for Phase 17 to prevent IP leaking.
+- The dedicated Notes Workspace and Autosave UI are deferred to Phase 17.2 and 17.3 respectively.
+
+---
+
 ## Adding Future Features
 
 When adding a new feature (projects, tasks, AI, billing), follow this pattern:

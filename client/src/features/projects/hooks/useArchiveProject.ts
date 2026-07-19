@@ -24,6 +24,7 @@ export function useArchiveProject() {
       const verb = project.archived ? "archived" : "unarchived";
 
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: projectKeys.options() });
       queryClient.invalidateQueries({ queryKey: projectKeys.detail(project.id) });
 
       toast.success(`Project ${verb} successfully.`);

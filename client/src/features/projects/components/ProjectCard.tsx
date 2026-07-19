@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Archive, Clock, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -32,15 +33,6 @@ interface ProjectCardProps {
 
 /**
  * A single project card in the dashboard grid.
- *
- * Design decisions:
- * - The emoji acts as the project's visual avatar — no generic icon fallback.
- * - The color accent is applied as a subtle left border, not a distracting
- *   full background — the card should feel informational, not decorative.
- * - Framer Motion enter animation is staggered by index for a premium feel.
- * - The MoreHorizontal menu appears on hover to keep the resting state clean.
- * - Archive badge is always visible when archived — the user should never
- *   accidentally forget they're looking at archived projects.
  */
 export function ProjectCard({
   project,
@@ -68,72 +60,90 @@ export function ProjectCard({
         className="relative flex h-full flex-col rounded-xl border bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
         style={{ borderLeftColor: project.color, borderLeftWidth: 3 }}
       >
+        {/* Full-card link overlay */}
+        <Link
+          to={`/projects/${project.id}`}
+          className="absolute inset-0 z-0 rounded-xl"
+          aria-label={`View project ${project.name}`}
+        />
+
         {/* Header: Emoji + Menu */}
         <div className="mb-3 flex items-start justify-between">
           <div
-            className="flex h-11 w-11 items-center justify-center rounded-xl text-2xl shadow-sm"
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-2xl shadow-sm z-10"
             style={{ backgroundColor: `${project.color}18` }}
           >
             {project.emoji}
           </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
-                aria-label={`Options for ${project.name}`}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
+          <div className="z-10 relative">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                  aria-label={`Options for ${project.name}`}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem
-                id={`edit-project-${project.id}`}
-                onClick={() => onEdit(project)}
-              >
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem
+                  id={`edit-project-${project.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(project);
+                  }}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
 
-              <DropdownMenuItem
-                id={`archive-project-${project.id}`}
-                onClick={() => onArchive(project)}
-              >
-                <Archive className="mr-2 h-4 w-4" />
-                {project.archived ? "Unarchive" : "Archive"}
-              </DropdownMenuItem>
+                <DropdownMenuItem
+                  id={`archive-project-${project.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onArchive(project);
+                  }}
+                >
+                  <Archive className="mr-2 h-4 w-4" />
+                  {project.archived ? "Unarchive" : "Archive"}
+                </DropdownMenuItem>
 
-              <DropdownMenuSeparator />
+                <DropdownMenuSeparator />
 
-              <DropdownMenuItem
-                id={`delete-project-${project.id}`}
-                onClick={() => onDelete(project)}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <DropdownMenuItem
+                  id={`delete-project-${project.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(project);
+                  }}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {/* Project name */}
-        <h3 className="mb-1 line-clamp-1 text-sm font-semibold tracking-tight text-foreground">
+        <h3 className="mb-1 line-clamp-1 text-sm font-semibold tracking-tight text-foreground z-10 pointer-events-none">
           {project.name}
         </h3>
 
         {/* Description */}
-        <p className="mb-4 line-clamp-2 flex-1 text-xs leading-relaxed text-muted-foreground">
+        <p className="mb-4 line-clamp-2 flex-1 text-xs leading-relaxed text-muted-foreground z-10 pointer-events-none">
           {project.description || (
             <span className="italic opacity-60">No description</span>
           )}
         </p>
 
         {/* Footer: badges + time */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 z-10 pointer-events-none">
           <div className="flex items-center gap-1.5">
             {project.archived && (
               <Badge

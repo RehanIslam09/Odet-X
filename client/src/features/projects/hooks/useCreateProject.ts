@@ -23,6 +23,7 @@ export function useCreateProject() {
       // Invalidate all list queries — the new project should appear on any
       // active list regardless of current filters.
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: projectKeys.options() });
 
       toast.success("Project created successfully.");
     },

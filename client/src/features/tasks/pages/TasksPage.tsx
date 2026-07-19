@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button.js";
 import { useDebounce } from "@/hooks/useDebounce.js";
-import { useProjects } from "@/features/projects/hooks/useProjects.js";
+import { useProjectOptions } from "@/features/projects/hooks/useProjectOptions.js";
 
 import { QuickFilters } from "../components/QuickFilters.js";
 import { TaskToolbar } from "../components/TaskToolbar.js";
@@ -55,9 +55,9 @@ export default function TasksPage() {
   // ---------------------------------------------------------------------------
   // Projects API Integration
   // ---------------------------------------------------------------------------
-  const { data: projectsData } = useProjects({ limit: 100 });
+  const { data: projectsData } = useProjectOptions();
   const projectOptions = useMemo(() => {
-    return (projectsData?.items || []).map((proj) => ({
+    return (projectsData || []).map((proj) => ({
       id: proj.id,
       name: `${proj.emoji} ${proj.name}`,
     }));
@@ -104,7 +104,7 @@ export default function TasksPage() {
 
   // Map task.projectId to project name and color using cached projects
   const mappedTasks = useMemo(() => {
-    const projectsList = projectsData?.items || [];
+    const projectsList = projectsData || [];
     const items = tasksData?.items || [];
 
     return items.map((task) => {

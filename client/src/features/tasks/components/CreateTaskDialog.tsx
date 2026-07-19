@@ -28,14 +28,17 @@ import {
   type CreateTaskFormValues,
 } from "@/features/tasks/validators/tasks.schemas.js";
 
-import { useCreateTask } from "@/features/tasks/hooks/index.js";
-import { useProjects } from "@/features/projects/hooks/useProjects.js";
+import { useCreateTask } from "@/features/tasks/hooks/useCreateTask";
+import { useProjectOptions } from "@/features/projects/hooks/useProjectOptions";
+import { useProject } from "@/features/projects/hooks/useProject";
 import { applyServerErrors } from "@/utils/form-errors.js";
 import { getApiError } from "@/utils/api-error.js";
 
 interface CreateTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialProjectId?: string;
+  fixedProject?: boolean;
 }
 
 /**
@@ -47,12 +50,25 @@ interface CreateTaskDialogProps {
  * - Uses Controller from React Hook Form for custom Select components.
  * - Form resets when the dialog is closed.
  */
-export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) {
+export function CreateTaskDialog({ open, onOpenChange, initialProjectId, fixedProject }: CreateTaskDialogProps) {
   const { mutate: createTask, isPending } = useCreateTask();
 
   // Load projects to select from (up to 100 for dropdown)
-  const { data: projectsData } = useProjects({ limit: 100 });
-  const projects = projectsData?.items || [];
+  const { data: projectsData } = useProjectOptions({ enabled: !fixedProject });
+  
+  // If fixedProject is true, we fetch just the initial project from cache 
+  // so the dropdown can display its name instead of being blank.
+  const { data: fixedProjectData } = useProject(fixedProject && initialProjectId ? initialProjectId : undefined);
+
+  // Combine them for rendering
+  const projects = projectsData || (fixedProject && fixedProjectData?.project ? [
+    {
+      id: fixedProjectData.project.id,
+      name: fixedProjectData.project.name,
+      emoji: fixedProjectData.project.emoji,
+      color: fixedProjectData.project.color,
+    }
+  ] : []);
 
   const form = useForm<CreateTaskFormInput, undefined, CreateTaskFormValues>({
     resolver: zodResolver(createTaskSchema),
@@ -68,12 +84,17 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
     },
   });
 
-  // Reset form when dialog closes
+  // Reset form when dialog closes or opens with new initialProjectId
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      // If opened with an initial project (Phase 12.3), set it
+      if (initialProjectId) {
+        form.setValue("projectId", initialProjectId);
+      }
+    } else {
       form.reset();
     }
-  }, [open, form]);
+  }, [open, form, initialProjectId]);
 
   function onSubmit(values: CreateTaskFormValues) {
     // Process labelsString into labels array
@@ -167,7 +188,7 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
                 name="projectId"
                 render={({ field }) => (
                   <Select
-                    disabled={isPending}
+                    disabled={isPending || fixedProject}
                     onValueChange={field.onChange}
                     value={field.value || "no-project"}
                   >

@@ -26,6 +26,7 @@ export function useDeleteProject() {
 
       // Invalidate all lists to reflect the deletion
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: projectKeys.options() });
 
       toast.success("Project deleted.");
     },

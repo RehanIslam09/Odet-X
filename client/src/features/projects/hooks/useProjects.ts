@@ -16,6 +16,9 @@ export const projectKeys = {
     [...projectKeys.lists(), params] as const,
   details: () => [...projectKeys.all, "detail"] as const,
   detail: (id: string) => [...projectKeys.details(), id] as const,
+  summaries: () => [...projectKeys.all, "summary"] as const,
+  summary: (id: string) => [...projectKeys.summaries(), id] as const,
+  options: () => [...projectKeys.all, "options"] as const,
 };
 
 // ---------------------------------------------------------------------------

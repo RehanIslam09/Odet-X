@@ -5,6 +5,8 @@ import {
   createProject,
   deleteProject,
   getProjectById,
+  getProjectOptions,
+  getProjectSummary,
   listProjects,
   toggleProjectArchive,
   updateProject,
@@ -75,6 +77,41 @@ export const getOne = asyncHandler(async (req: Request, res: Response) => {
     message: "Project retrieved successfully.",
     data: {
       project: project.toJSON(),
+    },
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /projects/:id/summary
+// ---------------------------------------------------------------------------
+
+export const getSummary = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id.toString();
+  const id = getRequiredProjectId(req);
+
+  const summary = await getProjectSummary(id, userId);
+
+  sendSuccessResponse(res, {
+    message: "Project summary retrieved successfully.",
+    data: {
+      summary,
+    },
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /projects/options
+// ---------------------------------------------------------------------------
+
+export const getOptions = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id.toString();
+
+  const options = await getProjectOptions(userId);
+
+  sendSuccessResponse(res, {
+    message: "Project options retrieved successfully.",
+    data: {
+      items: options,
     },
   });
 });

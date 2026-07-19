@@ -30,7 +30,7 @@ import {
 
 import type { Task } from "@/features/tasks/types/tasks.types.js";
 import { useUpdateTask } from "@/features/tasks/hooks/index.js";
-import { useProjects } from "@/features/projects/hooks/useProjects.js";
+import { useProjectOptions } from "@/features/projects/hooks/useProjectOptions";
 import { applyServerErrors } from "@/utils/form-errors.js";
 import { getApiError } from "@/utils/api-error.js";
 
@@ -48,9 +48,9 @@ interface EditTaskDialogProps {
 export function EditTaskDialog({ task, open, onOpenChange }: EditTaskDialogProps) {
   const { mutate: updateTask, isPending } = useUpdateTask();
 
-  // Load projects to select from (up to 100 for dropdown)
-  const { data: projectsData } = useProjects({ limit: 100 });
-  const projects = projectsData?.items || [];
+  // Load projects to select from
+  const { data: projectsData } = useProjectOptions();
+  const projects = projectsData || [];
 
   const form = useForm<UpdateTaskFormInput, undefined, UpdateTaskFormValues>({
     resolver: zodResolver(updateTaskSchema),

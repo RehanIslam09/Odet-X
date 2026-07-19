@@ -2,9 +2,11 @@ import { apiClient } from "@/services/axios";
 
 import type {
   CreateProjectDto,
+  ProjectOption,
   ProjectResponseData,
   ProjectsListResponseData,
   ProjectsQueryParams,
+  ProjectSummaryData,
   UpdateProjectDto,
 } from "@/features/projects/types/projects.types";
 
@@ -60,6 +62,26 @@ export const projectsApi = {
       `/projects/${id}`,
     );
     return response.data.data;
+  },
+
+  /**
+   * Fetch a lightweight list of project options for dropdowns.
+   */
+  getOptions: async (): Promise<ProjectOption[]> => {
+    const response = await apiClient.get<ApiResponse<{ items: ProjectOption[] }>>(
+      "/projects/options",
+    );
+    return response.data.data.items;
+  },
+
+  /**
+   * Fetch a project summary by ID.
+   */
+  getSummary: async (id: string): Promise<ProjectSummaryData> => {
+    const response = await apiClient.get<ApiResponse<{ summary: ProjectSummaryData }>>(
+      `/projects/${id}/summary`,
+    );
+    return response.data.data.summary;
   },
 
   /**

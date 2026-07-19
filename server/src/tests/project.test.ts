@@ -15,10 +15,15 @@ import {
   createProject,
   deleteProject,
   getProjectById,
+  getProjectOptions,
+  getProjectSummary,
   listProjects,
   toggleProjectArchive,
   updateProject,
 } from "../services/project.service.js";
+
+import { createTask } from "../services/task.service.js";
+import Task from "../models/task.model.js";
 
 import Project from "../models/project.model.js";
 import User from "../models/user.model.js";
@@ -206,12 +211,45 @@ async function runTests() {
     });
     expect(listSearchB.items.length === 0, "Search is tenant-scoped");
 
-    // Pagination limits
     const pageData = await listProjects(userA._id.toString(), {
       page: 1, limit: 2, sort: "-updatedAt", archived: false
     });
     expect(pageData.items.length === 2, "Pagination limit works");
     expect(pageData.pagination.totalPages === 2, "Pagination totalPages is correct");
+
+    // =========================================================================
+    // 3.5. Service Layer: Project Options (Selectors)
+    // =========================================================================
+    console.log("\n>> Running Project Options tests...");
+
+    // Create an archived project and a soft-deleted project to verify exclusions
+    const archivedForOptions = await createProject(userA._id.toString(), { name: "Archived Options Proj", description: "" });
+    await toggleProjectArchive(archivedForOptions._id.toString(), userA._id.toString());
+    
+    const deletedForOptions = await createProject(userA._id.toString(), { name: "Deleted Options Proj", description: "" });
+    await deleteProject(deletedForOptions._id.toString(), userA._id.toString());
+
+    // Fetch options for User A
+    const optionsA = await getProjectOptions(userA._id.toString());
+    expect(optionsA.length >= 3, "Returns active projects for user A");
+    
+    // Verify exclusions
+    expect(!optionsA.some(p => p.id === archivedForOptions._id.toString()), "Excludes archived projects");
+    expect(!optionsA.some(p => p.id === deletedForOptions._id.toString()), "Excludes soft-deleted projects");
+    
+    // Verify cross-tenant isolation
+    expect(!optionsA.some(p => p.id === projectB1._id.toString()), "User A cannot see User B's projects");
+
+    // Verify lightweight fields
+    const firstOption = optionsA[0]!;
+    expect(Object.keys(firstOption).length === 4, "Option contains exactly 4 fields");
+    expect("id" in firstOption && "name" in firstOption && "emoji" in firstOption && "color" in firstOption, "Option contains id, name, emoji, color");
+    expect(!("owner" in firstOption) && !("createdAt" in firstOption) && !("description" in firstOption), "Option excludes owner, description, and metadata");
+    
+    // Fetch options for a user with no projects
+    const emptyUser = await User.create({ email: "empty@test.com", password: "password123", username: "emptyuser", name: "Empty" });
+    const emptyOptions = await getProjectOptions(emptyUser._id.toString());
+    expect(emptyOptions.length === 0, "Returns empty array for user with no projects");
 
     // =========================================================================
     // 4. Archive & Soft Delete
@@ -246,8 +284,65 @@ async function runTests() {
     const unarchivedProj = await toggleProjectArchive(projectA1._id.toString(), userA._id.toString());
     expect(unarchivedProj.archived === false, "Project successfully unarchived");
 
+    // =========================================================================
+    // 5. Phase 12.3: Project Summary Metrics
+    // =========================================================================
+    console.log("\n>> Running Project Summary tests...");
+    
+    // Create a new project for summary tests
+    const sumProj = await createProject(userA._id.toString(), { name: "Summary Proj", description: "" });
+    
+    // Summary of zero-task project
+    const zeroSum = await getProjectSummary(sumProj._id.toString(), userA._id.toString());
+    expect(zeroSum.total === 0 && zeroSum.completionPercentage === 0, "Zero-task Project returns zeroed metrics");
+
+    // Add tasks
+    const tCompleted = await createTask(userA._id.toString(), { title: "D", status: "done", priority: "low", projectId: sumProj._id.toString() });
+    const tInProgress = await createTask(userA._id.toString(), { title: "I", status: "in_progress", priority: "low", projectId: sumProj._id.toString() });
+    const tTodo = await createTask(userA._id.toString(), { title: "T", status: "todo", priority: "low", projectId: sumProj._id.toString() });
+    const tCancelled = await createTask(userA._id.toString(), { title: "C", status: "cancelled", priority: "low", projectId: sumProj._id.toString() });
+    const tOverdue = await createTask(userA._id.toString(), { 
+      title: "O", status: "todo", priority: "low", projectId: sumProj._id.toString(), 
+      dueDate: new Date(Date.now() - 86400000) // yesterday
+    });
+    const tArchived = await createTask(userA._id.toString(), { title: "A", status: "todo", priority: "low", projectId: sumProj._id.toString() });
+    tArchived.archived = true;
+    await tArchived.save();
+
+    const sum1 = await getProjectSummary(sumProj._id.toString(), userA._id.toString());
+    expect(sum1.total === 5, "Correct total (excludes archived)");
+    expect(sum1.completed === 1, "Correct completed count");
+    expect(sum1.inProgress === 1, "Correct in-progress count");
+    expect(sum1.remaining === 3, "Correct remaining count (excludes cancelled)");
+    expect(sum1.overdue === 1, "Correct overdue count");
+    expect(sum1.completionPercentage === 25, "Cancelled tasks excluded from completion denominator (1/4 = 25%)");
+
+    // Cross-tenant summary block
+    let crossSumBlocked = false;
+    try {
+      await getProjectSummary(sumProj._id.toString(), userB._id.toString());
+    } catch(err: any) {
+      crossSumBlocked = true;
+      expect(err.name === "NotFoundError", "Cross-tenant Project summary returns NotFoundError");
+    }
+    expect(crossSumBlocked, "Cross-user summary blocked");
+
+    // Phase 12.3 Lifecycle Test: Create tasks to verify unassignment on project deletion
+    const projTask1 = await createTask(userA._id.toString(), { title: "T1", status: "todo", priority: "high", projectId: projectA1._id.toString() });
+    const projTask2 = await createTask(userA._id.toString(), { title: "T2", status: "done", priority: "low", projectId: projectA1._id.toString() });
+    const unrelatedTask = await createTask(userA._id.toString(), { title: "Unrelated", status: "todo", priority: "none" });
+
     // Soft delete
     await deleteProject(projectA1._id.toString(), userA._id.toString());
+    
+    // Verify tasks are unassigned (projectId: null) but not deleted
+    const t1After = await Task.findById(projTask1._id);
+    const t2After = await Task.findById(projTask2._id);
+    const unrelatedAfter = await Task.findById(unrelatedTask._id);
+    
+    expect(t1After !== null && t1After.isDeleted === false, "Associated tasks remain non-deleted");
+    expect(t1After?.projectId === null && t2After?.projectId === null, "Associated tasks receive projectId: null");
+    expect(unrelatedAfter?.projectId === null, "Tasks belonging to other Projects (or none) are untouched");
     
     // Check exclusion
     const listPostDelete = await listProjects(userA._id.toString(), {

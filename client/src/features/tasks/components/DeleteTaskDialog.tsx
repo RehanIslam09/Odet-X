@@ -15,16 +15,14 @@ interface DeleteTaskDialogProps {
   task: Task | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
 /**
  * Confirmation dialog for task deletion.
  */
-export function DeleteTaskDialog({
-  task,
-  open,
-  onOpenChange,
-}: DeleteTaskDialogProps) {
+export function DeleteTaskDialog(props: DeleteTaskDialogProps) {
+  const { task, open, onOpenChange } = props;
   const { mutate: deleteTask, isPending } = useDeleteTask();
 
   function handleConfirm() {
@@ -33,6 +31,7 @@ export function DeleteTaskDialog({
     deleteTask(task.id, {
       onSuccess: () => {
         onOpenChange(false);
+        if (props.onSuccess) props.onSuccess();
       },
     });
   }

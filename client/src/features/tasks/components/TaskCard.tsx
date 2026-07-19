@@ -1,8 +1,10 @@
+import { useNavigate } from "react-router-dom";
 import { Archive, Calendar, Clock, MoreHorizontal, Pencil, Tag, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils.js";
 import { TaskStatusBadge } from "./TaskStatusBadge.js";
 import { TaskPriorityBadge } from "./TaskPriorityBadge.js";
-import type { Task } from "../types/tasks.types.js";
+import type { Task, TaskStatus } from "../types/tasks.types.js";
+import { isTaskOverdue } from "../utils/task.utils.js";
 import { Button } from "@/components/ui/button.js";
 import {
   DropdownMenu,
@@ -22,7 +24,7 @@ interface TaskCardProps {
 /**
  * Formats a YYYY-MM-DD date into a relative, reader-friendly string.
  */
-function formatDueDate(dueDateStr?: string | null) {
+function formatDueDate(dueDateStr?: string | null, status?: TaskStatus) {
   if (!dueDateStr) return null;
 
   const today = new Date();
@@ -37,7 +39,9 @@ function formatDueDate(dueDateStr?: string | null) {
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const formattedDate = `${monthNames[due.getMonth()]} ${due.getDate()}`;
 
-  if (diffDays < 0) {
+  const isOverdue = status ? isTaskOverdue(dueDateStr, status) : diffDays < 0;
+
+  if (isOverdue) {
     return {
       text: `${formattedDate} (Overdue)`,
       style: "text-red-500 border-red-500/20 bg-red-500/5",
@@ -67,11 +71,22 @@ function formatDueDate(dueDateStr?: string | null) {
 }
 
 export function TaskCard({ task, onEdit, onArchive, onDelete }: TaskCardProps) {
-  const dateMeta = formatDueDate(task.dueDate);
+  const dateMeta = formatDueDate(task.dueDate, task.status);
+  const navigate = useNavigate();
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={() => navigate(`/tasks/${task.id}`)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          navigate(`/tasks/${task.id}`);
+        }
+      }}
       className={cn(
+        "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         "group flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 md:py-2.5 md:px-4 rounded-lg border border-border/60 bg-card hover:bg-muted/10 hover:border-border transition-all duration-150 shadow-2xs hover:shadow-xs",
         task.status === "done" && "opacity-85 hover:opacity-100",
         task.status === "cancelled" && "opacity-60 hover:opacity-100"
@@ -163,6 +178,7 @@ export function TaskCard({ task, onEdit, onArchive, onDelete }: TaskCardProps) {
             <Button
               variant="ghost"
               size="icon"
+              onClick={(e) => e.stopPropagation()}
               className="h-7 w-7 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus:opacity-100"
               aria-label={`Options for task ${task.title}`}
             >
@@ -170,10 +186,13 @@ export function TaskCard({ task, onEdit, onArchive, onDelete }: TaskCardProps) {
             </Button>
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuItem
               id={`edit-task-${task.id}`}
-              onClick={() => onEdit(task)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(task);
+              }}
             >
               <Pencil className="mr-2 h-3.5 w-3.5" />
               Edit
@@ -181,7 +200,10 @@ export function TaskCard({ task, onEdit, onArchive, onDelete }: TaskCardProps) {
 
             <DropdownMenuItem
               id={`archive-task-${task.id}`}
-              onClick={() => onArchive(task)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onArchive(task);
+              }}
             >
               <Archive className="mr-2 h-3.5 w-3.5" />
               {task.archived ? "Unarchive" : "Archive"}
@@ -191,7 +213,10 @@ export function TaskCard({ task, onEdit, onArchive, onDelete }: TaskCardProps) {
 
             <DropdownMenuItem
               id={`delete-task-${task.id}`}
-              onClick={() => onDelete(task)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(task);
+              }}
               className="text-destructive focus:text-destructive"
             >
               <Trash2 className="mr-2 h-3.5 w-3.5" />

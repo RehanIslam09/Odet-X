@@ -3,6 +3,7 @@ import {
   ThemeToggle,
   UserMenu,
 } from "@/components/layout";
+import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 
 export default function DashboardNavbar() {
   return (
@@ -16,8 +17,8 @@ export default function DashboardNavbar() {
       </div>
 
       <div className="flex items-center gap-3">
+        <NotificationBell />
         <ThemeToggle />
-
         <UserMenu />
       </div>
     </header>

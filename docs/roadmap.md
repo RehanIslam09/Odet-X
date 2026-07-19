@@ -258,7 +258,22 @@
 
 ---
 
-## 📋 Phase 15.2 — Deployment
+## ✅ Phase 16.2 — Notification Center Frontend Integration
+
+- Notification Bell and unread count badge in Dashboard Navbar
+- Popover preview with lazy fetching
+- Dedicated cursor-paginated `/notifications` page
+- Filter by All, Unread, and Read statuses
+- Contextual entity navigation from notifications
+- Cache synchronization via authoritative invalidation and optimistic unread counts
+
+---
+
+## ⏳ Phase 16.3 — Notification Producers & Real-time Delivery
+
+---
+
+## ✅ Phase 17 — Deployment
 
 - Docker + docker-compose
 - CI/CD pipeline (GitHub Actions)

@@ -2,6 +2,7 @@ import { useParams } from "react-router-dom";
 import { useTask } from "../hooks/useTask.js";
 import { TaskDetailHeader } from "../components/TaskDetailHeader.js";
 import { TaskPropertiesPanel } from "../components/TaskPropertiesPanel.js";
+import { TaskNotesPreview } from "../components/TaskNotesPreview.js";
 import { TaskNotFoundState } from "../components/TaskNotFoundState.js";
 import { TaskDetailSkeleton } from "../components/TaskDetailSkeleton.js";
 import { AlertCircle } from "lucide-react";
@@ -79,6 +80,10 @@ export default function TaskDetailPage() {
               No description provided.
             </div>
           )}
+
+          <div className="mt-8">
+            <TaskNotesPreview task={task} />
+          </div>
 
           <div className="mt-8">
             <TaskActivityTimeline taskId={task.id} />

@@ -282,6 +282,35 @@ All routes are prefixed `/api/v1`. A root `index.ts` router mounts sub-routers:
 
 ---
 
+## Task Notes Architecture (Phase 17)
+
+### Source of Truth
+- Each Task owns exactly ONE canonical Markdown document stored in `Task.notes`.
+- `description` remains a short task summary, while `notes` is the long-form task documentation.
+- The `notes` field allows up to 250,000 characters (approx. 50 pages) to prevent MongoDB payload inflation while supporting extensive docs.
+
+### API & Concurrency (Phase 17.3)
+- A dedicated endpoint (`PATCH /api/v1/tasks/:id/notes`) manages notes updates.
+- **Atomic Version Checking:** The endpoint requires an `expectedVersion` parameter. Updates use `Task.findOneAndUpdate` combining the `_id`, `owner`, and `__v: expectedVersion` in a single atomic database operation to prevent cross-tab overwrites.
+- **409 Conflict:** If the version mismatches, a 409 Conflict is returned, preventing the user from accidentally overwriting notes edited in another session. BOLA (404) protection is evaluated prior to 409 evaluation.
+- **Zero Activity:** Updating notes strictly bypasses the `TASK_UPDATED` Activity feed. This prevents history spam during autosaves.
+- **Zero Notification:** Notes updates are isolated from Notification worker deduplication.
+- **Collection Projection:** List endpoints (like `/tasks` or dashboard aggregations) explicitly exclude the `notes` field (`.select("-notes")`) to prevent 12MB+ payload sizes. Notes are only fetched individually via `/tasks/:id`.
+
+### Markdown Security Policy
+- Rendered exclusively using `react-markdown` and `remark-gfm`.
+- Raw HTML is explicitly disabled (no `rehype-raw`).
+- The native `urlTransform` drops unsafe `javascript:` URIs.
+- Remote images are disabled for Phase 17 to prevent IP leaking.
+
+### Workspace UI & Autosave
+- The UI exposes a dedicated `/tasks/:taskId/notes` Workspace with `Write` and `Preview` modes.
+- A custom `useTaskNotesAutosave` hook implements a strictly serialized, 1000ms-debounced auto-save pipeline.
+- It safely isolates the `localDraft` from the `lastSavedDraft` to provide race-condition-free updates without merging loops.
+- React Router `useBlocker` intercepts navigation if unsaved changes exist, preventing data loss.
+
+---
+
 ## Adding Future Features
 
 When adding a new feature (projects, tasks, AI, billing), follow this pattern:

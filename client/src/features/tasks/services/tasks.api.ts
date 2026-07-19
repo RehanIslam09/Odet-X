@@ -79,6 +79,21 @@ export const tasksApi = {
   },
 
   /**
+   * Update task notes.
+   */
+  updateNotes: async (
+    id: string,
+    notes: string,
+    expectedVersion?: number,
+  ): Promise<TaskResponseData> => {
+    const response = await apiClient.patch<ApiResponse<TaskResponseData>>(
+      `/tasks/${id}/notes`,
+      { notes, expectedVersion },
+    );
+    return response.data.data;
+  },
+
+  /**
    * Toggle the archived state of a task.
    */
   archive: async (id: string): Promise<TaskResponseData> => {

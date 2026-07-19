@@ -29,7 +29,7 @@ export const processTaskReminders = async (now: Date = new Date()): Promise<void
   const dueSoonCursor = Task.find({
     ...activeTaskFilter,
     dueDate: { $gt: now, $lte: threshold24h },
-  }).cursor();
+  }).select("-notes").cursor();
 
   for await (const task of dueSoonCursor) {
     if (!task.dueDate) continue;
@@ -63,7 +63,7 @@ export const processTaskReminders = async (now: Date = new Date()): Promise<void
   const overdueCursor = Task.find({
     ...activeTaskFilter,
     dueDate: { $lt: now },
-  }).cursor();
+  }).select("-notes").cursor();
 
   for await (const task of overdueCursor) {
     if (!task.dueDate) continue;

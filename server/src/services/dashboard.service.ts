@@ -91,7 +91,7 @@ export async function getDashboardOverview(userId: string) {
         { dueDate: { $gte: now, $lte: dueSoonCutoff } } // Due Soon
       ]
     })
-      // Sorting dueDate ascending natively places Overdue tasks before Due Soon tasks!
+      .select("-notes")
       .sort({ dueDate: 1 })
       .limit(5)
       .populate("projectId", "name emoji color")

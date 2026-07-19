@@ -234,7 +234,18 @@
 
 ---
 
-## 📋 Phase 15 — Deployment
+## ✅ Phase 15.1 — Activity & Audit Backend Foundation
+
+- Activity & Audit model
+- Best-effort bulk insertion layer
+- Granular event definitions (Created, Updated, Status Changed, etc.)
+- Task & Project Service integration
+- Isolated test infrastructure with Tenant boundaries
+- Cursor pagination for Activity feed
+
+---
+
+## 📋 Phase 15.2 — Deployment
 
 - Docker + docker-compose
 - CI/CD pipeline (GitHub Actions)

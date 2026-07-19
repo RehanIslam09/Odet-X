@@ -10,6 +10,8 @@ import type {
 } from "@/validators/task.validator.js";
 
 import { BadRequestError, ForbiddenError, NotFoundError } from "@/utils/app-error.js";
+import { recordActivity, recordActivities, BaseActivityPayload } from "@/services/activity.service.js";
+import { ACTIVITY_TYPES } from "@/constants/activity.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -109,6 +111,19 @@ export async function createTask(
     dueDate: data.dueDate ?? null,
     estimatedTime: data.estimatedTime ?? null,
     labels: data.labels ?? [],
+  });
+
+  await recordActivity({
+    owner: userId,
+    actorId: userId,
+    type: ACTIVITY_TYPES.TASK_CREATED,
+    entityType: "task",
+    entityId: task._id.toString(),
+    projectId: task.projectId?.toString() ?? null,
+    taskId: task._id.toString(),
+    metadata: {
+      taskTitle: task.title,
+    },
   });
 
   return task;
@@ -221,27 +236,102 @@ export async function updateTask(
   data: UpdateTaskDto,
 ): Promise<ITaskDocument> {
   const task = await assertTaskOwnership(taskId, userId);
+  const events: BaseActivityPayload[] = [];
+  let genericUpdate = false;
+
+  const baseEvent = {
+    owner: userId,
+    actorId: userId,
+    entityType: "task" as const,
+    entityId: task._id.toString(),
+    taskId: task._id.toString(),
+    metadata: { taskTitle: data.title !== undefined ? data.title : task.title },
+  };
 
   // If project is changing, validate access to the new project
   if (data.projectId !== undefined) {
-    if (data.projectId === null) {
+    if (data.projectId === null && task.projectId !== null) {
+      events.push({
+        ...baseEvent,
+        type: ACTIVITY_TYPES.TASK_PROJECT_CHANGED,
+        projectId: null,
+        metadata: { ...baseEvent.metadata, fromProjectId: task.projectId.toString(), toProjectId: null },
+      });
       task.projectId = null;
-    } else {
+    } else if (data.projectId !== null && (!task.projectId || task.projectId.toString() !== data.projectId)) {
       const projectObjId = new Types.ObjectId(data.projectId);
       await validateProjectOwnership(projectObjId, userId);
+      events.push({
+        ...baseEvent,
+        type: ACTIVITY_TYPES.TASK_PROJECT_CHANGED,
+        projectId: data.projectId,
+        metadata: { ...baseEvent.metadata, fromProjectId: task.projectId?.toString() || null, toProjectId: data.projectId },
+      });
       task.projectId = projectObjId;
     }
   }
 
-  if (data.title !== undefined) task.title = data.title;
-  if (data.description !== undefined) task.description = data.description;
-  if (data.status !== undefined) task.status = data.status;
-  if (data.priority !== undefined) task.priority = data.priority;
-  if (data.dueDate !== undefined) task.dueDate = data.dueDate;
-  if (data.estimatedTime !== undefined) task.estimatedTime = data.estimatedTime;
-  if (data.labels !== undefined) task.labels = data.labels;
+  if (data.title !== undefined && data.title !== task.title) {
+    task.title = data.title;
+    genericUpdate = true;
+  }
+  if (data.description !== undefined && data.description !== task.description) {
+    task.description = data.description;
+    genericUpdate = true;
+  }
+  if (data.status !== undefined && data.status !== task.status) {
+    events.push({
+      ...baseEvent,
+      type: ACTIVITY_TYPES.TASK_STATUS_CHANGED,
+      projectId: task.projectId?.toString() || null,
+      metadata: { ...baseEvent.metadata, fromStatus: task.status, toStatus: data.status },
+    });
+    task.status = data.status;
+  }
+  if (data.priority !== undefined && data.priority !== task.priority) {
+    events.push({
+      ...baseEvent,
+      type: ACTIVITY_TYPES.TASK_PRIORITY_CHANGED,
+      projectId: task.projectId?.toString() || null,
+      metadata: { ...baseEvent.metadata, fromPriority: task.priority, toPriority: data.priority },
+    });
+    task.priority = data.priority;
+  }
+  if (data.dueDate !== undefined) {
+    const oldDate = task.dueDate?.getTime();
+    const newDate = data.dueDate?.getTime();
+    if (oldDate !== newDate) {
+      task.dueDate = data.dueDate;
+      genericUpdate = true;
+    }
+  }
+  if (data.estimatedTime !== undefined && data.estimatedTime !== task.estimatedTime) {
+    task.estimatedTime = data.estimatedTime;
+    genericUpdate = true;
+  }
+  if (data.labels !== undefined) {
+    const oldLabels = task.labels.join(",");
+    const newLabels = [...new Set(data.labels.map(l => l.trim()).filter(l => l.length > 0))].join(",");
+    if (oldLabels !== newLabels) {
+      task.labels = data.labels;
+      genericUpdate = true;
+    }
+  }
+
+  if (genericUpdate) {
+    events.push({
+      ...baseEvent,
+      type: ACTIVITY_TYPES.TASK_UPDATED,
+      projectId: task.projectId?.toString() || null,
+    });
+  }
 
   await task.save();
+
+  if (events.length > 0) {
+    await recordActivities(events);
+  }
+
   return task;
 }
 
@@ -255,6 +345,20 @@ export async function toggleTaskArchive(
   const task = await assertTaskOwnership(taskId, userId);
   task.archived = !task.archived;
   await task.save();
+
+  await recordActivity({
+    owner: userId,
+    actorId: userId,
+    type: task.archived ? ACTIVITY_TYPES.TASK_ARCHIVED : ACTIVITY_TYPES.TASK_RESTORED,
+    entityType: "task",
+    entityId: task._id.toString(),
+    projectId: task.projectId?.toString() || null,
+    taskId: task._id.toString(),
+    metadata: {
+      taskTitle: task.title,
+    },
+  });
+
   return task;
 }
 
@@ -268,4 +372,17 @@ export async function deleteTask(
   const task = await assertTaskOwnership(taskId, userId);
   task.isDeleted = true;
   await task.save();
+
+  await recordActivity({
+    owner: userId,
+    actorId: userId,
+    type: ACTIVITY_TYPES.TASK_DELETED,
+    entityType: "task",
+    entityId: task._id.toString(),
+    projectId: task.projectId?.toString() || null,
+    taskId: task._id.toString(),
+    metadata: {
+      taskTitle: task.title,
+    },
+  });
 }

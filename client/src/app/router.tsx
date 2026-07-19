@@ -18,6 +18,7 @@ import ProjectDetailPage from "@/features/projects/pages/ProjectDetailPage";
 import SettingsPage from "@/features/settings/pages/SettingsPage";
 import TasksPage from "@/features/tasks/pages/TasksPage";
 import TaskDetailPage from "@/features/tasks/pages/TaskDetailPage";
+import ActivityPage from "@/features/activity/pages/ActivityPage";
 import ProtectedRoute from "@/routes/ProtectedRoute";
 import PublicRoute from "@/routes/PublicRoute";
 
@@ -78,6 +79,11 @@ export const router = createBrowserRouter(
           <Route path="tasks">
             <Route index element={<TasksPage />} />
             <Route path=":taskId" element={<TaskDetailPage />} />
+          </Route>
+
+          {/* Activities */}
+          <Route path="activities">
+            <Route index element={<ActivityPage />} />
           </Route>
 
           {/* Settings */}

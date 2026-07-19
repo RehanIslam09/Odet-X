@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys.js";
 import { tasksApi } from "@/features/tasks/services/tasks.api.js";
 import { taskKeys } from "@/features/tasks/hooks/useTasks.js";
+import { activityKeys } from "@/features/activity/hooks/activity.keys.js";
 import { projectKeys } from "@/features/projects/hooks/useProjects.js";
 import type { Task, TasksListResponseData } from "@/features/tasks/types/tasks.types.js";
 
@@ -55,6 +56,7 @@ export function useUpdateTask() {
       }
 
       queryClient.invalidateQueries({ queryKey: dashboardKeys.overview() });
+      queryClient.invalidateQueries({ queryKey: activityKeys.lists() });
       toast.success("Task updated successfully.");
     },
 

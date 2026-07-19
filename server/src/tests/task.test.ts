@@ -5,6 +5,8 @@ import { assert } from "console";
 // Load configuration
 dotenv.config();
 
+import { setupTestDatabase, teardownTestDatabase } from "./test-db.js";
+
 import {
   createTaskSchema,
   taskQuerySchema,
@@ -34,12 +36,7 @@ function expect(value: boolean, message: string) {
 }
 
 async function runTests() {
-  const uri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/ai-project-manager";
-  console.log(`Connecting to database: ${uri}`);
-  await mongoose.connect(uri);
-
-  // Clean up any stray test data
-  await mongoose.connection.db?.dropDatabase();
+  await setupTestDatabase();
 
   try {
     console.log("\n--- Starting Phase 10.2 Task Backend Tests ---\n");
@@ -93,12 +90,14 @@ async function runTests() {
     // Create test user and projects
     const userA = await User.create({
       name: "User A",
+      username: "usera",
       email: "usera@example.com",
       password: "password123",
     });
 
     const userB = await User.create({
       name: "User B",
+      username: "userb",
       email: "userb@example.com",
       password: "password123",
     });
@@ -352,9 +351,11 @@ async function runTests() {
     expect(deletedUpdateBlocked, "Updates are rejected for soft-deleted tasks");
 
     console.log("\n🎉 ALL TESTS COMPLETED SUCCESSFULLY! 🎉");
+    await teardownTestDatabase();
     process.exit(0);
   } catch (error) {
     console.error("Test execution failed with error:", error);
+    await teardownTestDatabase();
     process.exit(1);
   }
 }

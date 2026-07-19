@@ -133,7 +133,7 @@ Conversational, threaded, attached to a Task (or Project). Distinct from Activit
 A file or link associated with a Task or Comment. Kept as its own lightweight entity so it can be referenced from multiple places without duplicating storage.
 
 ### Notification
-A derived, per-user record pointing at an Activity or Comment that is relevant to that user, with a delivery/read state. Exists separately from Activity because Activity is workspace-truth and Notification is user-specific relevance + state.
+A derived, actionable per-user record that requires user attention (e.g., due dates, mentions), distinct from the immutable Activity log. It tracks delivery and read state (`readAt`) and uses its own snapshots for resilience against entity deletion. Phase 16.1 introduces the infrastructure, with producers deferred to later AI/Collaboration phases.
 
 ### Member / Role
 The membership and permission relationship between a User and a Workspace (and optionally a Project-level override). Kept distinct from User because a person's role is a property of their membership, not of their identity.

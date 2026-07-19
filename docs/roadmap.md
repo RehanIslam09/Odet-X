@@ -234,7 +234,7 @@
 
 ---
 
-## ✅ Phase 15.1 — Activity & Audit Backend Foundation
+## ✅ Phase 15 — Activity & Audit Foundation
 
 - Activity & Audit model
 - Best-effort bulk insertion layer
@@ -242,6 +242,19 @@
 - Task & Project Service integration
 - Isolated test infrastructure with Tenant boundaries
 - Cursor pagination for Activity feed
+- Dashboard and Entity-specific frontend timelines
+
+---
+
+## ✅ Phase 16.1 — Notification Backend Foundation
+
+- Separate Notification domain (distinct from Activity)
+- Actionable read/unread state tracking
+- Tenant isolation and BOLA protections
+- Snapshot persistence for resilient history
+- Cursor paginated API, unread count API
+- Idempotent state updates
+- (Active producers deferred to future collaboration/AI phases)
 
 ---
 

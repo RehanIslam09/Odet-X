@@ -241,6 +241,17 @@ No body required. Reads the `refreshToken` cookie automatically.
 
 ---
 
+## Notification Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/notifications` | Bearer | List cursor-paginated notifications |
+| GET | `/notifications/unread-count` | Bearer | Get unread notification count |
+| PATCH | `/notifications/:id/read` | Bearer | Mark specific notification as read |
+| PATCH | `/notifications/read-all` | Bearer | Mark all notifications as read |
+
+---
+
 ## Future Endpoints
 
 As phases are implemented, this document will be updated with:

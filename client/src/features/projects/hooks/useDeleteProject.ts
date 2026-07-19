@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys";
 import { projectsApi } from "@/features/projects/services/projects.api";
 import { projectKeys } from "@/features/projects/hooks/useProjects";
 
@@ -27,6 +28,7 @@ export function useDeleteProject() {
       // Invalidate all lists to reflect the deletion
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
       queryClient.invalidateQueries({ queryKey: projectKeys.options() });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.overview() });
 
       toast.success("Project deleted.");
     },

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys.js";
 import { tasksApi } from "@/features/tasks/services/tasks.api.js";
 import { taskKeys } from "@/features/tasks/hooks/useTasks.js";
 import { projectKeys } from "@/features/projects/hooks/useProjects.js";
@@ -34,7 +35,7 @@ export function useUpdateTask() {
           }
         }
       }
-      return { previousTask };
+      return { previousTask, previousProjectId: previousTask?.projectId };
     },
 
     onSuccess: (responseData, _variables, context) => {
@@ -44,16 +45,16 @@ export function useUpdateTask() {
 
       // Phase 12.3: Invalidate project summaries
       // If the task was moved between projects, invalidate both.
-      const previousProjectId = context?.previousTask?.projectId;
-      const newProjectId = task.projectId;
-
-      if (previousProjectId && previousProjectId !== newProjectId) {
-        queryClient.invalidateQueries({ queryKey: projectKeys.summary(previousProjectId) });
+      if (task.projectId !== context?.previousProjectId) {
+        if (task.projectId) {
+          queryClient.invalidateQueries({ queryKey: projectKeys.summary(task.projectId) });
+        }
+        if (context?.previousProjectId) {
+          queryClient.invalidateQueries({ queryKey: projectKeys.summary(context.previousProjectId) });
+        }
       }
-      if (newProjectId) {
-        queryClient.invalidateQueries({ queryKey: projectKeys.summary(newProjectId) });
-      }
 
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.overview() });
       toast.success("Task updated successfully.");
     },
 

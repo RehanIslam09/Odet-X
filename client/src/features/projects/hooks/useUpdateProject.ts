@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys";
 import { projectsApi } from "@/features/projects/services/projects.api";
 import { projectKeys } from "@/features/projects/hooks/useProjects";
 import type { UpdateProjectDto } from "@/features/projects/types/projects.types";
@@ -21,7 +22,12 @@ export function useUpdateProject() {
 
     onSuccess: (_data, { id }) => {
       queryClient.invalidateQueries({ queryKey: projectKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+      queryClient.invalidateQueries({
+        queryKey: projectKeys.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: dashboardKeys.overview(),
+      });
       queryClient.invalidateQueries({ queryKey: projectKeys.options() });
 
       toast.success("Project updated successfully.");

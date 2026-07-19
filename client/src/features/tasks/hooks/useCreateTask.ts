@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys";
 import { tasksApi } from "@/features/tasks/services/tasks.api.js";
 import { taskKeys } from "@/features/tasks/hooks/useTasks.js";
 import { projectKeys } from "@/features/projects/hooks/useProjects.js";
@@ -25,6 +26,8 @@ export function useCreateTask() {
       if (data.task.projectId) {
         queryClient.invalidateQueries({ queryKey: projectKeys.summary(data.task.projectId) });
       }
+      
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.overview() });
       
       toast.success("Task created successfully.");
     },

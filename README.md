@@ -163,6 +163,24 @@ Base URL: `http://localhost:5000/api/v1`
 | POST | `/auth/refresh` | Cookie | Refresh access token |
 | POST | `/auth/logout` | Bearer | Logout |
 | GET | `/auth/me` | Bearer | Get current user |
+| PATCH | `/users/me/profile` | Bearer | Update user profile |
+| PATCH | `/users/me/preferences` | Bearer | Update user preferences |
+| PATCH | `/users/me/password` | Bearer | Update user password |
+| GET | `/projects` | Bearer | List user projects |
+| POST | `/projects` | Bearer | Create a project |
+| GET | `/projects/options` | Bearer | Get project options for dropdowns |
+| GET | `/projects/:id` | Bearer | Get project details |
+| PATCH | `/projects/:id` | Bearer | Update a project |
+| POST | `/projects/:id/archive` | Bearer | Archive/unarchive a project |
+| DELETE| `/projects/:id` | Bearer | Soft delete a project |
+| GET | `/projects/:id/summary` | Bearer | Get project summary metrics |
+| GET | `/tasks` | Bearer | List tasks |
+| POST | `/tasks` | Bearer | Create a task |
+| GET | `/tasks/:id` | Bearer | Get task details |
+| PATCH | `/tasks/:id` | Bearer | Update a task |
+| POST | `/tasks/:id/archive` | Bearer | Archive/unarchive a task |
+| DELETE| `/tasks/:id` | Bearer | Soft delete a task |
+| GET | `/dashboard/overview`| Bearer | Get dashboard analytics overview |
 
 See [docs/api-design.md](./docs/api-design.md) for full request/response documentation.
 
@@ -228,11 +246,12 @@ ai-project-manager/
 - ✅ Core Authentication
 - ✅ Production Authentication (refresh tokens, rotation, validation)
 - ✅ Frontend Authentication (Axios, Zustand, React Query, route guards, forms, UI)
-- 📋 Project Management (CRUD)
-- 📋 Task Management (Kanban)
+- ✅ User Settings (Profile, Preferences, Password)
+- ✅ Project Management (CRUD, Soft Delete, Archive, Search, Pagination, Project Workspace)
+- ✅ Task Management (CRUD, Kanban lifecycle, Prioritization, Soft Delete, Task Workspace)
+- ✅ Dashboard Analytics (Active metrics, Recent Projects progress, Attention Tasks)
 - 📋 AI Features (task generation, summaries)
-- 📋 Real-time Collaboration
-- 📋 Analytics Dashboard
+- 📋 Real-time Collaboration (comments, live updates)
 - 📋 Deployment (Docker, CI/CD)
 
 ---

@@ -7,6 +7,7 @@ import { TaskDetailSkeleton } from "../components/TaskDetailSkeleton.js";
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
 import { useEffect } from "react";
+import { TaskActivityTimeline } from "@/features/activity/components/TaskActivityTimeline.js";
 
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
@@ -78,6 +79,10 @@ export default function TaskDetailPage() {
               No description provided.
             </div>
           )}
+
+          <div className="mt-8">
+            <TaskActivityTimeline taskId={task.id} />
+          </div>
         </div>
 
         {/* Sidebar (Properties) */}

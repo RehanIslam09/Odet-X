@@ -9,6 +9,8 @@ import type {
 } from "@/validators/project.validator.js";
 
 import { ForbiddenError, NotFoundError } from "@/utils/app-error.js";
+import { recordActivity } from "@/services/activity.service.js";
+import { ACTIVITY_TYPES } from "@/constants/activity.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -169,6 +171,19 @@ export async function createProject(
     ...data,
   });
 
+  await recordActivity({
+    owner: userId,
+    actorId: userId,
+    type: ACTIVITY_TYPES.PROJECT_CREATED,
+    entityType: "project",
+    entityId: project._id.toString(),
+    projectId: project._id.toString(),
+    contextProjectIds: [project._id.toString()],
+    metadata: {
+      projectName: project.name,
+    },
+  });
+
   return project;
 }
 
@@ -190,12 +205,40 @@ export async function updateProject(
   const project = await assertProjectOwnership(projectId, userId);
 
   // Apply only the provided fields (partial update)
-  if (data.name !== undefined) project.name = data.name;
-  if (data.description !== undefined) project.description = data.description;
-  if (data.emoji !== undefined) project.emoji = data.emoji;
-  if (data.color !== undefined) project.color = data.color;
+  let hasChanges = false;
+  if (data.name !== undefined && data.name !== project.name) {
+    project.name = data.name;
+    hasChanges = true;
+  }
+  if (data.description !== undefined && data.description !== project.description) {
+    project.description = data.description;
+    hasChanges = true;
+  }
+  if (data.emoji !== undefined && data.emoji !== project.emoji) {
+    project.emoji = data.emoji;
+    hasChanges = true;
+  }
+  if (data.color !== undefined && data.color !== project.color) {
+    project.color = data.color;
+    hasChanges = true;
+  }
 
   await project.save();
+
+  if (hasChanges) {
+    await recordActivity({
+      owner: userId,
+      actorId: userId,
+      type: ACTIVITY_TYPES.PROJECT_UPDATED,
+      entityType: "project",
+      entityId: project._id.toString(),
+      projectId: project._id.toString(),
+      contextProjectIds: [project._id.toString()],
+      metadata: {
+        projectName: project.name,
+      },
+    });
+  }
 
   return project;
 }
@@ -221,6 +264,19 @@ export async function toggleProjectArchive(
 
   project.archived = !project.archived;
   await project.save();
+
+  await recordActivity({
+    owner: userId,
+    actorId: userId,
+    type: project.archived ? ACTIVITY_TYPES.PROJECT_ARCHIVED : ACTIVITY_TYPES.PROJECT_RESTORED,
+    entityType: "project",
+    entityId: project._id.toString(),
+    projectId: project._id.toString(),
+    contextProjectIds: [project._id.toString()],
+    metadata: {
+      projectName: project.name,
+    },
+  });
 
   return project;
 }
@@ -261,6 +317,19 @@ export async function deleteProject(
       $set: { projectId: null },
     }
   );
+
+  await recordActivity({
+    owner: userId,
+    actorId: userId,
+    type: ACTIVITY_TYPES.PROJECT_DELETED,
+    entityType: "project",
+    entityId: project._id.toString(),
+    projectId: project._id.toString(),
+    contextProjectIds: [project._id.toString()],
+    metadata: {
+      projectName: project.name,
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -233,6 +233,14 @@ No body required. Reads the `refreshToken` cookie automatically.
 
 ---
 
+## Activity Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/activities` | Bearer | List cursor-paginated activity events |
+
+---
+
 ## Future Endpoints
 
 As phases are implemented, this document will be updated with:

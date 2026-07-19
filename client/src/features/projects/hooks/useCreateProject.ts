@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys";
 import { projectsApi } from "@/features/projects/services/projects.api";
 import { projectKeys } from "@/features/projects/hooks/useProjects";
+import { activityKeys } from "@/features/activity/hooks/activity.keys";
 
 /**
  * Create project mutation.
@@ -31,6 +32,9 @@ export function useCreateProject() {
       });
       queryClient.invalidateQueries({
         queryKey: dashboardKeys.overview(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: activityKeys.lists(),
       });
 
       toast.success("Project created successfully.");

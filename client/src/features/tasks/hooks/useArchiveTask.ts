@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys";
 import { tasksApi } from "@/features/tasks/services/tasks.api.js";
 import { taskKeys } from "@/features/tasks/hooks/useTasks.js";
+import { activityKeys } from "@/features/activity/hooks/activity.keys.js";
 import { projectKeys } from "@/features/projects/hooks/useProjects.js";
 
 /**
@@ -30,6 +31,7 @@ export function useArchiveTask() {
       }
       
       queryClient.invalidateQueries({ queryKey: dashboardKeys.overview() });
+      queryClient.invalidateQueries({ queryKey: activityKeys.lists() });
 
       toast.success(`Task ${verb} successfully.`);
     },

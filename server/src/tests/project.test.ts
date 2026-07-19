@@ -223,10 +223,10 @@ async function runTests() {
     console.log("\n>> Running Project Options tests...");
 
     // Create an archived project and a soft-deleted project to verify exclusions
-    const archivedForOptions = await createProject(userA._id.toString(), { name: "Archived Options Proj", description: "" });
+    const archivedForOptions = await createProject(userA._id.toString(), { name: "Archived Options Proj", description: "", emoji: "📁", color: "#6366f1" });
     await toggleProjectArchive(archivedForOptions._id.toString(), userA._id.toString());
     
-    const deletedForOptions = await createProject(userA._id.toString(), { name: "Deleted Options Proj", description: "" });
+    const deletedForOptions = await createProject(userA._id.toString(), { name: "Deleted Options Proj", description: "", emoji: "📁", color: "#6366f1" });
     await deleteProject(deletedForOptions._id.toString(), userA._id.toString());
 
     // Fetch options for User A
@@ -290,7 +290,7 @@ async function runTests() {
     console.log("\n>> Running Project Summary tests...");
     
     // Create a new project for summary tests
-    const sumProj = await createProject(userA._id.toString(), { name: "Summary Proj", description: "" });
+    const sumProj = await createProject(userA._id.toString(), { name: "Summary Proj", description: "", emoji: "📁", color: "#6366f1" });
     
     // Summary of zero-task project
     const zeroSum = await getProjectSummary(sumProj._id.toString(), userA._id.toString());

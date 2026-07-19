@@ -82,6 +82,49 @@ async function runTests() {
     });
     expect(queryInvalidSort.success === false, "Rejects un-whitelisted sort fields");
 
+    // Missing title
+    const createMissingTitle = createTaskSchema.safeParse({
+      description: "No title",
+    });
+    expect(createMissingTitle.success === false, "Rejects missing title");
+
+    const createEmptyTitle = createTaskSchema.safeParse({
+      title: "   ",
+    });
+    expect(createEmptyTitle.success === false, "Rejects empty title");
+
+    // Excessive field lengths
+    const createExcessiveTitle = createTaskSchema.safeParse({
+      title: "a".repeat(151),
+    });
+    expect(createExcessiveTitle.success === false, "Rejects excessive title length");
+
+    const createExcessiveDesc = createTaskSchema.safeParse({
+      title: "Valid",
+      description: "a".repeat(5001),
+    });
+    expect(createExcessiveDesc.success === false, "Rejects excessive description length");
+
+    const createExcessiveEstTime = createTaskSchema.safeParse({
+      title: "Valid",
+      estimatedTime: "a".repeat(21),
+    });
+    expect(createExcessiveEstTime.success === false, "Rejects excessive estimatedTime length");
+
+    // Protected field injection stripping
+    const updateProtectedFields = updateTaskSchema.safeParse({
+      title: "Valid",
+      owner: new Types.ObjectId().toString(),
+      isDeleted: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    expect(updateProtectedFields.success === true, "Accepts valid fields while ignoring protected ones");
+    expect(!("owner" in (updateProtectedFields as any).data), "Strips owner from update payload");
+    expect(!("isDeleted" in (updateProtectedFields as any).data), "Strips isDeleted from update payload");
+    expect(!("createdAt" in (updateProtectedFields as any).data), "Strips createdAt from update payload");
+    expect(!("updatedAt" in (updateProtectedFields as any).data), "Strips updatedAt from update payload");
+
     // =========================================================================
     // 2. Mongoose Schema pre-save hooks & concurrency
     // =========================================================================
@@ -127,15 +170,64 @@ async function runTests() {
     expect(!labelTask.labels.includes(""), "Ignores empty labels");
 
     // completedAt Transitions
-    expect(labelTask.completedAt === null, "completedAt is null for non-done statuses");
+    const compTask = await Task.create({
+      owner: userA._id,
+      title: "Completion Semantics Task",
+      status: "todo"
+    });
+    
+    // 10. todo -> in_progress leaves completedAt null
+    compTask.status = "in_progress";
+    await compTask.save();
+    expect(compTask.completedAt === null, "todo -> in_progress leaves completedAt null");
 
-    labelTask.status = "done";
-    await labelTask.save();
-    expect(labelTask.completedAt instanceof Date, "completedAt is populated when status is 'done'");
+    // 2. in_progress -> done sets completedAt
+    compTask.status = "done";
+    await compTask.save();
+    expect(compTask.completedAt instanceof Date, "in_progress -> done sets completedAt");
+    const firstCompletion = compTask.completedAt;
 
-    labelTask.status = "in_progress";
-    await labelTask.save();
-    expect(labelTask.completedAt === null, "completedAt resets to null when status changes away from 'done'");
+    // 7. done -> done preserves completedAt
+    compTask.status = "done";
+    await compTask.save();
+    expect(compTask.completedAt?.getTime() === firstCompletion?.getTime(), "done -> done preserves completedAt");
+
+    // 8. Updating description on a done Task preserves completedAt
+    compTask.description = "New description";
+    await compTask.save();
+    expect(compTask.completedAt?.getTime() === firstCompletion?.getTime(), "Updating description on a done Task preserves completedAt");
+
+    // 9. Updating priority on a done Task preserves completedAt
+    compTask.priority = "urgent";
+    await compTask.save();
+    expect(compTask.completedAt?.getTime() === firstCompletion?.getTime(), "Updating priority on a done Task preserves completedAt");
+
+    // 4. done -> todo clears completedAt
+    compTask.status = "todo";
+    await compTask.save();
+    expect(compTask.completedAt === null, "done -> todo clears completedAt");
+
+    // 1. todo -> done sets completedAt
+    compTask.status = "done";
+    await compTask.save();
+    expect(compTask.completedAt instanceof Date, "todo -> done sets completedAt");
+
+    // 5. done -> in_progress clears completedAt
+    compTask.status = "in_progress";
+    await compTask.save();
+    expect(compTask.completedAt === null, "done -> in_progress clears completedAt");
+
+    // 6. done -> cancelled clears completedAt
+    compTask.status = "done";
+    await compTask.save();
+    compTask.status = "cancelled";
+    await compTask.save();
+    expect(compTask.completedAt === null, "done -> cancelled clears completedAt");
+
+    // 3. cancelled -> done sets completedAt
+    compTask.status = "done";
+    await compTask.save();
+    expect(compTask.completedAt instanceof Date, "cancelled -> done sets completedAt");
 
     // Optimistic Concurrency Control
     const docInstance1 = await Task.findById(labelTask._id);
@@ -172,6 +264,38 @@ async function runTests() {
       labels: ["Frontend"],
     });
     expect(taskA1.projectId?.toString() === projectA._id.toString(), "Task created under correct project");
+
+    // Verify default values
+    const taskDefault = await createTask(userA._id.toString(), {
+      title: "Task Default Values",
+    });
+    expect(taskDefault.status === "todo", "Default status is 'todo'");
+    expect(taskDefault.priority === "none", "Default priority is 'none'");
+    expect(taskDefault.projectId === null, "Default projectId is null");
+    expect(taskDefault.dueDate === null, "Default dueDate is null");
+    expect(taskDefault.estimatedTime === null, "Default estimatedTime is null");
+    expect(taskDefault.labels.length === 0, "Default labels is empty array");
+    expect(taskDefault.description === "", "Default description is empty string");
+    expect(taskDefault.createdAt instanceof Date, "Populates createdAt");
+    expect(taskDefault.updatedAt instanceof Date, "Populates updatedAt");
+
+    // Verify partial updates
+    const updatedTitle = await updateTask(taskDefault._id.toString(), userA._id.toString(), {
+      title: "Updated Title Only",
+    });
+    expect(updatedTitle.title === "Updated Title Only", "Updates title");
+    expect(updatedTitle.status === "todo", "Leaves other fields unchanged on partial update");
+
+    const updatedProject = await updateTask(taskDefault._id.toString(), userA._id.toString(), {
+      projectId: projectA._id.toString(),
+    });
+    expect(updatedProject.projectId?.toString() === projectA._id.toString(), "Updates projectId");
+
+    // Verify projectId: null unassigns task
+    const unassignedProject = await updateTask(taskDefault._id.toString(), userA._id.toString(), {
+      projectId: null,
+    });
+    expect(unassignedProject.projectId === null, "Unassigns task from project on projectId: null");
 
     // Create Task under Project B by User A (Cross-project ownership vulnerability check)
     let crossProjectFailed = false;
@@ -260,7 +384,7 @@ async function runTests() {
       sort: "-updatedAt",
       archived: false,
     });
-    expect(list1.items.length === 3, "Lists all active tasks for user A (including normalized task)");
+    expect(list1.items.length === 5, "Lists all active tasks for user A (including normalized task)");
     expect(!list1.items.some((t) => t.owner.toString() === userB._id.toString()), "Excludes User B's tasks from lists");
 
     // Regex Search: matching title, description, and labels

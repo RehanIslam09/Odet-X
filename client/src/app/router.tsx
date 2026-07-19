@@ -18,6 +18,7 @@ import ProjectDetailPage from "@/features/projects/pages/ProjectDetailPage";
 import SettingsPage from "@/features/settings/pages/SettingsPage";
 import TasksPage from "@/features/tasks/pages/TasksPage";
 import TaskDetailPage from "@/features/tasks/pages/TaskDetailPage";
+import TaskNotesWorkspacePage from "@/features/tasks/pages/TaskNotesWorkspacePage";
 import ActivityPage from "@/features/activity/pages/ActivityPage";
 import NotificationsPage from "@/features/notifications/pages/NotificationsPage";
 import ProtectedRoute from "@/routes/ProtectedRoute";
@@ -80,6 +81,7 @@ export const router = createBrowserRouter(
           <Route path="tasks">
             <Route index element={<TasksPage />} />
             <Route path=":taskId" element={<TaskDetailPage />} />
+            <Route path=":taskId/notes" element={<TaskNotesWorkspacePage />} />
           </Route>
 
           {/* Activities */}

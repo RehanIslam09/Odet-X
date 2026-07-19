@@ -22,6 +22,7 @@ export interface Task {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  notes?: string;
 }
 
 export interface TasksQueryParams {

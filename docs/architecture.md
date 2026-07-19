@@ -242,9 +242,11 @@ Even if a sensitive field is accidentally selected, the `toJSON` transform remov
 ```
 /                           ← ProtectedRoute → DashboardLayout
   /                         ← DashboardPage
-  /projects                 ← (Phase 8)
-  /tasks                    ← (Phase 9)
-  /settings                 ← (future)
+  /projects                 ← ProjectsDashboardPage
+  /projects/:id             ← ProjectDetailPage
+  /tasks                    ← Tasks Dashboard
+  /tasks/:id                ← TaskDetailPage
+  /settings                 ← SettingsPage
 
 /auth                       ← PublicRoute → AuthLayout
   /auth/login               ← LoginPage
@@ -265,8 +267,10 @@ All routes are prefixed `/api/v1`. A root `index.ts` router mounts sub-routers:
 ```
 /api/v1/health
 /api/v1/auth/*
-/api/v1/projects/*  (Phase 8)
-/api/v1/tasks/*     (Phase 9)
+/api/v1/users/me/*
+/api/v1/projects/*
+/api/v1/tasks/*
+/api/v1/dashboard/*
 ```
 
 ---

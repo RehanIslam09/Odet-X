@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys";
 import { tasksApi } from "@/features/tasks/services/tasks.api.js";
 import { taskKeys } from "@/features/tasks/hooks/useTasks.js";
 import { projectKeys } from "@/features/projects/hooks/useProjects.js";
@@ -46,9 +47,12 @@ export function useDeleteTask() {
       queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
 
       // Phase 12.3: Invalidate project summary
-      if (context?.previousTask?.projectId) {
-        queryClient.invalidateQueries({ queryKey: projectKeys.summary(context.previousTask.projectId) });
+      const previousTask = context?.previousTask;
+      if (previousTask?.projectId) {
+        queryClient.invalidateQueries({ queryKey: projectKeys.summary(previousTask.projectId) });
       }
+
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.overview() });
 
       toast.success("Task deleted.");
     },

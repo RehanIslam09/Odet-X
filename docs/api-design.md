@@ -187,17 +187,55 @@ No body required. Reads the `refreshToken` cookie automatically.
 
 ---
 
+## Project Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/projects` | Bearer | List paginated projects |
+| POST | `/projects` | Bearer | Create a new project |
+| GET | `/projects/options` | Bearer | Get simplified project list for dropdowns |
+| GET | `/projects/:id` | Bearer | Get full project details |
+| PATCH | `/projects/:id` | Bearer | Update project details |
+| POST | `/projects/:id/archive` | Bearer | Archive/unarchive a project |
+| DELETE| `/projects/:id` | Bearer | Soft delete a project |
+| GET | `/projects/:id/summary` | Bearer | Get project summary metrics |
+
+---
+
+## Task Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/tasks` | Bearer | List paginated tasks (filtered by project/etc) |
+| POST | `/tasks` | Bearer | Create a new task |
+| GET | `/tasks/:id` | Bearer | Get full task details |
+| PATCH | `/tasks/:id` | Bearer | Update task fields (status, priority, etc) |
+| POST | `/tasks/:id/archive` | Bearer | Archive/unarchive a task |
+| DELETE| `/tasks/:id` | Bearer | Soft delete a task |
+
+---
+
+## User & Settings Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| PATCH | `/users/me/profile` | Bearer | Update display name and bio |
+| PATCH | `/users/me/preferences` | Bearer | Update theme, locale, notifications |
+| PATCH | `/users/me/password` | Bearer | Change password |
+
+---
+
+## Dashboard Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/dashboard/overview`| Bearer | Get comprehensive analytics and metrics |
+
+---
+
 ## Future Endpoints
 
 As phases are implemented, this document will be updated with:
 
-- `POST /projects` — Create project
-- `GET /projects` — List projects
-- `GET /projects/:id` — Get project
-- `PATCH /projects/:id` — Update project
-- `DELETE /projects/:id` — Delete project
-- `POST /projects/:id/tasks` — Create task
-- `GET /projects/:id/tasks` — List tasks
-- `PATCH /tasks/:id` — Update task
-- `DELETE /tasks/:id` — Delete task
 - `POST /ai/generate-tasks` — AI task generation
+- `POST /ai/summarize` — AI summaries

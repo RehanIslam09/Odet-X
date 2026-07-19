@@ -12,7 +12,10 @@ export function useActivities(params?: Omit<ActivityQueryDto, "cursor">) {
         cursor: pageParam as string | undefined,
       }),
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.pagination.nextCursor,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage?.pagination?.hasMore) return undefined;
+      return lastPage.pagination.nextCursor ?? undefined;
+    },
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }

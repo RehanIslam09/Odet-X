@@ -178,6 +178,7 @@ export async function createProject(
     entityType: "project",
     entityId: project._id.toString(),
     projectId: project._id.toString(),
+    contextProjectIds: [project._id.toString()],
     metadata: {
       projectName: project.name,
     },
@@ -232,6 +233,7 @@ export async function updateProject(
       entityType: "project",
       entityId: project._id.toString(),
       projectId: project._id.toString(),
+      contextProjectIds: [project._id.toString()],
       metadata: {
         projectName: project.name,
       },
@@ -270,6 +272,7 @@ export async function toggleProjectArchive(
     entityType: "project",
     entityId: project._id.toString(),
     projectId: project._id.toString(),
+    contextProjectIds: [project._id.toString()],
     metadata: {
       projectName: project.name,
     },
@@ -322,6 +325,7 @@ export async function deleteProject(
     entityType: "project",
     entityId: project._id.toString(),
     projectId: project._id.toString(),
+    contextProjectIds: [project._id.toString()],
     metadata: {
       projectName: project.name,
     },

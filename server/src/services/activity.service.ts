@@ -9,6 +9,7 @@ export interface BaseActivityPayload {
   entityType: "project" | "task";
   entityId: string;
   projectId?: string | null;
+  contextProjectIds?: string[];
   taskId?: string | null;
   metadata: Record<string, any>; // constructed safely server-side
 }
@@ -36,6 +37,7 @@ export async function recordActivity(payload: BaseActivityPayload): Promise<void
       entityType: payload.entityType,
       entityId: new Types.ObjectId(payload.entityId),
       projectId: payload.projectId ? new Types.ObjectId(payload.projectId) : null,
+      contextProjectIds: payload.contextProjectIds?.map(id => new Types.ObjectId(id)) || [],
       taskId: payload.taskId ? new Types.ObjectId(payload.taskId) : null,
       metadata: payload.metadata,
     });
@@ -59,6 +61,7 @@ export async function recordActivities(payloads: BaseActivityPayload[]): Promise
       entityType: p.entityType,
       entityId: new Types.ObjectId(p.entityId),
       projectId: p.projectId ? new Types.ObjectId(p.projectId) : null,
+      contextProjectIds: p.contextProjectIds?.map(id => new Types.ObjectId(id)) || [],
       taskId: p.taskId ? new Types.ObjectId(p.taskId) : null,
       metadata: p.metadata,
     }));
@@ -81,7 +84,14 @@ export async function listActivities(
     owner: new Types.ObjectId(userId),
   };
 
-  if (projectId) filter.projectId = new Types.ObjectId(projectId);
+  if (projectId) {
+    // Backward compatibility: match either the new context array or the legacy projectId field.
+    const projectObjId = new Types.ObjectId(projectId);
+    filter.$or = [
+      { contextProjectIds: projectObjId },
+      { projectId: projectObjId },
+    ];
+  }
   if (taskId) filter.taskId = new Types.ObjectId(taskId);
   if (cursor) filter._id = { $lt: new Types.ObjectId(cursor) };
 

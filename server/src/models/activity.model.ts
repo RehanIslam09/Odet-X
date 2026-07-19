@@ -7,7 +7,8 @@ export interface IActivity {
   type: ActivityType;
   entityType: "project" | "task";
   entityId: Types.ObjectId;
-  projectId?: Types.ObjectId | null;
+  projectId?: Types.ObjectId | null; // Primary project context (legacy filtering)
+  contextProjectIds: Types.ObjectId[]; // All projects this event is relevant to (e.g. source and destination on move)
   taskId?: Types.ObjectId | null;
   metadata: Record<string, any>;
   createdAt: Date;
@@ -23,6 +24,7 @@ const activitySchema = new Schema<IActivityDocument>(
     entityType: { type: String, enum: ["project", "task"], required: true },
     entityId: { type: Schema.Types.ObjectId, required: true },
     projectId: { type: Schema.Types.ObjectId, ref: "Project", default: null },
+    contextProjectIds: { type: [Schema.Types.ObjectId], ref: "Project", default: [] },
     taskId: { type: Schema.Types.ObjectId, ref: "Task", default: null },
     metadata: { type: Schema.Types.Mixed, default: {} },
   },
@@ -42,8 +44,10 @@ const activitySchema = new Schema<IActivityDocument>(
 // Indexes
 // Dashboard activity feed
 activitySchema.index({ owner: 1, _id: -1 });
-// Project activity feed
+// Project activity feed (legacy)
 activitySchema.index({ owner: 1, projectId: 1, _id: -1 });
+// Project activity feed (new multikey index)
+activitySchema.index({ owner: 1, contextProjectIds: 1, _id: -1 });
 // Task activity feed
 activitySchema.index({ owner: 1, taskId: 1, _id: -1 });
 

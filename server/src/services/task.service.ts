@@ -1,7 +1,7 @@
 import { SortOrder, Types } from "mongoose";
 
 import Task, { ITaskDocument } from "@/models/task.model.js";
-import Project from "@/models/project.model.js";
+import Project, { IProjectDocument } from "@/models/project.model.js";
 
 import type {
   CreateTaskDto,
@@ -45,7 +45,7 @@ function escapeRegex(value: string): string {
 async function validateProjectOwnership(
   projectId: string | Types.ObjectId,
   userId: string,
-): Promise<void> {
+): Promise<IProjectDocument> {
   const project = await Project.findOne({
     _id: projectId,
     owner: new Types.ObjectId(userId),
@@ -55,6 +55,8 @@ async function validateProjectOwnership(
   if (!project) {
     throw new NotFoundError("Project not found.");
   }
+
+  return project;
 }
 
 /**
@@ -120,6 +122,7 @@ export async function createTask(
     entityType: "task",
     entityId: task._id.toString(),
     projectId: task.projectId?.toString() ?? null,
+    contextProjectIds: task.projectId ? [task.projectId.toString()] : [],
     taskId: task._id.toString(),
     metadata: {
       taskTitle: task.title,
@@ -246,26 +249,43 @@ export async function updateTask(
     entityId: task._id.toString(),
     taskId: task._id.toString(),
     metadata: { taskTitle: data.title !== undefined ? data.title : task.title },
+    contextProjectIds: task.projectId ? [task.projectId.toString()] : [],
   };
 
   // If project is changing, validate access to the new project
   if (data.projectId !== undefined) {
     if (data.projectId === null && task.projectId !== null) {
+      const fromProject = await Project.findById(task.projectId);
       events.push({
         ...baseEvent,
         type: ACTIVITY_TYPES.TASK_PROJECT_CHANGED,
         projectId: null,
-        metadata: { ...baseEvent.metadata, fromProjectId: task.projectId.toString(), toProjectId: null },
+        contextProjectIds: [task.projectId.toString()],
+        metadata: {
+          ...baseEvent.metadata,
+          fromProjectId: task.projectId.toString(),
+          toProjectId: null,
+          fromProjectName: fromProject?.name || "Unknown Project",
+          toProjectName: null
+        },
       });
       task.projectId = null;
     } else if (data.projectId !== null && (!task.projectId || task.projectId.toString() !== data.projectId)) {
       const projectObjId = new Types.ObjectId(data.projectId);
-      await validateProjectOwnership(projectObjId, userId);
+      const toProject = await validateProjectOwnership(projectObjId, userId);
+      const fromProject = task.projectId ? await Project.findById(task.projectId) : null;
       events.push({
         ...baseEvent,
         type: ACTIVITY_TYPES.TASK_PROJECT_CHANGED,
         projectId: data.projectId,
-        metadata: { ...baseEvent.metadata, fromProjectId: task.projectId?.toString() || null, toProjectId: data.projectId },
+        contextProjectIds: task.projectId ? [task.projectId.toString(), data.projectId] : [data.projectId],
+        metadata: {
+          ...baseEvent.metadata,
+          fromProjectId: task.projectId?.toString() || null,
+          toProjectId: data.projectId,
+          fromProjectName: fromProject?.name || null,
+          toProjectName: toProject.name
+        },
       });
       task.projectId = projectObjId;
     }
@@ -353,6 +373,7 @@ export async function toggleTaskArchive(
     entityType: "task",
     entityId: task._id.toString(),
     projectId: task.projectId?.toString() || null,
+    contextProjectIds: task.projectId ? [task.projectId.toString()] : [],
     taskId: task._id.toString(),
     metadata: {
       taskTitle: task.title,
@@ -380,6 +401,7 @@ export async function deleteTask(
     entityType: "task",
     entityId: task._id.toString(),
     projectId: task.projectId?.toString() || null,
+    contextProjectIds: task.projectId ? [task.projectId.toString()] : [],
     taskId: task._id.toString(),
     metadata: {
       taskTitle: task.title,

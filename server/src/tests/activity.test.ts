@@ -135,6 +135,41 @@ async function runTests() {
     expect(activities[0]!.type === ACTIVITY_TYPES.TASK_UPDATED, "Emits TASK_UPDATED");
     expect(activities[0]!.metadata.taskTitle === "New Title", "Metadata captures new title");
 
+    console.log("\n>> Running Integration: Project Reassignment Metadata Test...");
+    await Activity.deleteMany({});
+    
+    // Create Project A and Project B
+    const { createProject } = await import("../services/project.service.js");
+    const projA = await createProject(userA, { name: "Project A", description: "", emoji: "📁", color: "blue" });
+    const projB = await createProject(userA, { name: "Project B", description: "", emoji: "📁", color: "red" });
+
+    // Move task to Project A (from no project)
+    await updateTask(task._id.toString(), userA, { projectId: projA._id.toString() });
+    activities = await Activity.find({ owner: new Types.ObjectId(userA), entityId: task._id, type: ACTIVITY_TYPES.TASK_PROJECT_CHANGED });
+    expect(activities.length === 1, "Emitted TASK_PROJECT_CHANGED on assignment");
+    expect(activities[0]!.metadata.toProjectName === "Project A", "Captured toProjectName correctly");
+    expect(activities[0]!.metadata.fromProjectName === null, "fromProjectName is null");
+    expect(activities[0]!.contextProjectIds.map(id => id.toString()).includes(projA._id.toString()), "Context includes Project A");
+
+    // Move task from Project A to Project B
+    await Activity.deleteMany({});
+    await updateTask(task._id.toString(), userA, { projectId: projB._id.toString() });
+    activities = await Activity.find({ owner: new Types.ObjectId(userA), entityId: task._id, type: ACTIVITY_TYPES.TASK_PROJECT_CHANGED });
+    expect(activities.length === 1, "Emitted TASK_PROJECT_CHANGED on reassignment");
+    expect(activities[0]!.metadata.fromProjectName === "Project A", "Captured fromProjectName correctly");
+    expect(activities[0]!.metadata.toProjectName === "Project B", "Captured toProjectName correctly");
+    expect(activities[0]!.contextProjectIds.map(id => id.toString()).includes(projA._id.toString()), "Context includes Project A (from)");
+    expect(activities[0]!.contextProjectIds.map(id => id.toString()).includes(projB._id.toString()), "Context includes Project B (to)");
+
+    // Remove task from Project B
+    await Activity.deleteMany({});
+    await updateTask(task._id.toString(), userA, { projectId: null });
+    activities = await Activity.find({ owner: new Types.ObjectId(userA), entityId: task._id, type: ACTIVITY_TYPES.TASK_PROJECT_CHANGED });
+    expect(activities.length === 1, "Emitted TASK_PROJECT_CHANGED on removal");
+    expect(activities[0]!.metadata.fromProjectName === "Project B", "Captured fromProjectName correctly on removal");
+    expect(activities[0]!.metadata.toProjectName === null, "toProjectName is null on removal");
+    expect(activities[0]!.contextProjectIds.map(id => id.toString()).includes(projB._id.toString()), "Context includes Project B");
+
     console.log("\n🎉 ALL TESTS COMPLETED SUCCESSFULLY! 🎉");
     await teardownTestDatabase();
     process.exit(0);

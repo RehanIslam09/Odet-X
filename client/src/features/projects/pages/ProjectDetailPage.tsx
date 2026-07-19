@@ -16,6 +16,7 @@ import { ProjectSummaryCards } from "@/features/projects/components/ProjectSumma
 import { ProjectTasks } from "@/features/projects/components/ProjectTasks";
 import { EditProjectDialog } from "@/features/projects/components/EditProjectDialog";
 import { DeleteProjectDialog } from "@/features/projects/components/DeleteProjectDialog";
+import { EntityActivityTimeline } from "@/features/activity/components/EntityActivityTimeline";
 
 /**
  * The Project Detail Workspace.
@@ -116,6 +117,8 @@ export default function ProjectDetailPage() {
       />
 
       <ProjectTasks projectId={project.id} />
+
+      <EntityActivityTimeline projectId={project.id} />
 
       <EditProjectDialog
         project={project}

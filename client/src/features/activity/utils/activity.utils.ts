@@ -41,8 +41,17 @@ export function getActivityDescription(activity: Activity): string {
       return `Updated priority for ${taskTitle}`;
     }
     case "task.project_changed": {
-      const toProject = typeof metadata.toProjectId === "string" ? "another project" : "no project";
-      return `Moved ${taskTitle} to ${toProject}`; // Simple fallback without fetching project names
+      const fromProject = typeof metadata.fromProjectName === "string" ? metadata.fromProjectName : null;
+      const toProject = typeof metadata.toProjectName === "string" ? metadata.toProjectName : null;
+
+      if (fromProject && toProject) {
+        return `Moved ${taskTitle} from ${fromProject} to ${toProject}`;
+      } else if (toProject) {
+        return `Added ${taskTitle} to ${toProject}`;
+      } else if (fromProject) {
+        return `Removed ${taskTitle} from ${fromProject}`;
+      }
+      return `Moved ${taskTitle}`;
     }
     case "task.archived":
       return `Archived task ${taskTitle}`;

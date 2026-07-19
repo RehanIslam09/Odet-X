@@ -10,7 +10,7 @@ import type {
   UpdateTaskNotesDto,
 } from "@/validators/task.validator.js";
 
-import { BadRequestError, ForbiddenError, NotFoundError } from "@/utils/app-error.js";
+import { BadRequestError, ForbiddenError, NotFoundError, ConflictError } from "@/utils/app-error.js";
 import { recordActivity, recordActivities, BaseActivityPayload } from "@/services/activity.service.js";
 import { ACTIVITY_TYPES } from "@/constants/activity.js";
 
@@ -367,18 +367,47 @@ export async function updateTaskNotes(
   userId: string,
   data: UpdateTaskNotesDto,
 ): Promise<ITaskDocument> {
-  const task = await assertTaskOwnership(taskId, userId);
-  
-  // Update only notes
-  task.notes = data.notes;
-  
-  // Note: Optimistic concurrency control (__v) is automatically handled by task.save()
-  // if enabled in the schema. This provides basic stale-write protection, though
-  // full autosave conflict resolution is deferred to Phase 17.3.
-  await task.save();
+  const query: any = {
+    _id: taskId,
+    owner: new Types.ObjectId(userId),
+    isDeleted: false,
+  };
+
+  // If expectedVersion is provided, make the update atomic and conditional
+  if (data.expectedVersion !== undefined) {
+    query.__v = data.expectedVersion;
+  }
+
+  // Use findOneAndUpdate to atomically apply the notes and increment __v
+  // runValidators: false is safe here because notes validation already occurred via Zod,
+  // but true is safer if Mongoose has custom schema constraints.
+  const task = await Task.findOneAndUpdate(
+    query,
+    {
+      $set: { notes: data.notes },
+      $inc: { __v: 1 },
+    },
+    { new: true, runValidators: true }
+  );
+
+  if (!task) {
+    // If the document wasn't found, we must distinguish between:
+    // 1. Task doesn't exist / deleted / wrong owner -> 404
+    // 2. Task exists but __v mismatched -> 409 Conflict
+    const exists = await Task.exists({
+      _id: taskId,
+      owner: new Types.ObjectId(userId),
+      isDeleted: false,
+    });
+
+    if (!exists) {
+      throw new NotFoundError("Task not found.");
+    } else {
+      throw new ConflictError("Notes were updated in another session.");
+    }
+  }
 
   // Explicitly ZERO Activity events generated here.
-  
   return task;
 }
 /**

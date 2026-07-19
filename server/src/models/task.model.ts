@@ -128,9 +128,8 @@ const taskSchema = new Schema<ITaskDocument>(
     toJSON: {
       virtuals: true,
       transform(_doc, ret) {
-        const { _id: _, __v: __, ...safe } = ret as Record<string, unknown>;
-        void _, void __;
-        return safe;
+        const { _id: _, __v, ...safe } = ret as Record<string, unknown>;
+        return { ...safe, version: __v };
       },
     },
   },

@@ -15,8 +15,8 @@ export function useUpdateTaskNotes() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, notes }: { id: string; notes: string }) =>
-      tasksApi.updateNotes(id, notes),
+    mutationFn: ({ id, notes, expectedVersion }: { id: string; notes: string; expectedVersion?: number }) =>
+      tasksApi.updateNotes(id, notes, expectedVersion),
 
     onSuccess: (responseData) => {
       const { task } = responseData;

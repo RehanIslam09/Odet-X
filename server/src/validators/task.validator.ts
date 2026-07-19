@@ -100,6 +100,7 @@ export const updateTaskNotesSchema = z.object({
   notes: z
     .string()
     .max(250000, "Notes must be at most 250,000 characters."),
+  expectedVersion: z.number().int().nonnegative().optional(),
 });
 
 // ---------------------------------------------------------------------------

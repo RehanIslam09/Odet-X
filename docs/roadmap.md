@@ -277,7 +277,32 @@
 - Strict MongoDB-level idempotency via sparse `dedupeKey` index
 - (Real-time delivery via WebSockets deferred to Phase 12 Collaboration)
 
-## ✅ Phase 17 — Deployment
+## ✅ Phase 17.1 — Task Notes Backend Foundation
+- Single canonical Markdown notes document per Task
+- Secure Markdown persistence in `Task.notes`
+- Activity and Notification system isolation
+- Backend CRUD endpoints for Task Notes
+
+---
+
+## ✅ Phase 17.2 — Task Notes Workspace UI
+- Compact Task Detail notes preview with truncation
+- Dedicated `/tasks/:taskId/notes` Workspace
+- Write and Preview view modes
+- Local draft state tied strictly to route initialization
+
+---
+
+## ✅ Phase 17.3 — Task Notes Autosave & Concurrency
+- Atomic version-checked backend updates (409 Conflict)
+- 1000ms debounced auto-save hook with strict serialization
+- Safe component unmount and draft isolation
+- Robust internal navigation blocking (`useBlocker`)
+- Native browser `beforeunload` protection
+
+---
+
+## 📋 Phase 18 — Deployment
 
 - Docker + docker-compose
 - CI/CD pipeline (GitHub Actions)

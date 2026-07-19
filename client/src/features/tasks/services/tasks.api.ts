@@ -84,10 +84,11 @@ export const tasksApi = {
   updateNotes: async (
     id: string,
     notes: string,
+    expectedVersion?: number,
   ): Promise<TaskResponseData> => {
     const response = await apiClient.patch<ApiResponse<TaskResponseData>>(
       `/tasks/${id}/notes`,
-      { notes },
+      { notes, expectedVersion },
     );
     return response.data.data;
   },

@@ -23,6 +23,7 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   notes?: string;
+  version: number;
 }
 
 export interface TasksQueryParams {

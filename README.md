@@ -98,8 +98,11 @@ VITE_API_URL=http://localhost:5000/api/v1
 ### 5. Start the development servers
 
 ```bash
-# Server (from /server)
+# Server API (from /server)
 npm run dev
+
+# Server Background Worker (from /server, in a separate terminal)
+npm run worker:dev
 
 # Client (from /client)
 npm run dev
@@ -180,7 +183,11 @@ Base URL: `http://localhost:5000/api/v1`
 | PATCH | `/tasks/:id` | Bearer | Update a task |
 | POST | `/tasks/:id/archive` | Bearer | Archive/unarchive a task |
 | DELETE| `/tasks/:id` | Bearer | Soft delete a task |
-| GET | `/dashboard/overview`| Bearer | Get dashboard analytics overview |
+| GET | `/activities` | Bearer | List activity history |
+| GET | `/notifications` | Bearer | List notifications |
+| GET | `/notifications/unread-count` | Bearer | Get unread notification count |
+| PATCH | `/notifications/:id/read` | Bearer | Mark notification as read |
+| PATCH | `/notifications/read-all` | Bearer | Mark all notifications as read |
 
 See [docs/api-design.md](./docs/api-design.md) for full request/response documentation.
 
@@ -250,8 +257,9 @@ ai-project-manager/
 - ✅ Project Management (CRUD, Soft Delete, Archive, Search, Pagination, Project Workspace)
 - ✅ Task Management (CRUD, Kanban lifecycle, Prioritization, Soft Delete, Task Workspace)
 - ✅ Dashboard Analytics (Active metrics, Recent Projects progress, Attention Tasks)
-- ✅ Activity & Audit Backend Foundation
-- 📋 AI Features (task generation, summaries)
+- ✅ Activity & Audit Foundation (Backend + Frontend UX)
+- ✅ Notification Backend Foundation
+- ✅ Notification Frontend Center
 - 📋 Real-time Collaboration (comments, live updates)
 - 📋 Deployment (Docker, CI/CD)
 

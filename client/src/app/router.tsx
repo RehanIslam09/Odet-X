@@ -19,6 +19,7 @@ import SettingsPage from "@/features/settings/pages/SettingsPage";
 import TasksPage from "@/features/tasks/pages/TasksPage";
 import TaskDetailPage from "@/features/tasks/pages/TaskDetailPage";
 import ActivityPage from "@/features/activity/pages/ActivityPage";
+import NotificationsPage from "@/features/notifications/pages/NotificationsPage";
 import ProtectedRoute from "@/routes/ProtectedRoute";
 import PublicRoute from "@/routes/PublicRoute";
 
@@ -84,6 +85,11 @@ export const router = createBrowserRouter(
           {/* Activities */}
           <Route path="activities">
             <Route index element={<ActivityPage />} />
+          </Route>
+
+          {/* Notifications */}
+          <Route path="notifications">
+            <Route index element={<NotificationsPage />} />
           </Route>
 
           {/* Settings */}

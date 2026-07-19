@@ -234,7 +234,7 @@
 
 ---
 
-## ✅ Phase 15.1 — Activity & Audit Backend Foundation
+## ✅ Phase 15 — Activity & Audit Foundation
 
 - Activity & Audit model
 - Best-effort bulk insertion layer
@@ -242,10 +242,42 @@
 - Task & Project Service integration
 - Isolated test infrastructure with Tenant boundaries
 - Cursor pagination for Activity feed
+- Dashboard and Entity-specific frontend timelines
 
 ---
 
-## 📋 Phase 15.2 — Deployment
+## ✅ Phase 16.1 — Notification Backend Foundation
+
+- Separate Notification domain (distinct from Activity)
+- Actionable read/unread state tracking
+- Tenant isolation and BOLA protections
+- Snapshot persistence for resilient history
+- Cursor paginated API, unread count API
+- Idempotent state updates
+- (Active producers deferred to future collaboration/AI phases)
+
+---
+
+## ✅ Phase 16.2 — Notification Center Frontend Integration
+
+- Notification Bell and unread count badge in Dashboard Navbar
+- Popover preview with lazy fetching
+- Dedicated cursor-paginated `/notifications` page
+- Filter by All, Unread, and Read statuses
+- Contextual entity navigation from notifications
+- Cache synchronization via authoritative invalidation and optimistic unread counts
+
+---
+
+## ✅ Phase 16.3 — Notification Producers & Scheduled Reminders
+
+- Node-cron independent worker process (`worker.ts`)
+- Global `task.due_soon` (24h) evaluation
+- Global `task.overdue` evaluation
+- Strict MongoDB-level idempotency via sparse `dedupeKey` index
+- (Real-time delivery via WebSockets deferred to Phase 12 Collaboration)
+
+## ✅ Phase 17 — Deployment
 
 - Docker + docker-compose
 - CI/CD pipeline (GitHub Actions)

@@ -17,8 +17,13 @@ export const notificationApi = {
     const response = await apiClient.get<
       ApiResponse<CursorPaginatedNotifications>
     >("/notifications", { params });
-    // CRITICAL: Explicitly unwrap the API envelope as defined in the Phase 16.2 spec.
-    return response.data.data;
+    const data = response.data.data;
+    // Normalize _id from lean() to id to prevent missing key warnings
+    data.items = data.items.map((item: import("../types/notification.types").Notification & { _id?: string }) => ({
+      ...item,
+      id: item._id || item.id,
+    }));
+    return data;
   },
 
   getUnreadCount: async (): Promise<{ count: number }> => {

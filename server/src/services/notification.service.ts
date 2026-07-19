@@ -13,6 +13,7 @@ export interface CreateNotificationPayload {
   title: string;
   message: string;
   metadata?: Record<string, unknown>;
+  dedupeKey?: string | null;
 }
 
 /**
@@ -21,16 +22,46 @@ export interface CreateNotificationPayload {
  */
 export const createNotification = async (payload: CreateNotificationPayload): Promise<void> => {
   try {
-    const notification = new Notification({
+    const docData: any = {
       ...payload,
       recipientId: new Types.ObjectId(payload.recipientId),
       actorId: payload.actorId ? new Types.ObjectId(payload.actorId) : null,
       entityId: payload.entityId ? new Types.ObjectId(payload.entityId) : null,
       metadata: payload.metadata || {},
-    });
+    };
+    if (docData.dedupeKey === null) delete docData.dedupeKey;
+    const notification = new Notification(docData);
     await notification.save();
   } catch (error) {
     console.error("Failed to create notification (best-effort):", error);
+  }
+};
+
+/**
+ * Strict internal helper for background workers.
+ * Distinguishes expected deduplication (E11000 on dedupeKey) from genuine database failures.
+ * Throws genuine errors so workers can handle retries safely.
+ */
+export const createNotificationStrict = async (payload: CreateNotificationPayload): Promise<boolean> => {
+  try {
+    const docData: any = {
+      ...payload,
+      recipientId: new Types.ObjectId(payload.recipientId),
+      actorId: payload.actorId ? new Types.ObjectId(payload.actorId) : null,
+      entityId: payload.entityId ? new Types.ObjectId(payload.entityId) : null,
+      metadata: payload.metadata || {},
+    };
+    if (docData.dedupeKey === null) delete docData.dedupeKey;
+    const notification = new Notification(docData);
+    await notification.save();
+    return true; // Successfully created
+  } catch (error: any) {
+    // E11000 Duplicate Key Error explicitly caught to verify idempotency
+    if (error?.code === 11000) {
+      return false; // Safely ignored as deduplication
+    }
+    // Genuine DB failure, throw to let the worker handle it
+    throw error;
   }
 };
 

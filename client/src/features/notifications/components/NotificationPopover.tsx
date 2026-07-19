@@ -24,14 +24,17 @@ export function NotificationPopover({ children }: NotificationPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   // Lazy fetch: only enabled when the popover is open
-  const { data, isLoading, isError, error, refetch } = useNotifications(
+  const { data, isPending, isError, error, refetch } = useNotifications(
     { limit: 5 },
     { enabled: isOpen },
   );
   
   const markAllRead = useMarkAllNotificationsRead();
 
-  const notifications = data?.pages.flatMap((page) => page.items) ?? [];
+  const rawNotifications = data?.pages.flatMap((page) => page.items) ?? [];
+  const notifications = Array.from(
+    new Map(rawNotifications.map((n) => [n.id, n])).values(),
+  );
   const hasUnread = notifications.some((n) => n.readAt === null);
 
   return (
@@ -60,7 +63,7 @@ export function NotificationPopover({ children }: NotificationPopoverProps) {
           <div className="overflow-y-auto max-h-[400px]">
             <NotificationList
               notifications={notifications}
-              isLoading={isLoading}
+              isLoading={isPending}
               isError={isError}
               error={error}
               onRetry={refetch}

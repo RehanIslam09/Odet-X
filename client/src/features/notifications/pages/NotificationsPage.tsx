@@ -15,7 +15,7 @@ export default function NotificationsPage() {
 
   const {
     data,
-    isLoading,
+    isPending,
     isError,
     error,
     refetch,
@@ -26,7 +26,10 @@ export default function NotificationsPage() {
 
   const markAllRead = useMarkAllNotificationsRead();
 
-  const notifications = data?.pages.flatMap((page) => page.items) ?? [];
+  const rawNotifications = data?.pages.flatMap((page) => page.items) ?? [];
+  const notifications = Array.from(
+    new Map(rawNotifications.map((n) => [n.id, n])).values(),
+  );
   // Has unread in current view
   const hasUnread = notifications.some((n) => n.readAt === null);
 
@@ -74,11 +77,11 @@ export default function NotificationsPage() {
             <ErrorBoundary fallback={<div className="p-4 text-destructive">Failed to render notifications.</div>}>
               <NotificationList
                 notifications={notifications}
-                isLoading={isLoading}
+                isLoading={isPending}
                 isError={isError}
                 error={error}
                 onRetry={refetch}
-                skeletonCount={8}
+                skeletonCount={4}
                 emptyStateFilter={filter}
               />
             </ErrorBoundary>

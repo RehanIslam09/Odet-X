@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Notification } from "../types/notification.types";
 import { NotificationItem } from "./NotificationItem";
@@ -25,12 +26,16 @@ export function NotificationList({
   onSelect,
 }: NotificationListProps) {
   if (isError) {
-    return <NotificationErrorState onRetry={onRetry} />;
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+        <NotificationErrorState onRetry={onRetry} />
+      </motion.div>
+    );
   }
 
   if (isLoading) {
     return (
-      <div className="flex flex-col">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }} className="flex flex-col">
         {Array.from({ length: skeletonCount }).map((_, i) => (
           <div key={i} className="flex gap-3 border-b p-4 last:border-b-0">
             <Skeleton className="mt-1 h-2 w-2 shrink-0 rounded-full" />
@@ -40,16 +45,20 @@ export function NotificationList({
             </div>
           </div>
         ))}
-      </div>
+      </motion.div>
     );
   }
 
   if (notifications.length === 0) {
-    return <NotificationEmptyState statusFilter={emptyStateFilter} />;
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+        <NotificationEmptyState statusFilter={emptyStateFilter} />
+      </motion.div>
+    );
   }
 
   return (
-    <div className="flex flex-col">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }} className="flex flex-col">
       {notifications.map((notification, idx) => (
         <div
           key={notification.id}
@@ -60,6 +69,6 @@ export function NotificationList({
           <NotificationItem notification={notification} onSelect={onSelect} />
         </div>
       ))}
-    </div>
+    </motion.div>
   );
 }

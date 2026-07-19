@@ -98,8 +98,11 @@ VITE_API_URL=http://localhost:5000/api/v1
 ### 5. Start the development servers
 
 ```bash
-# Server (from /server)
+# Server API (from /server)
 npm run dev
+
+# Server Background Worker (from /server, in a separate terminal)
+npm run worker:dev
 
 # Client (from /client)
 npm run dev

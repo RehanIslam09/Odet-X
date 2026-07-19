@@ -189,6 +189,9 @@ taskSchema.index({ owner: 1, isDeleted: 1, archived: 1, dueDate: 1, updatedAt: -
 // 6. Support text-like queries on label lists inside task filtering
 taskSchema.index({ owner: 1, isDeleted: 1, labels: 1 });
 
+// 7. Global Scheduler Index: Efficiently scans active tasks globally by dueDate
+taskSchema.index({ isDeleted: 1, archived: 1, status: 1, dueDate: 1 });
+
 // ---------------------------------------------------------------------------
 // Model
 // ---------------------------------------------------------------------------

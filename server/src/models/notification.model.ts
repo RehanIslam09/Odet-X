@@ -13,6 +13,9 @@ export interface INotification {
 
   metadata: Record<string, unknown>;
 
+  // dedupeKey: Guarantees idempotency for background schedulers
+  dedupeKey?: string | null;
+
   readAt: Date | null;
   createdAt: Date;
 }
@@ -31,6 +34,8 @@ const notificationSchema = new Schema<INotificationDocument>(
     message: { type: String, required: true },
 
     metadata: { type: Schema.Types.Mixed, default: {} },
+
+    dedupeKey: { type: String, unique: true, sparse: true },
 
     readAt: { type: Date, default: null },
   },

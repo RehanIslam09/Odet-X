@@ -133,10 +133,16 @@ Controllers are intentionally thin. They:
 2. Call a service function
 3. Send the response
 
-They do **not** contain:
+Controllers do **not** contain:
 - Validation logic
 - Business rules
 - Direct database access
+
+### Background Worker Process
+
+The application includes an independently runnable Node-cron worker (`server/src/worker.ts`). The worker periodically connects to MongoDB to process asynchronous background tasks (like `task.due_soon` and `task.overdue` notifications) without blocking the HTTP API.
+
+It operates strictly asynchronously using idempotency keys (`dedupeKey`) in MongoDB to prevent duplicate processing if multiple worker instances ever run concurrently.
 
 ### Backend Folder Structure
 
@@ -192,7 +198,8 @@ server/src/
 │   └── index.ts             # Barrel exports
 │
 ├── app.ts                   # Express app setup
-└── index.ts                 # Server bootstrap
+├── index.ts                 # Server bootstrap
+└── worker.ts                # Background scheduler entry point
 ```
 
 ---

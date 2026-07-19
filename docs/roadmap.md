@@ -269,9 +269,13 @@
 
 ---
 
-## ⏳ Phase 16.3 — Notification Producers & Real-time Delivery
+## ✅ Phase 16.3 — Notification Producers & Scheduled Reminders
 
----
+- Node-cron independent worker process (`worker.ts`)
+- Global `task.due_soon` (24h) evaluation
+- Global `task.overdue` evaluation
+- Strict MongoDB-level idempotency via sparse `dedupeKey` index
+- (Real-time delivery via WebSockets deferred to Phase 12 Collaboration)
 
 ## ✅ Phase 17 — Deployment
 

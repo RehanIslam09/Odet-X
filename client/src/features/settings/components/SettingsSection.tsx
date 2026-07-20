@@ -22,10 +22,8 @@ export function SettingsSection({
     <section
       id={id}
       className={cn(
-        "scroll-mt-6 py-8 first:pt-0",
-        destructive
-          ? "rounded-xl border border-destructive/20 bg-destructive/5 p-6 my-6"
-          : "border-b border-border/40 last:border-b-0",
+        "py-6 first:pt-0",
+        destructive && "rounded-xl border border-destructive/20 bg-destructive/5 p-6 my-6",
         className
       )}
       {...props}

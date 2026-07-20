@@ -130,5 +130,47 @@
     }
   html {
     @apply font-sans;
-    }
+  }
+}
+
+@layer utilities {
+  .markdown-prose {
+    @apply text-foreground/90 leading-relaxed max-w-none break-words whitespace-pre-wrap;
+  }
+  .markdown-prose p {
+    @apply mb-4 last:mb-0;
+  }
+  .markdown-prose h1 {
+    @apply text-2xl font-semibold tracking-tight mb-4 mt-6 first:mt-0;
+  }
+  .markdown-prose h2 {
+    @apply text-xl font-semibold tracking-tight mb-4 mt-6;
+  }
+  .markdown-prose h3 {
+    @apply text-lg font-semibold tracking-tight mb-3 mt-5;
+  }
+  .markdown-prose ul {
+    @apply list-disc list-outside ml-6 mb-4 space-y-1;
+  }
+  .markdown-prose ol {
+    @apply list-decimal list-outside ml-6 mb-4 space-y-1;
+  }
+  .markdown-prose li > p {
+    @apply mb-0 inline;
+  }
+  .markdown-prose blockquote {
+    @apply border-l-4 border-muted pl-4 italic text-muted-foreground mb-4;
+  }
+  .markdown-prose code {
+    @apply rounded-md bg-muted px-1.5 py-0.5 font-mono text-sm;
+  }
+  .markdown-prose pre code {
+    @apply bg-transparent p-0;
+  }
+  .markdown-prose a {
+    @apply text-primary font-medium underline underline-offset-4 hover:text-primary/80;
+  }
+  .markdown-prose strong {
+    @apply font-semibold;
+  }
 }

@@ -24,7 +24,7 @@ function TaskActivityTimelineContent({ taskId }: TaskActivityTimelineProps) {
   const activities = data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
-    <div className="mt-8 flex flex-col rounded-xl border bg-card p-4 shadow-sm">
+    <div className="mt-8 flex flex-col pt-4 border-t border-border/40">
       <div className="mb-4 flex items-center gap-2">
         <Activity className="h-4 w-4 text-muted-foreground" />
         <h2 className="text-sm font-semibold tracking-tight text-foreground">
@@ -62,7 +62,7 @@ export function TaskActivityTimeline(props: TaskActivityTimelineProps) {
   return (
     <ErrorBoundary
       fallbackRender={({ resetErrorBoundary }) => (
-        <div className="mt-8 flex flex-col rounded-xl border bg-card p-4 shadow-sm">
+        <div className="mt-8 flex flex-col pt-4 border-t border-border/40">
           <ActivityErrorState
             message="Failed to load task history."
             onRetry={() => resetErrorBoundary()}

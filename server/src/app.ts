@@ -30,8 +30,8 @@ app.use(
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 
 // Body parsers
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "500kb" }));
+app.use(express.urlencoded({ extended: true, limit: "500kb" }));
 
 // Cookie parser — required to read the refresh token HTTP-only cookie
 app.use(cookieParser());

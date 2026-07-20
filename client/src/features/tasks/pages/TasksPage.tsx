@@ -12,6 +12,7 @@ import { TaskList } from "../components/TaskList.js";
 import { CreateTaskDialog } from "../components/CreateTaskDialog.js";
 import { EditTaskDialog } from "../components/EditTaskDialog.js";
 import { DeleteTaskDialog } from "../components/DeleteTaskDialog.js";
+import { PageHeader } from "@/components/common/PageHeader.js";
 
 import type { Task, TaskStatus, TaskPriority } from "../types/tasks.types.js";
 import {
@@ -131,21 +132,20 @@ export default function TasksPage() {
         transition={{ duration: 0.25, ease: "easeOut" }}
         className="flex items-start justify-between gap-4"
       >
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Tasks</h1>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Keep track of everything that needs your attention.
-          </p>
-        </div>
-
-        <Button
-          id="new-task-button"
-          onClick={() => setCreateOpen(true)}
-          className="gap-1.5 h-8 text-xs px-3 shadow-xs cursor-pointer"
-        >
-          <Plus className="h-4 w-4" />
-          New Task
-        </Button>
+        <PageHeader 
+          title="Tasks" 
+          description="Keep track of everything that needs your attention." 
+          action={
+            <Button
+              id="new-task-button"
+              onClick={() => setCreateOpen(true)}
+              className="gap-1.5 h-8 text-xs px-3 shadow-xs cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              New Task
+            </Button>
+          } 
+        />
       </motion.div>
 
       {/* Quick Filters Pill Toggles */}

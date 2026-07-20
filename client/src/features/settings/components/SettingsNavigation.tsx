@@ -1,6 +1,6 @@
 import { Bell, Palette, Shield, Trash2, User, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { NavLink } from "react-router-dom";
 
 export interface NavItem {
   id: string;
@@ -18,25 +18,17 @@ const navigationItems: NavItem[] = [
   { id: "danger-zone", label: "Danger Zone", icon: Trash2, destructive: true },
 ];
 
-interface SettingsNavigationProps {
-  activeSection: string;
-  onItemClick: (id: string) => void;
-}
-
-export function SettingsNavigation({ activeSection, onItemClick }: SettingsNavigationProps) {
+export function SettingsNavigation() {
   return (
     <nav className="flex flex-col sm:flex-row md:flex-col gap-1 border-b border-border/40 sm:border-b-0 pb-4 sm:pb-0 mb-6 md:mb-0 md:sticky md:top-6 w-full md:w-56 shrink-0">
       {navigationItems.map((item) => {
         const Icon = item.icon;
-        const isActive = activeSection === item.id;
-
         return (
-          <Button
+          <NavLink
             key={item.id}
-            variant="ghost"
-            onClick={() => onItemClick(item.id)}
-            className={cn(
-              "justify-start gap-2.5 px-3 py-2 h-9 text-sm font-medium transition-all rounded-md relative",
+            to={item.id}
+            className={({ isActive }) => cn(
+              "inline-flex items-center justify-start gap-2.5 px-3 py-2 h-9 text-sm font-medium transition-all rounded-md relative",
               isActive
                 ? item.destructive
                   ? "bg-destructive/10 text-destructive hover:bg-destructive/15"
@@ -51,7 +43,7 @@ export function SettingsNavigation({ activeSection, onItemClick }: SettingsNavig
           >
             <Icon className="h-4 w-4 shrink-0" />
             <span>{item.label}</span>
-          </Button>
+          </NavLink>
         );
       })}
     </nav>

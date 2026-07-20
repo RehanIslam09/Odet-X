@@ -8,7 +8,7 @@ interface UseTaskNotesAutosaveProps {
   taskId: string;
   taskNotes: string | undefined;
   taskVersion: number | undefined;
-  refetch: () => Promise<any>;
+  refetch: () => Promise<unknown>;
 }
 
 export function useTaskNotesAutosave({ taskId, taskNotes, taskVersion, refetch }: UseTaskNotesAutosaveProps) {
@@ -27,7 +27,7 @@ export function useTaskNotesAutosave({ taskId, taskNotes, taskVersion, refetch }
   const expectedVersionRef = useRef(expectedVersion);
   const statusRef = useRef(status);
   const isSavingRef = useRef(false);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { mutateAsync: updateNotes } = useUpdateTaskNotes();
 
@@ -62,7 +62,7 @@ export function useTaskNotesAutosave({ taskId, taskNotes, taskVersion, refetch }
     }
   }, [taskId, taskNotes, taskVersion]);
 
-  // Serialized Save Pipeline
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const flush = useCallback(async (): Promise<boolean> => {
     // Return true if successful or nothing to save
     if (latestDraftRef.current === lastSavedDraftRef.current) return true;
@@ -90,9 +90,10 @@ export function useTaskNotesAutosave({ taskId, taskNotes, taskVersion, refetch }
       }, 2000);
 
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // 409 Conflict check
-      if (error?.response?.status === 409 || error?.status === 409) {
+      const err = error as { response?: { status?: number }, status?: number };
+      if (err?.response?.status === 409 || err?.status === 409) {
         setStatus("conflict");
       } else {
         setStatus("error");
@@ -173,7 +174,7 @@ export function useTaskNotesAutosave({ taskId, taskNotes, taskVersion, refetch }
   // Recovery actions for Conflict
   const reloadLatest = useCallback(async () => {
     // Await refetch to ensure we have the absolute latest canonical task data
-    const res = await refetch();
+    const res = (await refetch()) as { data?: { task?: { notes?: string; version?: number } } };
     const latestTask = res.data?.task;
 
     if (latestTask?.notes !== undefined && latestTask?.version !== undefined) {
@@ -186,7 +187,7 @@ export function useTaskNotesAutosave({ taskId, taskNotes, taskVersion, refetch }
 
   const overwriteWithMyVersion = useCallback(async () => {
     // Await refetch to get the freshest version before we overwrite
-    const res = await refetch();
+    const res = (await refetch()) as { data?: { task?: { notes?: string; version?: number } } };
     const latestTask = res.data?.task;
 
     if (latestTask?.version !== undefined) {

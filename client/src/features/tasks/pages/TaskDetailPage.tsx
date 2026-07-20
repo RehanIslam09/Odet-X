@@ -5,7 +5,6 @@ import { TaskPropertiesPanel } from "../components/TaskPropertiesPanel.js";
 import { TaskNotesPreview } from "../components/TaskNotesPreview.js";
 import { TaskNotFoundState } from "../components/TaskNotFoundState.js";
 import { TaskDetailSkeleton } from "../components/TaskDetailSkeleton.js";
-import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
 import { ErrorState } from "@/components/common/ErrorState.js";
 import { useEffect } from "react";

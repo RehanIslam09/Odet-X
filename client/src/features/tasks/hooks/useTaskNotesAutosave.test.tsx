@@ -1,5 +1,5 @@
 import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { useTaskNotesAutosave } from "./useTaskNotesAutosave.js";
 import { useUpdateTaskNotes } from "./useUpdateTaskNotes.js";
 import { useBlocker } from "react-router-dom";
@@ -14,13 +14,13 @@ vi.mock("./useUpdateTaskNotes", () => ({
 }));
 
 describe("useTaskNotesAutosave", () => {
-  let mockMutateAsync: any;
+  let mockMutateAsync: Mock;
 
   beforeEach(() => {
     vi.useFakeTimers();
     mockMutateAsync = vi.fn().mockResolvedValue({ task: { version: 1 } });
-    (useUpdateTaskNotes as any).mockReturnValue({ mutateAsync: mockMutateAsync });
-    (useBlocker as any).mockReturnValue({ state: "unblocked" });
+    (useUpdateTaskNotes as Mock).mockReturnValue({ mutateAsync: mockMutateAsync });
+    (useBlocker as Mock).mockReturnValue({ state: "unblocked" });
   });
 
   afterEach(() => {

@@ -93,7 +93,7 @@ export default function NotificationsPage() {
                 {isFetchingNextPage ? "Loading more..." : "Load more"}
               </Button>
             </div>
-      </div>
+          )}
     </div>
   );
 }

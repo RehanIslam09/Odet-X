@@ -59,7 +59,7 @@ export function useUpdatePreferences() {
           preferences: updatedUser.preferences,
         });
       }
-      toast.success("Preferences updated successfully.");
+      toast.success("Preferences updated successfully.", { duration: 1800 });
     },
     onError: (error) => {
       const { message } = getApiError(error);

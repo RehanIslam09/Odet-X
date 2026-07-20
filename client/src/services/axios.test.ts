@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import MockAdapter from "axios-mock-adapter";
 import { apiClient, setAccessToken, getAccessToken, clearAccessToken } from "./axios.js";
 import { useAuthStore } from "@/store/auth.store.js";
@@ -86,7 +86,7 @@ describe("Axios Refresh Interceptor", () => {
     mock.onPost("/auth/refresh").replyOnce(401);
 
     const clearUserMock = vi.fn();
-    (useAuthStore.getState as any).mockReturnValue({ clearUser: clearUserMock });
+    (useAuthStore.getState as Mock).mockReturnValue({ clearUser: clearUserMock });
 
     await expect(apiClient.get("/protected")).rejects.toThrow();
 

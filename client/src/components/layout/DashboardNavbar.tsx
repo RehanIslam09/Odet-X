@@ -11,7 +11,7 @@ export default function DashboardNavbar() {
       <div className="flex items-center gap-3">
         <MobileSidebar />
 
-        <h1 className="text-xl font-semibold">
+        <h1 className="text-xl font-semibold md:hidden">
           AI Project Manager
         </h1>
       </div>

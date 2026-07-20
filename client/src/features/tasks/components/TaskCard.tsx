@@ -179,7 +179,7 @@ export function TaskCard({ task, onEdit, onArchive, onDelete }: TaskCardProps) {
               variant="ghost"
               size="icon"
               onClick={(e) => e.stopPropagation()}
-              className="h-7 w-7 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus:opacity-100"
+              className="h-7 w-7 opacity-100 md:opacity-0 transition-opacity duration-150 md:group-hover:opacity-100 focus:opacity-100"
               aria-label={`Options for task ${task.title}`}
             >
               <MoreHorizontal className="h-3.5 w-3.5" />

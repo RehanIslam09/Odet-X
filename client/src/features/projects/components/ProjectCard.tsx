@@ -82,7 +82,7 @@ export function ProjectCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                  className="h-8 w-8 opacity-100 md:opacity-0 transition-opacity duration-150 md:group-hover:opacity-100 focus:opacity-100"
                   aria-label={`Options for ${project.name}`}
                 >
                   <MoreHorizontal className="h-4 w-4" />

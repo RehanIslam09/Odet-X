@@ -60,7 +60,7 @@ export function NotificationPopover({ children }: NotificationPopoverProps) {
             )}
           </div>
           <Separator />
-          <div className="overflow-y-auto max-h-[400px]">
+          <div className="overflow-y-auto max-h-[min(400px,60vh)]">
             <NotificationList
               notifications={notifications}
               isLoading={isPending}

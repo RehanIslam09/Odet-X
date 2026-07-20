@@ -70,7 +70,7 @@ export default function TaskDetailPage() {
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold text-foreground mb-4">Description</h3>
           {task.description ? (
-            <div className="prose prose-sm dark:prose-invert max-w-none break-words whitespace-pre-wrap text-foreground/80 leading-relaxed">
+            <div className="markdown-prose text-sm">
               {task.description}
             </div>
           ) : (

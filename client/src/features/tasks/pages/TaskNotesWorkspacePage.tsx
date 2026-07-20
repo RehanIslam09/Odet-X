@@ -10,6 +10,9 @@ import { TaskDetailSkeleton } from "../components/TaskDetailSkeleton.js";
 import { TaskNotFoundState } from "../components/TaskNotFoundState.js";
 import { Button } from "@/components/ui/button.js";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.js";
+import { PageHeader } from "@/components/common/PageHeader.js";
+import { PageContainer } from "@/components/common/PageContainer.js";
+import { ErrorState } from "@/components/common/ErrorState.js";
 import {
   Dialog,
   DialogContent,
@@ -76,36 +79,33 @@ export default function TaskNotesWorkspacePage() {
   // Error States (404/BOLA)
   if (taskError?.message?.includes("404") || taskError?.name === "NotFoundError" || (taskError as { status?: number })?.status === 404) {
     return (
-      <div className="max-w-5xl mx-auto w-full p-4 md:p-6 lg:p-8 animate-in fade-in duration-500">
+      <PageContainer maxWidth="5xl">
         <TaskNotFoundState />
-      </div>
+      </PageContainer>
     );
   }
 
   // Recoverable Error
   if (taskError) {
     return (
-      <div className="max-w-5xl mx-auto w-full p-4 md:p-6 lg:p-8 animate-in fade-in duration-500">
-        <div className="flex flex-col items-center justify-center min-h-[400px] text-center px-4">
-          <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
-            <AlertCircle className="h-6 w-6 text-destructive" />
-          </div>
-          <h2 className="text-xl font-semibold mb-2">Failed to load task</h2>
-          <p className="text-muted-foreground mb-6 max-w-md">
-            There was a problem communicating with the server. Please check your connection and try again.
-          </p>
-          <Button onClick={() => refetch()} variant="outline">
-            Retry
-          </Button>
-        </div>
-      </div>
+      <PageContainer maxWidth="5xl">
+        <ErrorState
+          title="Failed to load task"
+          description="There was a problem communicating with the server. Please check your connection and try again."
+          action={
+            <Button onClick={() => refetch()} variant="outline">
+              Retry
+            </Button>
+          }
+        />
+      </PageContainer>
     );
   }
 
   if (!task) return null;
 
   return (
-    <div className="max-w-5xl mx-auto w-full animate-in fade-in duration-500">
+    <PageContainer maxWidth="5xl">
       {/* Header Context */}
       <div className="mb-6">
         <Button variant="ghost" size="sm" className="mb-4 text-muted-foreground hover:text-foreground gap-1.5 -ml-2" asChild>
@@ -114,14 +114,17 @@ export default function TaskNotesWorkspacePage() {
             Back to task
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold text-foreground mb-2 break-words">
-          {task.title}
-        </h1>
-        <div className="text-sm text-muted-foreground flex items-center gap-2">
-          <span>Detailed Notes</span>
-          <span className="text-border">•</span>
-          <span className="truncate">{task.projectName || "No Project"}</span>
-        </div>
+        <PageHeader 
+          title={task.title}
+          description={
+            <div className="flex items-center gap-2">
+              <span>Detailed Notes</span>
+              <span className="text-border">•</span>
+              <span className="truncate">{task.projectName || "No Project"}</span>
+            </div>
+          }
+          className="mb-0"
+        />
       </div>
 
       {/* Conflict Resolution Banner */}
@@ -280,6 +283,6 @@ export default function TaskNotesWorkspacePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

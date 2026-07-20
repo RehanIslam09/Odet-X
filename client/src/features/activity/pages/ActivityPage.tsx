@@ -1,6 +1,7 @@
 import { useActivities } from "../hooks/useActivities";
 import { ActivityList } from "../components/ActivityList";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/common/PageHeader";
 
 export default function ActivityPage() {
   const {
@@ -17,19 +18,14 @@ export default function ActivityPage() {
   const activities = data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-6 lg:p-8">
-        <div className="mx-auto max-w-3xl">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              Activity
-            </h1>
-            <p className="mt-2 text-muted-foreground">
-              A timeline of everything happening in your workspace.
-            </p>
-          </div>
+    <div className="mx-auto w-full max-w-3xl">
+      <PageHeader 
+        title="Activity" 
+        description="A timeline of everything happening in your workspace." 
+        className="mb-8"
+      />
 
-          <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="rounded-xl border bg-card p-6 shadow-sm">
             <ActivityList
               activities={activities}
               isLoading={isLoading}
@@ -51,7 +47,6 @@ export default function ActivityPage() {
               </div>
             )}
           </div>
-        </div>
       </div>
     </div>
   );

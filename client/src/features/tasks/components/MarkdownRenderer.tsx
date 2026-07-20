@@ -8,7 +8,7 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none break-words whitespace-pre-wrap text-foreground/80 leading-relaxed">
+    <div className="markdown-prose">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         urlTransform={(url) => {

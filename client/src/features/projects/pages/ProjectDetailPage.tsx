@@ -10,6 +10,8 @@ import { useArchiveProject } from "@/features/projects/hooks";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isApiError } from "@/utils/api-error";
+import { ErrorState } from "@/components/common/ErrorState";
+import { EmptyState } from "@/components/common/EmptyState";
 
 import { ProjectHeader } from "@/features/projects/components/ProjectHeader";
 import { ProjectSummaryCards } from "@/features/projects/components/ProjectSummaryCards";
@@ -62,36 +64,31 @@ export default function ProjectDetailPage() {
 
   if (isNotFoundError || (!isProjectLoading && !projectData)) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground mb-4">
-          <AlertCircle className="h-8 w-8" />
-        </div>
-        <h2 className="text-xl font-semibold tracking-tight">Project Not Found</h2>
-        <p className="mt-2 text-sm text-muted-foreground max-w-sm">
-          The project you are looking for does not exist, has been deleted, or you don't have permission to view it.
-        </p>
-        <Button onClick={() => navigate("/projects")} className="mt-6">
-          Return to Projects
-        </Button>
-      </div>
+      <EmptyState
+        icon={AlertCircle}
+        title="Project Not Found"
+        description="The project you are looking for does not exist, has been deleted, or you don't have permission to view it."
+        action={
+          <Button onClick={() => navigate("/projects")}>
+            Return to Projects
+          </Button>
+        }
+      />
     );
   }
 
   // Handle other network/server errors
   if (projectError) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive mb-4">
-          <AlertCircle className="h-8 w-8" />
-        </div>
-        <h2 className="text-xl font-semibold tracking-tight">Failed to load project</h2>
-        <p className="mt-2 text-sm text-muted-foreground max-w-sm">
-          A network or server error occurred. Please try again later.
-        </p>
-        <Button onClick={() => window.location.reload()} variant="outline" className="mt-6">
-          Retry
-        </Button>
-      </div>
+      <ErrorState
+        title="Failed to load project"
+        description="A network or server error occurred. Please try again later."
+        action={
+          <Button onClick={() => window.location.reload()} variant="outline">
+            Retry
+          </Button>
+        }
+      />
     );
   }
 

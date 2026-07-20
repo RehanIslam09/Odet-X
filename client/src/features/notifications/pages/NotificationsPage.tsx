@@ -4,6 +4,7 @@ import { ErrorBoundary } from "react-error-boundary";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/common/PageHeader";
 
 import { useNotifications } from "../hooks/useNotifications";
 import { useMarkAllNotificationsRead } from "../hooks/useMarkAllNotificationsRead";
@@ -34,32 +35,27 @@ export default function NotificationsPage() {
   const hasUnread = notifications.some((n) => n.readAt === null);
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-6 lg:p-8">
-        <div className="mx-auto max-w-3xl">
-          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                Notifications
-              </h1>
-              <p className="mt-2 text-muted-foreground">
-                Stay up to date with what needs your attention.
-              </p>
-            </div>
-            {hasUnread && filter !== "read" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => markAllRead.mutate()}
-                disabled={markAllRead.isPending}
-              >
-                <Check className="mr-2 h-4 w-4" />
-                Mark all as read
-              </Button>
-            )}
-          </div>
+    <div className="mx-auto w-full max-w-3xl">
+      <PageHeader
+        title="Notifications"
+        description="Stay up to date with what needs your attention."
+        className="mb-8"
+        action={
+          hasUnread && filter !== "read" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => markAllRead.mutate()}
+              disabled={markAllRead.isPending}
+            >
+              <Check className="mr-2 h-4 w-4" />
+              Mark all as read
+            </Button>
+          )
+        }
+      />
 
-          <div className="rounded-xl border bg-card shadow-sm">
+      <div className="rounded-xl border bg-card shadow-sm">
             <div className="border-b p-4">
               <Tabs
                 value={filter}
@@ -97,8 +93,6 @@ export default function NotificationsPage() {
                 {isFetchingNextPage ? "Loading more..." : "Load more"}
               </Button>
             </div>
-          )}
-        </div>
       </div>
     </div>
   );

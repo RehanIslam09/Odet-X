@@ -11,6 +11,7 @@ import { ProjectFilters } from "@/features/projects/components/ProjectFilters";
 import { CreateProjectDialog } from "@/features/projects/components/CreateProjectDialog";
 import { EditProjectDialog } from "@/features/projects/components/EditProjectDialog";
 import { DeleteProjectDialog } from "@/features/projects/components/DeleteProjectDialog";
+import { PageHeader } from "@/components/common/PageHeader";
 
 import {
   useProjects,
@@ -168,23 +169,22 @@ export default function ProjectsDashboardPage() {
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         className="flex items-center justify-between gap-4"
       >
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {pagination
-              ? `${pagination.total} project${pagination.total === 1 ? "" : "s"}`
-              : "Your workspace"}
-          </p>
-        </div>
-
-        <Button
-          id="create-project-button"
-          onClick={() => setCreateOpen(true)}
-          className="gap-2 shadow-sm"
-        >
-          <Plus className="h-4 w-4" />
-          New Project
-        </Button>
+        <PageHeader
+          title="Projects"
+          description={pagination
+            ? `${pagination.total} project${pagination.total === 1 ? "" : "s"}`
+            : "Your workspace"}
+          action={
+            <Button
+              id="create-project-button"
+              onClick={() => setCreateOpen(true)}
+              className="gap-2 shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              New Project
+            </Button>
+          }
+        />
       </motion.div>
 
       {/* Filters */}

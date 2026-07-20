@@ -1,15 +1,12 @@
-import { useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
-import TextareaAutosize from "react-textarea-autosize";
-import { ArrowLeft, AlertCircle, Save, Loader2, Check } from "lucide-react";
+import { ArrowLeft, AlertCircle } from "lucide-react";
 
 import { useTask } from "../hooks/useTask.js";
 import { useTaskNotesAutosave } from "../hooks/useTaskNotesAutosave.js";
-import { MemoizedMarkdownRenderer } from "../components/MarkdownRenderer.js";
+import { TaskNotesEditor } from "../components/TaskNotesEditor.js";
 import { TaskDetailSkeleton } from "../components/TaskDetailSkeleton.js";
 import { TaskNotFoundState } from "../components/TaskNotFoundState.js";
 import { Button } from "@/components/ui/button.js";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.js";
 import { PageHeader } from "@/components/common/PageHeader.js";
 import { PageContainer } from "@/components/common/PageContainer.js";
 import { ErrorState } from "@/components/common/ErrorState.js";
@@ -55,17 +52,7 @@ export default function TaskNotesWorkspacePage() {
     setSearchParams({ mode: newMode }, { replace: true });
   };
 
-  // Ctrl/Cmd + S Shortcut
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-        e.preventDefault();
-        handleExplicitSave();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleExplicitSave]);
+
 
   // Loading State
   if (isTaskLoading) {
@@ -150,108 +137,15 @@ export default function TaskNotesWorkspacePage() {
         </div>
       )}
 
-      {/* Editor Card */}
-      <div className="border border-border/60 rounded-xl shadow-sm bg-card overflow-hidden flex flex-col mb-8">
-        {/* Card Header (Tabs) */}
-        <div className="bg-muted/30 border-b border-border/60 px-2 sm:px-4 pt-2">
-          <Tabs value={mode} onValueChange={(v) => setMode(v as "write" | "preview")} className="w-full">
-            <TabsList className="bg-transparent h-auto p-0 flex w-full justify-start border-none">
-              <TabsTrigger 
-                value="write" 
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2 mb-[-1px] font-medium"
-              >
-                Write
-              </TabsTrigger>
-              <TabsTrigger 
-                value="preview" 
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2 mb-[-1px] font-medium"
-              >
-                Preview
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-
-        {/* Card Content Area */}
-        <div className="flex flex-col min-h-[450px] max-h-[70vh] overflow-y-auto custom-scrollbar bg-background">
-          {mode === "write" ? (
-            <div className="flex flex-col flex-1">
-              <TextareaAutosize
-                value={localDraft}
-                onChange={(e) => handleDraftChange(e.target.value)}
-                className="w-full flex-1 resize-none bg-transparent border-none focus:outline-none focus:ring-0 p-4 md:p-6 text-base text-foreground/90 font-mono leading-relaxed"
-                placeholder="Add detailed notes, technical context, implementation ideas..."
-                aria-label="Task notes editor"
-                spellCheck={true}
-                minRows={15}
-              />
-            </div>
-          ) : (
-            <div className="flex flex-col flex-1 p-4 md:p-6 lg:p-8">
-              {localDraft.trim().length === 0 ? (
-                <div className="flex-1 flex items-center justify-center text-muted-foreground italic h-[400px]">
-                  Nothing to preview.
-                </div>
-              ) : (
-                <MemoizedMarkdownRenderer content={localDraft} />
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Card Footer */}
-        <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-t border-border/60 text-sm">
-          <div className="text-muted-foreground flex items-center gap-2">
-            <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" className="fill-current opacity-70 hidden sm:block"><path d="M14.85 3H1.15C.52 3 0 3.52 0 4.15v7.69C0 12.48.52 13 1.15 13h13.69c.64 0 1.15-.52 1.15-1.15v-7.7C16 3.52 15.48 3 14.85 3ZM9 11H7V8L5.5 9.92 4 8v3H2V5h2l1.5 2L7 5h2v6Zm2.99.5L9.5 8H11V5h2v3h1.5l-2.51 3.5Z"></path></svg>
-            <span className="hidden sm:inline">Markdown is supported</span>
-            <span className="sm:hidden">Markdown</span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="text-sm">
-              {status === "saving" && (
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Saving...
-                </span>
-              )}
-              {status === "saved" && (
-                <span className="text-emerald-600 dark:text-emerald-500 flex items-center gap-1.5" aria-live="polite">
-                  <Check className="h-3.5 w-3.5" />
-                  Saved
-                </span>
-              )}
-              {status === "error" && (
-                <span className="text-destructive flex items-center gap-1.5" aria-live="polite">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  Save failed
-                </span>
-              )}
-              {status === "conflict" && (
-                <span className="text-destructive font-medium flex items-center gap-1.5" aria-live="polite">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  Conflict
-                </span>
-              )}
-              {status === "idle" && isDirty && (
-                <span className="text-amber-600 dark:text-amber-500 font-medium">
-                  Unsaved changes
-                </span>
-              )}
-            </div>
-            
-            <Button 
-              onClick={handleExplicitSave} 
-              disabled={!isDirty || status === "saving" || status === "conflict"}
-              size="sm"
-              className="gap-2 shadow-sm min-w-[80px]"
-            >
-              <Save className="h-3.5 w-3.5" />
-              Save
-            </Button>
-          </div>
-        </div>
-      </div>
+      <TaskNotesEditor
+        localDraft={localDraft}
+        isDirty={isDirty}
+        status={status}
+        onDraftChange={handleDraftChange}
+        onExplicitSave={handleExplicitSave}
+        mode={mode as "write" | "preview"}
+        onModeChange={setMode}
+      />
 
       {/* Navigation Blocker Dialog */}
       <Dialog open={blocker.state === "blocked"} onOpenChange={(open) => { if (!open && blocker.state === "blocked") blocker.reset?.() }}>

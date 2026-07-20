@@ -8,9 +8,10 @@ interface UseTaskNotesAutosaveProps {
   taskId: string;
   taskNotes: string | undefined;
   taskVersion: number | undefined;
+  refetch: () => Promise<any>;
 }
 
-export function useTaskNotesAutosave({ taskId, taskNotes, taskVersion }: UseTaskNotesAutosaveProps) {
+export function useTaskNotesAutosave({ taskId, taskNotes, taskVersion, refetch }: UseTaskNotesAutosaveProps) {
   // Local State
   const [localDraft, setLocalDraft] = useState("");
   const [lastSavedDraft, setLastSavedDraft] = useState("");
@@ -170,27 +171,32 @@ export function useTaskNotesAutosave({ taskId, taskNotes, taskVersion }: UseTask
   );
 
   // Recovery actions for Conflict
-  const reloadLatest = useCallback(() => {
-    // To reload, we just act as if we are re-initializing from the server task data
-    if (taskNotes !== undefined && taskVersion !== undefined) {
-      setLocalDraft(taskNotes);
-      setLastSavedDraft(taskNotes);
-      setExpectedVersion(taskVersion);
+  const reloadLatest = useCallback(async () => {
+    // Await refetch to ensure we have the absolute latest canonical task data
+    const res = await refetch();
+    const latestTask = res.data?.task;
+
+    if (latestTask?.notes !== undefined && latestTask?.version !== undefined) {
+      setLocalDraft(latestTask.notes);
+      setLastSavedDraft(latestTask.notes);
+      setExpectedVersion(latestTask.version);
       setStatus("idle");
     }
-  }, [taskNotes, taskVersion]);
+  }, [refetch]);
 
-  const overwriteWithMyVersion = useCallback(() => {
-    // To overwrite safely, we adopt the SERVER'S newest version as our expected version,
-    // and then immediately flush our draft.
-    if (taskVersion !== undefined) {
-      setExpectedVersion(taskVersion);
+  const overwriteWithMyVersion = useCallback(async () => {
+    // Await refetch to get the freshest version before we overwrite
+    const res = await refetch();
+    const latestTask = res.data?.task;
+
+    if (latestTask?.version !== undefined) {
+      setExpectedVersion(latestTask.version);
       // Wait a tick for state to apply to refs
       setTimeout(() => {
         handleExplicitSave();
       }, 0);
     }
-  }, [taskVersion, handleExplicitSave]);
+  }, [refetch, handleExplicitSave]);
 
   return {
     localDraft,

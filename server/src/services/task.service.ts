@@ -74,7 +74,7 @@ async function assertTaskOwnership(
     _id: taskId,
     owner: new Types.ObjectId(userId),
     isDeleted: false,
-  });
+  }).select("-notes");
 
   if (!task) {
     throw new NotFoundError("Task not found.");
@@ -134,13 +134,23 @@ export async function createTask(
 }
 
 /**
- * Retrieves a single task, verifying ownership boundaries.
+ * Retrieves a single task, including full notes, verifying ownership boundaries.
  */
 export async function getTaskById(
   taskId: string,
   userId: string,
 ): Promise<ITaskDocument> {
-  return assertTaskOwnership(taskId, userId);
+  const task = await Task.findOne({
+    _id: taskId,
+    owner: new Types.ObjectId(userId),
+    isDeleted: false,
+  });
+
+  if (!task) {
+    throw new NotFoundError("Task not found.");
+  }
+
+  return task;
 }
 
 /**

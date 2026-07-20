@@ -40,6 +40,7 @@ export default function TaskNotesWorkspacePage() {
     taskId: task?.id as string,
     taskNotes: task?.notes,
     taskVersion: task?.version,
+    refetch,
   });
 
   // URL Mode Management

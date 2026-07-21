@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import Task, { ITaskDocument } from "@/models/task.model.js";
 import Project, { IProjectDocument } from "@/models/project.model.js";
 import { NotFoundError, BadRequestError } from "@/utils/app-error.js";
+import { AIModelTier } from '../ai/types/index.js';
 import { aiService } from "@/ai/ai.service.js";
 import { promptRegistry } from "@/ai/prompts/registry/prompt.registry.js";
 import { GeneratedLabelsSchema } from "@/ai/schemas/task-labels.schema.js";
@@ -63,7 +64,7 @@ export async function generateLabelsForTask(
   const templateBlueprint = promptRegistry.get('task-auto-label');
   
   const dynamicSections = [
-    ...templateBlueprint.sections,
+    ...templateBlueprint.sections.filter((s: any) => s.identifier !== 'intent'),
     {
       identifier: 'context',
       content: `${projectContext}\n\nExisting Task Labels: ${existingLabelsText}`
@@ -83,7 +84,7 @@ export async function generateLabelsForTask(
   const result = await aiService.generateStructuredData(
     executableTemplate,
     GeneratedLabelsSchema,
-    { tier: 'deep-context' }
+    { tier: AIModelTier.DEEP_CONTEXT }
   );
 
   const generatedLabels = result.data.labels;

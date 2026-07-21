@@ -1,5 +1,5 @@
 import { ZodSchema } from 'zod';
-import { AIRequestOptions } from '../types';
+import { AIRequestOptions } from '../types/index.js';
 
 /**
  * The core contract that any AI provider must fulfill.

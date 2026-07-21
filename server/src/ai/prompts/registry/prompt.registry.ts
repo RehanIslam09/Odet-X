@@ -1,5 +1,5 @@
-import { PromptTemplate } from '../types';
-import { validatePromptTemplate, PromptValidationError } from '../validation/prompt.validator';
+import { PromptTemplate } from '../types.js';
+import { validatePromptTemplate, PromptValidationError } from '../validation/prompt.validator.js';
 
 /**
  * A simple in-memory registry for organizing and retrieving prompt definitions.

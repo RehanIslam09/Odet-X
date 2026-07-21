@@ -13,6 +13,7 @@ import {
 } from "@/services/project.service.js";
 
 import { generateTasksForProject } from "@/services/project-ai.service.js";
+import { generateSummaryForProject } from "@/services/project-summary-ai.service.js";
 
 import { sendSuccessResponse } from "@/utils/api-response.js";
 import { asyncHandler } from "@/utils/async-handler.js";
@@ -203,6 +204,25 @@ export const generateTasks = asyncHandler(async (req: Request, res: Response) =>
     message: "Tasks generated successfully.",
     data: {
       items: tasks.map(t => t.toJSON()),
+    },
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /projects/:id/generate-summary (AI)
+// ---------------------------------------------------------------------------
+
+export const generateSummary = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id.toString();
+  const id = getRequiredProjectId(req);
+
+  const project = await generateSummaryForProject(id, userId);
+
+  sendSuccessResponse(res, {
+    statusCode: 201,
+    message: "Project summary generated successfully.",
+    data: {
+      project: project.toJSON(),
     },
   });
 });

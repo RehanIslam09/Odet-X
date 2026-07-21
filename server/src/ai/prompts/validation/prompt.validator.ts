@@ -1,5 +1,5 @@
-import { PromptTemplate } from '../types';
-import { AIConfigurationError } from '../../errors/ai.errors';
+import { PromptTemplate } from '../types.js';
+import { AIConfigurationError } from '../../errors/ai.errors.js';
 
 /**
  * Custom error for prompt definition issues, extending AIConfigurationError.

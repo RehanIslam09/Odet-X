@@ -1,9 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { z } from 'zod';
-import { AIService } from '../ai.service';
-import { PromptTemplate } from '../prompts/types';
-import { AIConfigurationError } from '../errors/ai.errors';
+import { AIService } from '../ai.service.js';
+import { PromptTemplate } from '../prompts/types.js';
+import { AIConfigurationError } from '../errors/ai.errors.js';
+import { AIModelTier } from '../types/index.js';
 
 // Mocking the provider logic since we are only testing execution lifecycle
 class MockProvider {
@@ -28,7 +29,7 @@ describe('AI Execution Framework', () => {
   };
 
   const schema = z.object({ status: z.string(), generated: z.boolean() });
-  const options = { tier: 'fast-json' as const };
+  const options = { tier: AIModelTier.FAST_JSON as const };
 
   it('should successfully execute the lifecycle and return metadata', async () => {
     const aiService = new AIService();

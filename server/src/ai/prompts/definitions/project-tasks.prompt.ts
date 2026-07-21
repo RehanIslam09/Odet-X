@@ -1,5 +1,5 @@
-import { PromptTemplate } from '../types';
-import { GLOBAL_SYSTEM_BEHAVIOR } from '../system/global-system.prompt';
+import { PromptTemplate } from '../types.js';
+import { GLOBAL_SYSTEM_BEHAVIOR } from '../system/global-system.prompt.js';
 
 export const projectToTasksPrompt: PromptTemplate = {
   metadata: {
@@ -20,6 +20,10 @@ STRICT INSTRUCTIONS:
 4. Do NOT invent additional fields outside the requested schema.
 5. Provide actionable, concise task titles (e.g. "Setup Database" instead of "I need to setup the database").
 6. Ensure there are no duplicate tasks.`
+    },
+    {
+      identifier: 'intent',
+      content: 'Break down the requested project description into structured tasks.'
     },
     {
       identifier: 'schema',

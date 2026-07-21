@@ -1,5 +1,5 @@
-import { PromptTemplate } from '../types';
-import { GLOBAL_SYSTEM_BEHAVIOR } from '../system/global-system.prompt';
+import { PromptTemplate } from '../types.js';
+import { GLOBAL_SYSTEM_BEHAVIOR } from '../system/global-system.prompt.js';
 
 export const taskAutoLabelPrompt: PromptTemplate = {
   metadata: {
@@ -22,6 +22,10 @@ STRICT INSTRUCTIONS:
 6. Avoid synonyms of existing labels provided in the context.
 7. Avoid duplicate concepts.
 8. Avoid sentences or long phrases.`
+    },
+    {
+      identifier: 'intent',
+      content: 'Classify the task with appropriate labels.'
     },
     {
       identifier: 'schema',

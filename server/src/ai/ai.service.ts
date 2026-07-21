@@ -1,15 +1,15 @@
 import crypto from 'crypto';
 import { ZodSchema } from 'zod';
-import { AIProvider } from './providers/base.provider';
-import { AnthropicProvider } from './providers/anthropic.provider';
-import { AIRequestOptions, AIExecutionResult, AIExecutionMetadata } from './types';
-import { buildPrompt } from './prompts/builder/prompt.builder';
-import { validatePromptTemplate } from './prompts/validation/prompt.validator';
-import { PromptTemplate } from './prompts/types';
-import { validateAIResponse } from './validation/ai-response.validator';
-import { AIBaseError, AIConfigurationError } from './errors/ai.errors';
-import { aiLogger } from './utils/logger';
-import { aiConfig } from './config/ai.config';
+import { AIProvider } from './providers/base.provider.js';
+import { AnthropicProvider } from './providers/anthropic.provider.js';
+import { AIRequestOptions, AIExecutionResult, AIExecutionMetadata , AIModelTier } from './types/index.js';
+import { buildPrompt } from './prompts/builder/prompt.builder.js';
+import { validatePromptTemplate } from './prompts/validation/prompt.validator.js';
+import { PromptTemplate } from './prompts/types.js';
+import { validateAIResponse } from './validation/ai-response.validator.js';
+import { AIBaseError, AIConfigurationError } from './errors/ai.errors.js';
+import { aiLogger } from './utils/logger.js';
+import { aiConfig } from './config/ai.config.js';
 
 /**
  * The central orchestration layer for all AI features.
@@ -128,9 +128,9 @@ export class AIService {
    */
   private resolveModelFromTier(options: AIRequestOptions): string {
     switch (options.tier) {
-      case 'fast-json':
+      case AIModelTier.FAST_JSON:
         return aiConfig.models.fastJson;
-      case 'deep-context':
+      case AIModelTier.DEEP_CONTEXT:
         return aiConfig.models.deepContext;
       default:
         throw new AIConfigurationError(`Unsupported model tier: ${options.tier}`);

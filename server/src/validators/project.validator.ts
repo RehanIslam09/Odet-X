@@ -89,6 +89,11 @@ export const updateProjectSchema = z.object({
   description: descriptionSchema,
   emoji: emojiSchema,
   color: colorSchema,
+  aiSummary: z.object({
+    summary: z.string(),
+    highlights: z.array(z.string()),
+    risks: z.array(z.string())
+  }).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -167,3 +172,7 @@ export const generateProjectTasksSchema = z.object({
 });
 
 export type GenerateProjectTasksDto = z.infer<typeof generateProjectTasksSchema>;
+
+export const generateProjectSummarySchema = z.object({}); // Empty body
+
+export type GenerateProjectSummaryDto = z.infer<typeof generateProjectSummarySchema>;

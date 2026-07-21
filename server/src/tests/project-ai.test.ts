@@ -1,7 +1,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert";
 import mongoose from "mongoose";
-import { setupTestDB, teardownTestDB } from "./test-db.js";
+import { setupTestDatabase, teardownTestDatabase } from "./test-db.js";
 import { createProject } from "@/services/project.service.js";
 import { createTask } from "@/services/task.service.js";
 import { generateTasksForProject } from "@/services/project-ai.service.js";
@@ -15,9 +15,9 @@ describe("Project AI Service - Task Generation", () => {
   let projectId: string;
 
   before(async () => {
-    await setupTestDB();
+    await setupTestDatabase();
     const user = await User.create({
-      name: "AI Test User",
+      username: "ai_test_user", name: "AI Test User",
       email: "ai-test@example.com",
       password: "password123",
     });
@@ -26,6 +26,8 @@ describe("Project AI Service - Task Generation", () => {
     const project = await createProject(userId, {
       name: "AI Test Project",
       description: "A project for testing AI tasks",
+      emoji: "🚀",
+      color: "blue"
     });
     projectId = project._id.toString();
 
@@ -38,7 +40,7 @@ describe("Project AI Service - Task Generation", () => {
   });
 
   after(async () => {
-    await teardownTestDB();
+    await teardownTestDatabase();
   });
 
   it("should successfully generate and persist tasks from AI", async () => {
@@ -51,15 +53,14 @@ describe("Project AI Service - Task Generation", () => {
           { title: "Task 2", description: "Desc 2", priority: "low", estimatedTime: null, suggestedOrder: 2 }
         ]
       },
-      metadata: { executionId: '123', provider: 'test', model: 'test', durationMs: 100, promptName: 'project-to-tasks', promptVersion: '1.0' }
-    });
+      metadata: { executionId: '123', provider: 'test', model: 'test', durationMs: 100, promptName: 'project-to-tasks', promptVersion: '1.0' } } as any);
 
     try {
       const tasks = await generateTasksForProject(projectId, userId, "Make a generic test suite");
-      assert.strictEqual(tasks.length, 2);
-      assert.strictEqual(tasks[0].title, "Task 1");
-      assert.strictEqual(tasks[0].projectId?.toString(), projectId);
-      assert.strictEqual(tasks[1].title, "Task 2");
+      assert.strictEqual(tasks!.length, 2);
+      assert.strictEqual(tasks![0]!.title, "Task 1");
+      assert.strictEqual(tasks![0]!.projectId?.toString(), projectId);
+      assert.strictEqual(tasks![1]!.title, "Task 2");
     } finally {
       aiService.generateStructuredData = originalGenerate;
     }
@@ -67,7 +68,7 @@ describe("Project AI Service - Task Generation", () => {
 
   it("should filter out duplicate task titles from the AI response", async () => {
     // Manually create a task first
-    await createTask(userId, { projectId, title: "Duplicate Task" });
+    await createTask(userId, { projectId: projectId as any, title: "Duplicate Task" });
 
     const originalGenerate = aiService.generateStructuredData.bind(aiService);
     aiService.generateStructuredData = async () => ({
@@ -77,13 +78,12 @@ describe("Project AI Service - Task Generation", () => {
           { title: "New Task", description: "New", priority: "none", estimatedTime: null, suggestedOrder: 2 }
         ]
       },
-      metadata: { executionId: '123', provider: 'test', model: 'test', durationMs: 100, promptName: 'project-to-tasks', promptVersion: '1.0' }
-    });
+      metadata: { executionId: '123', provider: 'test', model: 'test', durationMs: 100, promptName: 'project-to-tasks', promptVersion: '1.0' } } as any);
 
     try {
       const tasks = await generateTasksForProject(projectId, userId, "Test duplicates");
-      assert.strictEqual(tasks.length, 1);
-      assert.strictEqual(tasks[0].title, "New Task");
+      assert.strictEqual(tasks!.length, 1);
+      assert.strictEqual(tasks![0]!.title, "New Task");
     } finally {
       aiService.generateStructuredData = originalGenerate;
     }
@@ -93,8 +93,7 @@ describe("Project AI Service - Task Generation", () => {
     const originalGenerate = aiService.generateStructuredData.bind(aiService);
     aiService.generateStructuredData = async () => ({
       data: { tasks: [] },
-      metadata: { executionId: '123', provider: 'test', model: 'test', durationMs: 100, promptName: 'project-to-tasks', promptVersion: '1.0' }
-    });
+      metadata: { executionId: '123', provider: 'test', model: 'test', durationMs: 100, promptName: 'project-to-tasks', promptVersion: '1.0' } } as any);
 
     try {
       await assert.rejects(

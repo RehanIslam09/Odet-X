@@ -1,5 +1,5 @@
 import { ZodSchema } from 'zod';
-import { AIValidationError } from '../errors/ai.errors';
+import { AIValidationError } from '../errors/ai.errors.js';
 
 /**
  * Enforces Zod schema correctness on raw LLM output.

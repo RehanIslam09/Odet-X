@@ -1,9 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { PromptTemplate } from '../prompts/types';
-import { buildPrompt } from '../prompts/builder/prompt.builder';
-import { validatePromptTemplate, PromptValidationError } from '../prompts/validation/prompt.validator';
-import { promptRegistry } from '../prompts/registry/prompt.registry';
+import { PromptTemplate } from '../prompts/types.js';
+import { buildPrompt } from '../prompts/builder/prompt.builder.js';
+import { validatePromptTemplate, PromptValidationError } from '../prompts/validation/prompt.validator.js';
+import { promptRegistry } from '../prompts/registry/prompt.registry.js';
 
 describe('Prompt Builder', () => {
   it('should deterministically assemble sections and wrap with XML delimiters', () => {

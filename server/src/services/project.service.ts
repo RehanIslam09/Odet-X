@@ -222,6 +222,10 @@ export async function updateProject(
     project.color = data.color;
     hasChanges = true;
   }
+  if (data.aiSummary !== undefined) {
+    project.aiSummary = data.aiSummary;
+    hasChanges = true;
+  }
 
   await project.save();
 

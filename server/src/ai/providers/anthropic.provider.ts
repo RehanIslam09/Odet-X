@@ -1,14 +1,14 @@
 import { ZodSchema } from 'zod';
 import Anthropic from '@anthropic-ai/sdk';
-import { AIProvider } from './base.provider';
-import { AIRequestOptions, AIModelTier } from '../types';
-import { aiConfig } from '../config/ai.config';
+import { AIProvider } from './base.provider.js';
+import { AIRequestOptions, AIModelTier } from '../types/index.js';
+import { aiConfig } from '../config/ai.config.js';
 import { 
   AIBaseError, 
   AIConfigurationError, 
   AIProviderError, 
   AITimeoutError 
-} from '../errors/ai.errors';
+} from '../errors/ai.errors.js';
 
 /**
  * Concrete implementation of the AIProvider for Anthropic.
@@ -56,11 +56,12 @@ export class AnthropicProvider implements AIProvider {
       );
 
       const contentBlock = response.content[0];
+      if (!contentBlock) throw new AIProviderError('No content received from Anthropic');
       if (contentBlock.type !== 'text') {
         throw new AIProviderError(`Unexpected content type received from Anthropic: ${contentBlock.type}`);
       }
 
-      let rawText = contentBlock.text.trim();
+      let rawText = (contentBlock as any).text.trim();
       
       // Attempt to clean up markdown code block wrapping if the LLM ignored our "no formatting" instruction
       if (rawText.startsWith('```')) {

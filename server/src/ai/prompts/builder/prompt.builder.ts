@@ -1,4 +1,4 @@
-import { PromptTemplate, PromptSection } from '../types';
+import { PromptTemplate, PromptSection } from '../types.js';
 
 /**
  * Assembles a prompt template into a single, deterministic string.

@@ -2,7 +2,8 @@ import { Types } from "mongoose";
 import Project, { IProjectDocument } from "@/models/project.model.js";
 import Task from "@/models/task.model.js";
 import { NotFoundError, BadRequestError } from "@/utils/app-error.js";
-import { aiService } from "@/ai/ai.service.js";
+import { AIModelTier } from '../ai/types/index.js';
+import { aiService } from "../ai/ai.service.js";
 import { promptRegistry } from "@/ai/prompts/registry/prompt.registry.js";
 import { GenerateTasksResponseSchema } from "@/ai/schemas/project-tasks.schema.js";
 import { createTask } from "./task.service.js";
@@ -62,9 +63,9 @@ export async function generateTasksForProject(
   // Retrieve the blueprint from the registry
   const templateBlueprint = promptRegistry.get('project-to-tasks');
   
-  // Clone sections and append dynamic user context
+  // Clone sections and append dynamic user context, replacing the static intent
   const dynamicSections = [
-    ...templateBlueprint.sections,
+    ...templateBlueprint.sections.filter((s: any) => s.identifier !== 'intent'),
     {
       identifier: 'context',
       content: `Project Name: ${project.name}\nProject Description: ${project.description || 'None'}\n\nExisting Task Titles (DO NOT DUPLICATE THESE):\n${existingTitles.length > 0 ? existingTitles.join('\n') : 'None'}`
@@ -85,13 +86,13 @@ export async function generateTasksForProject(
   const result = await aiService.generateStructuredData(
     executableTemplate,
     GenerateTasksResponseSchema,
-    { tier: 'deep-context' } // High reasoning tier for task planning
+    { tier: AIModelTier.DEEP_CONTEXT } // High reasoning tier for task planning
   );
 
   const generatedTasks = result.data.tasks;
 
   // 4. Domain / Business Validation
-  const validTasksToCreate = [];
+  const validTasksToCreate: any[] = [];
   const normalizedExistingTitles = new Set(existingTitles.map(t => t.toLowerCase().trim()));
 
   for (const t of generatedTasks) {

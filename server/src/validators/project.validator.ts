@@ -89,6 +89,11 @@ export const updateProjectSchema = z.object({
   description: descriptionSchema,
   emoji: emojiSchema,
   color: colorSchema,
+  aiSummary: z.object({
+    summary: z.string(),
+    highlights: z.array(z.string()),
+    risks: z.array(z.string())
+  }).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -157,3 +162,17 @@ export const projectQuerySchema = z.object({
 export type CreateProjectDto = z.infer<typeof createProjectSchema>;
 export type UpdateProjectDto = z.infer<typeof updateProjectSchema>;
 export type ProjectQueryDto = z.infer<typeof projectQuerySchema>;
+
+// ---------------------------------------------------------------------------
+// AI Validation
+// ---------------------------------------------------------------------------
+
+export const generateProjectTasksSchema = z.object({
+  description: z.string().trim().min(1, "A project description is required for task generation."),
+});
+
+export type GenerateProjectTasksDto = z.infer<typeof generateProjectTasksSchema>;
+
+export const generateProjectSummarySchema = z.object({}); // Empty body
+
+export type GenerateProjectSummaryDto = z.infer<typeof generateProjectSummarySchema>;

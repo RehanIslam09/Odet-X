@@ -58,6 +58,11 @@ export interface IProject {
   color: string;
   archived: boolean;
   isDeleted: boolean;
+  aiSummary?: {
+    summary: string;
+    highlights: string[];
+    risks: string[];
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -109,6 +114,15 @@ const projectSchema = new Schema<IProjectDocument>(
     isDeleted: {
       type: Boolean,
       default: false,
+    },
+
+    aiSummary: {
+      type: {
+        summary: { type: String, required: true },
+        highlights: { type: [String], default: [] },
+        risks: { type: [String], default: [] }
+      },
+      required: false,
     },
   },
   {

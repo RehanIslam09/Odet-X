@@ -36,7 +36,7 @@ async function runTests() {
       priority: "none",
     });
     
-    expect(task.__v === 0, "Initial version is 0");
+    expect((task as any).__v === 0, "Initial version is 0");
 
     const updatedTask = await updateTaskNotes(
       task._id.toString(),
@@ -45,7 +45,7 @@ async function runTests() {
     );
 
     expect(updatedTask.notes === "New Notes", "Notes were updated in returned object");
-    expect(updatedTask.__v === 1, "Version incremented to 1 in returned object");
+    expect((updatedTask as any).__v === 1, "Version incremented to 1 in returned object");
     
     // Verify it actually persisted
     const dbTask = await Task.findById(task._id);
@@ -135,8 +135,8 @@ async function runTests() {
 
     // Client 1 loads task (__v = 0)
     // Client 2 loads task (__v = 0)
-    const client1Version = task.__v;
-    const client2Version = task.__v;
+    const client1Version = (task as any).__v;
+    const client2Version = (task as any).__v;
 
     // Client 1 saves successfully
     await updateTaskNotes(task._id.toString(), userA, { notes: "Client 1 Edit", expectedVersion: client1Version });

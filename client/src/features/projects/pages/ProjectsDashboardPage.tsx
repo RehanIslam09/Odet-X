@@ -167,7 +167,7 @@ export default function ProjectsDashboardPage() {
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="flex items-center justify-between gap-4"
+        className="w-full"
       >
         <PageHeader
           title="Projects"

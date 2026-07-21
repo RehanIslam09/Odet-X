@@ -178,3 +178,11 @@ export type UpdateTaskDto = z.infer<typeof updateTaskSchema>;
 export type UpdateTaskNotesDto = z.infer<typeof updateTaskNotesSchema>;
 export type TaskQueryDto = z.infer<typeof taskQuerySchema>;
 export type TaskParamDto = { id: string };
+
+// ---------------------------------------------------------------------------
+// AI Validation
+// ---------------------------------------------------------------------------
+
+export const generateTaskLabelsSchema = z.object({}); // Empty body, relies on URL params and user context
+
+export type GenerateTaskLabelsDto = z.infer<typeof generateTaskLabelsSchema>;

@@ -12,6 +12,9 @@ import {
   updateProject,
 } from "@/services/project.service.js";
 
+import { generateTasksForProject } from "@/services/project-ai.service.js";
+import { generateSummaryForProject } from "@/services/project-summary-ai.service.js";
+
 import { sendSuccessResponse } from "@/utils/api-response.js";
 import { asyncHandler } from "@/utils/async-handler.js";
 import { BadRequestError } from "@/utils/app-error.js";
@@ -182,5 +185,44 @@ export const remove = asyncHandler(async (req: Request, res: Response) => {
 
   sendSuccessResponse(res, {
     message: "Project deleted successfully.",
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /projects/:id/generate-tasks (AI)
+// ---------------------------------------------------------------------------
+
+export const generateTasks = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id.toString();
+  const id = getRequiredProjectId(req);
+  const { description } = req.body;
+
+  const tasks = await generateTasksForProject(id, userId, description);
+
+  sendSuccessResponse(res, {
+    statusCode: 201,
+    message: "Tasks generated successfully.",
+    data: {
+      items: tasks.map(t => t.toJSON()),
+    },
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /projects/:id/generate-summary (AI)
+// ---------------------------------------------------------------------------
+
+export const generateSummary = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id.toString();
+  const id = getRequiredProjectId(req);
+
+  const project = await generateSummaryForProject(id, userId);
+
+  sendSuccessResponse(res, {
+    statusCode: 201,
+    message: "Project summary generated successfully.",
+    data: {
+      project: project.toJSON(),
+    },
   });
 });

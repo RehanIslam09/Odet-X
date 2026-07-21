@@ -11,6 +11,8 @@ import {
   updateTaskNotes,
 } from "@/services/task.service.js";
 
+import { generateLabelsForTask } from "@/services/task-ai.service.js";
+
 import { sendSuccessResponse } from "@/utils/api-response.js";
 import { asyncHandler } from "@/utils/async-handler.js";
 import { BadRequestError } from "@/utils/app-error.js";
@@ -146,5 +148,23 @@ export const remove = asyncHandler(async (req: Request, res: Response) => {
 
   sendSuccessResponse(res, {
     message: "Task deleted successfully.",
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /tasks/:id/generate-labels (AI)
+// ---------------------------------------------------------------------------
+export const generateLabels = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id.toString();
+  const id = getRequiredTaskId(req);
+
+  const task = await generateLabelsForTask(id, userId);
+
+  sendSuccessResponse(res, {
+    statusCode: 201,
+    message: "Labels generated and applied successfully.",
+    data: {
+      task: task.toJSON(),
+    },
   });
 });

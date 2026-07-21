@@ -4,8 +4,11 @@
  */
 
 export interface AILogMetadata {
+  executionId: string;
   provider: string;
   model: string;
+  promptName: string;
+  promptVersion: string;
   executionTimeMs: number;
   success: boolean;
   errorType?: string;

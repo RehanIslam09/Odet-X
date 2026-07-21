@@ -14,6 +14,26 @@ export enum AIModelTier {
 }
 
 /**
+ * Metadata associated with an AI execution, returned to the caller for observability.
+ */
+export interface AIExecutionMetadata {
+  executionId: string;
+  provider: string;
+  model: string;
+  durationMs: number;
+  promptName: string;
+  promptVersion: string;
+}
+
+/**
+ * A wrapper for the validated data and its associated execution metadata.
+ */
+export interface AIExecutionResult<T> {
+  data: T;
+  metadata: AIExecutionMetadata;
+}
+
+/**
  * Options required to formulate a request to the AI service.
  */
 export interface AIRequestOptions {

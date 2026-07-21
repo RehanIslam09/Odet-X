@@ -9,7 +9,6 @@ import {
   AIProviderError, 
   AITimeoutError 
 } from '../errors/ai.errors';
-import { aiLogger } from '../utils/logger';
 
 /**
  * Concrete implementation of the AIProvider for Anthropic.
@@ -74,14 +73,11 @@ export class AnthropicProvider implements AIProvider {
       } catch (err) {
         throw new AIProviderError(`Failed to parse LLM output as JSON. Raw output: ${rawText.substring(0, 100)}...`, err);
       }
-
-      this.logSuccess(model, startTime);
       
       // Note: We return raw parsed JSON. Validation happens centrally in the ai-response.validator.ts 
       // as orchestrated by the AIService.
       return parsedJson as T;
     } catch (error: any) {
-      this.logFailure(model, startTime, error);
       this.mapAndThrowError(error);
     }
     
@@ -127,26 +123,5 @@ export class AnthropicProvider implements AIProvider {
       default:
         throw new AIConfigurationError(`Unsupported model tier: ${tier}`);
     }
-  }
-
-  private logSuccess(model: string, startTime: number): void {
-    aiLogger.logExecution({
-      provider: 'anthropic',
-      model,
-      executionTimeMs: Date.now() - startTime,
-      success: true,
-    });
-  }
-
-  private logFailure(model: string, startTime: number, error: any): void {
-    const errorType = error instanceof Error ? error.constructor.name : 'UnknownError';
-    aiLogger.logExecution({
-      provider: 'anthropic',
-      model,
-      executionTimeMs: Date.now() - startTime,
-      success: false,
-      errorType,
-      errorMessage: error instanceof Error ? error.message : String(error),
-    });
   }
 }

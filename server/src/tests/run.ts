@@ -19,7 +19,7 @@ for (const file of files) {
     // We execute each test sequentially using tsx
     execSync(`npx tsx src/tests/${file}`, { stdio: "inherit", env: { ...process.env, NODE_ENV: "test" } });
     passed++;
-  } catch (error) {
+  } catch {
     failed++;
     console.error(`\n❌ Test failed: ${file}`);
   }

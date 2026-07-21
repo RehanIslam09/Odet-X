@@ -34,7 +34,7 @@ describe("Project Summary AI Service", () => {
     // Ensure prompt is registered
     try {
       promptRegistry.register(projectSummaryPrompt);
-    } catch (e) {
+    } catch {
       // Ignore if already registered
     }
   });

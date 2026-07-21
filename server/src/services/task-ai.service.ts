@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
 import Task, { ITaskDocument } from "@/models/task.model.js";
-import Project, { IProjectDocument } from "@/models/project.model.js";
-import { NotFoundError, BadRequestError } from "@/utils/app-error.js";
+import Project from "@/models/project.model.js";
+import { NotFoundError } from "@/utils/app-error.js";
 import { AIModelTier } from '../ai/types/index.js';
 import { aiService } from "@/ai/ai.service.js";
 import { promptRegistry } from "@/ai/prompts/registry/prompt.registry.js";

@@ -1,6 +1,5 @@
 import dotenv from "dotenv";
-import mongoose, { Types } from "mongoose";
-import { assert } from "console";
+import { Types } from "mongoose";
 
 // Load configuration
 dotenv.config();
@@ -242,7 +241,7 @@ async function runTests() {
     let concurrencyFailed = false;
     try {
       await docInstance2!.save();
-    } catch (err: any) {
+    } catch {
       concurrencyFailed = true;
     }
     expect(concurrencyFailed, "Throws version exception on concurrent out-of-date document edits");
@@ -367,7 +366,7 @@ async function runTests() {
     expect(softDeletedProjectBlocked, "Security boundary prevents assigning tasks to soft-deleted projects");
 
     // Query listings (Search & Filtering)
-    const taskA2 = await createTask(userA._id.toString(), {
+    await createTask(userA._id.toString(), {
       title: "User A Task 2: Build AI Dashboard",
       description: "Must verify websocket connections",
       status: "in_progress",

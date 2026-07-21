@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt";
-import { Document, Model, Schema, model } from "mongoose";
+import { Document, Schema, model } from "mongoose";
 
 import {
   BCRYPT_SALT_ROUNDS,
@@ -196,8 +196,6 @@ const userSchema = new Schema<IUserDocument>(
           refreshTokenHash: ____,
           ...safe
         } = ret as Record<string, unknown>;
-
-        void _, void __, void ___, void ____;
 
         return safe;
       },

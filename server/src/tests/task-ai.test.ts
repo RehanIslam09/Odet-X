@@ -1,9 +1,8 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert";
-import mongoose from "mongoose";
 import { setupTestDatabase, teardownTestDatabase } from "./test-db.js";
 import { createProject } from "@/services/project.service.js";
-import { createTask, getTaskById } from "@/services/task.service.js";
+import { createTask } from "@/services/task.service.js";
 import { generateLabelsForTask } from "@/services/task-ai.service.js";
 import { aiService } from "@/ai/ai.service.js";
 import { promptRegistry } from "@/ai/prompts/registry/prompt.registry.js";
@@ -33,7 +32,7 @@ describe("Task AI Service - Label Generation", () => {
 
     try {
       promptRegistry.register(taskAutoLabelPrompt);
-    } catch (e) {
+    } catch {
       // ignore if already registered
     }
   });

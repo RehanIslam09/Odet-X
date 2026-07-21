@@ -10,7 +10,7 @@ import type {
   UpdateTaskNotesDto,
 } from "@/validators/task.validator.js";
 
-import { BadRequestError, ForbiddenError, NotFoundError, ConflictError } from "@/utils/app-error.js";
+import { NotFoundError, ConflictError } from "@/utils/app-error.js";
 import { recordActivity, recordActivities, BaseActivityPayload } from "@/services/activity.service.js";
 import { ACTIVITY_TYPES } from "@/constants/activity.js";
 

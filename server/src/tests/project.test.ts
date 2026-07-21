@@ -8,7 +8,6 @@ import { setupTestDatabase, teardownTestDatabase } from "./test-db.js";
 import {
   createProjectSchema,
   projectQuerySchema,
-  updateProjectSchema,
 } from "../validators/project.validator.js";
 
 import {
@@ -27,7 +26,6 @@ import Task from "../models/task.model.js";
 
 import Project from "../models/project.model.js";
 import User from "../models/user.model.js";
-import { Types } from "mongoose";
 
 // Helper for assertion logging
 function expect(value: boolean, message: string) {
@@ -168,7 +166,7 @@ async function runTests() {
     // Ownership injection prevention test
     // Even if client sent `owner`, Zod strips it, and service doesn't accept it.
     // Testing update directly with service data
-    let ownershipInjectionBlocked = true; // Handled by typing, we can't even pass owner to updateProject
+    const ownershipInjectionBlocked = true; // Handled by typing, we can't even pass owner to updateProject
     expect(ownershipInjectionBlocked, "Service signature prevents owner injection during update");
 
     // =========================================================================
@@ -264,7 +262,7 @@ async function runTests() {
     let crossArchiveBlocked = false;
     try {
       await toggleProjectArchive(projectA1._id.toString(), userB._id.toString());
-    } catch(err: any) {
+    } catch {
       crossArchiveBlocked = true;
     }
     expect(crossArchiveBlocked, "Cross-user archive is securely blocked");
@@ -297,11 +295,11 @@ async function runTests() {
     expect(zeroSum.total === 0 && zeroSum.completionPercentage === 0, "Zero-task Project returns zeroed metrics");
 
     // Add tasks
-    const tCompleted = await createTask(userA._id.toString(), { title: "D", status: "done", priority: "low", projectId: sumProj._id.toString() });
-    const tInProgress = await createTask(userA._id.toString(), { title: "I", status: "in_progress", priority: "low", projectId: sumProj._id.toString() });
-    const tTodo = await createTask(userA._id.toString(), { title: "T", status: "todo", priority: "low", projectId: sumProj._id.toString() });
-    const tCancelled = await createTask(userA._id.toString(), { title: "C", status: "cancelled", priority: "low", projectId: sumProj._id.toString() });
-    const tOverdue = await createTask(userA._id.toString(), { 
+    await createTask(userA._id.toString(), { title: "D", status: "done", priority: "low", projectId: sumProj._id.toString() });
+    await createTask(userA._id.toString(), { title: "I", status: "in_progress", priority: "low", projectId: sumProj._id.toString() });
+    await createTask(userA._id.toString(), { title: "T", status: "todo", priority: "low", projectId: sumProj._id.toString() });
+    await createTask(userA._id.toString(), { title: "C", status: "cancelled", priority: "low", projectId: sumProj._id.toString() });
+    await createTask(userA._id.toString(), {
       title: "O", status: "todo", priority: "low", projectId: sumProj._id.toString(), 
       dueDate: new Date(Date.now() - 86400000) // yesterday
     });

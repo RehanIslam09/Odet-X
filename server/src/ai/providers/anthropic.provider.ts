@@ -34,7 +34,7 @@ export class AnthropicProvider implements AIProvider {
   ): Promise<T> {
     const model = this.getModelForTier(options.tier);
     const timeoutMs = options.timeoutMs || aiConfig.timeouts.standard;
-    const startTime = Date.now();
+
 
     try {
       // Append a specific instruction to ensure the model outputs valid JSON.

@@ -89,7 +89,7 @@ async function runTests() {
         entityId: new Types.ObjectId().toString(),
         metadata: {},
       });
-    } catch (e) {
+    } catch {
       threwError = true;
     }
     expect(threwError === false, "Activity insertion failure doesn't throw to caller");

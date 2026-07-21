@@ -43,7 +43,7 @@ async function runTests() {
       metadata: { foo: "bar" },
     });
 
-    let countA = await Notification.countDocuments({ recipientId: userA });
+    const countA = await Notification.countDocuments({ recipientId: userA });
     expect(countA === 1, "Created single notification successfully");
 
     const notif = await Notification.findOne({ recipientId: userA });
@@ -61,7 +61,7 @@ async function runTests() {
         title: "Fail",
         message: "Fail",
       });
-    } catch (e) {
+    } catch {
       threwError = true;
     }
     expect(threwError === false, "Notification insertion failure doesn't throw to caller");
@@ -92,7 +92,7 @@ async function runTests() {
     expect(updatedNotif!.readAt !== null, "readAt is set");
 
     console.log("\n>> Running Idempotent Mark As Read Test...");
-    const readAtBefore = updatedNotif!.readAt!.getTime();
+
     
     // Simulate slight delay before next call
     await new Promise(r => setTimeout(r, 10));

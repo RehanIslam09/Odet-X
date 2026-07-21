@@ -34,7 +34,6 @@ const activitySchema = new Schema<IActivityDocument>(
       virtuals: true,
       transform(_doc, ret) {
         const { _id: _, __v: __, ...safe } = ret as Record<string, unknown>;
-        void _, void __;
         return safe;
       },
     },

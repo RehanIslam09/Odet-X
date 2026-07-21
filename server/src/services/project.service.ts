@@ -8,7 +8,7 @@ import type {
   UpdateProjectDto,
 } from "@/validators/project.validator.js";
 
-import { ForbiddenError, NotFoundError } from "@/utils/app-error.js";
+import { NotFoundError } from "@/utils/app-error.js";
 import { recordActivity } from "@/services/activity.service.js";
 import { ACTIVITY_TYPES } from "@/constants/activity.js";
 

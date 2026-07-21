@@ -42,7 +42,7 @@ export class AIService {
     let model = 'unknown';
     try {
       model = this.resolveModelFromTier(options);
-    } catch (err) {
+    } catch {
       // Defer throwing so we can log it properly
     }
 
@@ -119,7 +119,7 @@ export class AIService {
       }
       
       // Wrap unexpected errors
-      throw new Error(`Unexpected failure in AIService: ${(error as Error).message}`);
+      throw new Error(`Unexpected failure in AIService: ${(error as Error).message}`, { cause: error });
     }
   }
 

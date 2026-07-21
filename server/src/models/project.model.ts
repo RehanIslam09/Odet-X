@@ -134,7 +134,6 @@ const projectSchema = new Schema<IProjectDocument>(
         // Remove internal MongoDB fields from serialized output.
         // Uses destructuring (not delete) for strict TypeScript compatibility.
         const { _id: _, __v: __, ...safe } = ret as Record<string, unknown>;
-        void _, void __;
         return safe;
       },
     },

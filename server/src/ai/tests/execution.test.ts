@@ -8,7 +8,7 @@ import { AIModelTier } from '../types/index.js';
 
 // Mocking the provider logic since we are only testing execution lifecycle
 class MockProvider {
-  async generateStructured(prompt: string, schema: any, options: any) {
+  async generateStructured(prompt: string, _schema: any, _options: any) {
     if (prompt.includes('fail-provider')) {
       throw new Error('Provider simulated failure');
     }

@@ -1,4 +1,4 @@
-import mongoose, { Types } from "mongoose";
+import { Types } from "mongoose";
 import Project from "@/models/project.model.js";
 import Task from "@/models/task.model.js";
 

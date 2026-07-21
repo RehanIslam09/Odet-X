@@ -1,6 +1,5 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert";
-import mongoose from "mongoose";
 import { setupTestDatabase, teardownTestDatabase } from "./test-db.js";
 import { createProject } from "@/services/project.service.js";
 import { createTask } from "@/services/task.service.js";
@@ -34,7 +33,7 @@ describe("Project AI Service - Task Generation", () => {
     // Ensure prompt is registered for testing
     try {
       promptRegistry.register(projectToTasksPrompt);
-    } catch (e) {
+    } catch {
       // ignore if already registered
     }
   });

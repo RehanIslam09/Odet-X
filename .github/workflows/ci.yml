@@ -33,6 +33,7 @@ jobs:
       NODE_ENV: test
       PORT: 5000
       CLIENT_URL: http://localhost:5173
+      VITE_API_URL: http://localhost:5000/api
       MONGODB_URI: mongodb://127.0.0.1:27017/ai-project-manager-test
       JWT_ACCESS_SECRET: ci-access-secret-do-not-use
       JWT_REFRESH_SECRET: ci-refresh-secret-do-not-use

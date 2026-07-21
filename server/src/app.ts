@@ -10,6 +10,10 @@ import errorHandler from "@/middleware/error-handler.js";
 import notFoundMiddleware from "@/middleware/not-found.js";
 
 import routes from "@/routes/index.js";
+import { initializeAI } from "@/ai/init.js";
+
+// Initialize AI Subsystem
+initializeAI();
 
 const app = express();
 

@@ -9,6 +9,7 @@ import {
   list,
   remove,
   update,
+  generateTasks,
 } from "@/controllers/project.controller.js";
 
 import { authenticate } from "@/middleware/auth.middleware.js";
@@ -19,6 +20,7 @@ import {
   createProjectSchema,
   projectQuerySchema,
   updateProjectSchema,
+  generateProjectTasksSchema,
 } from "@/validators/project.validator.js";
 
 const router = Router();
@@ -61,5 +63,8 @@ router.delete("/:id", remove);
 
 // POST /projects/:id/archive  (toggles archived state)
 router.post("/:id/archive", archive);
+
+// POST /projects/:id/generate-tasks (AI Task Generation)
+router.post("/:id/generate-tasks", validate(generateProjectTasksSchema), generateTasks);
 
 export default router;

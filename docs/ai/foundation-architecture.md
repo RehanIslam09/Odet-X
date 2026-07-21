@@ -29,7 +29,15 @@ During Phase 19.1, several architectural choices were explicitly simplified to a
 - **No Global AIResponse Wrapper**: The AI Service does not wrap all responses in a generic `AIResponse<T>` object. Instead, the response naturally shapes itself based on the caller's requirements (e.g., directly returning the validated JSON).
 - **No Streaming (Yet)**: The `AIProvider` interface deliberately omits `generateStream()`. It only exposes what is strictly required for the MVP phase (`generateStructured`).
 
-## 4. Error Handling
+## 4. Provider Integration (Anthropic)
+
+The module uses the official `@anthropic-ai/sdk`. The integration focuses strictly on:
+- Passing the fully constructed prompt and requesting JSON output.
+- Converting Anthropic-specific SDK errors into the internal error hierarchy (see Error Handling below).
+- Enforcing timeout limits via the SDK and mapping `APIConnectionTimeoutError` to `AITimeoutError`.
+- Emitting structured logs for observability.
+
+## 5. Error Handling
 
 Errors inside the AI module are clearly categorized for future observability:
 - `AIProviderError`: Issues communicating with the LLM (e.g., rate limits, network failures).
@@ -37,8 +45,15 @@ Errors inside the AI module are clearly categorized for future observability:
 - `AIConfigurationError`: Bad setup (e.g., missing API keys).
 - `AITimeoutError`: Generation took too long.
 
-These errors inherit from `AIBaseError` and are bubbled up by the `AIService` so the calling Application Service can handle them gracefully (e.g., by returning a 503 or 422 to the client, or disabling the feature locally).
+These errors inherit from `AIBaseError` and are bubbled up by the `AIService` so the calling Application Service can handle them gracefully.
 
-## 5. Security & Prompt Integrity
+## 6. Observability
+
+Lightweight structured logging is implemented via `src/ai/utils/logger.ts`.
+- Logs include: `provider`, `model`, `executionTimeMs`, `success`, and mapped error types.
+- Logs explicitly DO NOT include: `API keys`, `user prompts`, or raw `provider responses` to protect privacy and prevent data leakage.
+
+## 7. Security & Prompt Integrity
 
 The `Prompt Builder` deliberately separates system instructions from user-provided context. By wrapping context in `<context>` tags, we reduce the surface area for Prompt Injection attacks. The LLM is structurally guided to treat user inputs as data to analyze, not instructions to execute.
+

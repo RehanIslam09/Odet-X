@@ -1,20 +1,32 @@
 import { ZodSchema } from 'zod';
+import Anthropic from '@anthropic-ai/sdk';
 import { AIProvider } from './base.provider';
 import { AIRequestOptions, AIModelTier } from '../types';
 import { aiConfig } from '../config/ai.config';
-import { AIConfigurationError, AIProviderError, AITimeoutError } from '../errors/ai.errors';
+import { 
+  AIBaseError, 
+  AIConfigurationError, 
+  AIProviderError, 
+  AITimeoutError 
+} from '../errors/ai.errors';
+import { aiLogger } from '../utils/logger';
 
 /**
  * Concrete implementation of the AIProvider for Anthropic.
  */
 export class AnthropicProvider implements AIProvider {
-  // In a real implementation, you would initialize the Anthropic SDK client here.
-  // private client: Anthropic;
-  //
-  // constructor(apiKey: string) {
-  //   if (!apiKey) throw new AIConfigurationError('Anthropic API key is missing.');
-  //   this.client = new Anthropic({ apiKey });
-  // }
+  private client: Anthropic;
+
+  constructor() {
+    const apiKey = aiConfig.anthropic.apiKey;
+    if (!apiKey) {
+      throw new AIConfigurationError('Anthropic API key is missing. Please set ANTHROPIC_API_KEY in your environment variables.');
+    }
+    
+    this.client = new Anthropic({
+      apiKey,
+    });
+  }
 
   public async generateStructured<T>(
     prompt: string,
@@ -22,17 +34,85 @@ export class AnthropicProvider implements AIProvider {
     options: AIRequestOptions
   ): Promise<T> {
     const model = this.getModelForTier(options.tier);
-    const timeout = options.timeoutMs || aiConfig.timeouts.standard;
+    const timeoutMs = options.timeoutMs || aiConfig.timeouts.standard;
+    const startTime = Date.now();
 
-    // Stubbed implementation for Phase 19.1
-    // 1. Prepare messages array for Anthropic.
-    // 2. Set max_tokens, temperature (usually 0 for structured).
-    // 3. Make the API call wrapping in a timeout promise.
-    // 4. Map Anthropic errors to our custom AIProviderError.
-    // 5. Extract text from the response block and parse as JSON.
-    // 6. Return the raw (unvalidated) JSON object. Validation happens in the generic validator.
+    try {
+      // Append a specific instruction to ensure the model outputs valid JSON.
+      const jsonPrompt = `${prompt}\n\nPlease output your response as valid JSON matching the requested structure. Output ONLY JSON, with no other text, markdown formatting, or explanations.`;
 
-    throw new Error('Anthropic SDK integration is out of scope for Phase 19.1');
+      const response = await this.client.messages.create(
+        {
+          model,
+          max_tokens: 4096,
+          temperature: 0, // Deterministic output for structured data
+          messages: [
+            {
+              role: 'user',
+              content: jsonPrompt,
+            },
+          ],
+        },
+        { timeout: timeoutMs }
+      );
+
+      const contentBlock = response.content[0];
+      if (contentBlock.type !== 'text') {
+        throw new AIProviderError(`Unexpected content type received from Anthropic: ${contentBlock.type}`);
+      }
+
+      let rawText = contentBlock.text.trim();
+      
+      // Attempt to clean up markdown code block wrapping if the LLM ignored our "no formatting" instruction
+      if (rawText.startsWith('```')) {
+        rawText = rawText.replace(/^```(json)?\n/, '').replace(/\n```$/, '');
+      }
+
+      let parsedJson: unknown;
+      try {
+        parsedJson = JSON.parse(rawText);
+      } catch (err) {
+        throw new AIProviderError(`Failed to parse LLM output as JSON. Raw output: ${rawText.substring(0, 100)}...`, err);
+      }
+
+      this.logSuccess(model, startTime);
+      
+      // Note: We return raw parsed JSON. Validation happens centrally in the ai-response.validator.ts 
+      // as orchestrated by the AIService.
+      return parsedJson as T;
+    } catch (error: any) {
+      this.logFailure(model, startTime, error);
+      this.mapAndThrowError(error);
+    }
+    
+    throw new Error('Unreachable');
+  }
+
+  /**
+   * Maps Anthropic SDK errors into our custom error hierarchy.
+   */
+  private mapAndThrowError(error: any): never {
+    if (error instanceof AIBaseError) {
+      throw error; // Already mapped
+    }
+
+    if (error instanceof Anthropic.APIConnectionTimeoutError) {
+      throw new AITimeoutError(`Anthropic API timed out after configured limit.`);
+    }
+
+    if (error instanceof Anthropic.AuthenticationError) {
+      throw new AIConfigurationError('Anthropic authentication failed. Check your API key.');
+    }
+
+    if (error instanceof Anthropic.RateLimitError) {
+      throw new AIProviderError('Anthropic rate limit exceeded.', error);
+    }
+
+    if (error instanceof Anthropic.APIError) {
+      throw new AIProviderError(`Anthropic API error: ${error.message}`, error);
+    }
+
+    throw new AIProviderError(`Unexpected error during AI generation: ${error.message || 'Unknown'}`, error);
   }
 
   /**
@@ -47,5 +127,26 @@ export class AnthropicProvider implements AIProvider {
       default:
         throw new AIConfigurationError(`Unsupported model tier: ${tier}`);
     }
+  }
+
+  private logSuccess(model: string, startTime: number): void {
+    aiLogger.logExecution({
+      provider: 'anthropic',
+      model,
+      executionTimeMs: Date.now() - startTime,
+      success: true,
+    });
+  }
+
+  private logFailure(model: string, startTime: number, error: any): void {
+    const errorType = error instanceof Error ? error.constructor.name : 'UnknownError';
+    aiLogger.logExecution({
+      provider: 'anthropic',
+      model,
+      executionTimeMs: Date.now() - startTime,
+      success: false,
+      errorType,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
   }
 }

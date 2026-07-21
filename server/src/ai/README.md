@@ -25,6 +25,20 @@ When building a new AI feature:
 3. Call `aiService.generateStructuredData(schema, context, intent)` from your business service.
 4. **Never** include business rules (e.g., "save to database") inside the AI module. The AI module only returns validated data; the caller decides what to do with it.
 
+## Local Development & Setup
+
+To enable AI features locally, you need to configure the Anthropic provider:
+
+1. Obtain an API key from your [Anthropic Console](https://console.anthropic.com/).
+2. Add the following to your `.env` file:
+   ```env
+   # AI Configuration
+   ANTHROPIC_API_KEY=your_api_key_here
+   AI_DEFAULT_MODEL=claude-3-haiku-20240307
+   AI_REQUEST_TIMEOUT=30000
+   ```
+3. If `ANTHROPIC_API_KEY` is missing, the application will throw an `AIConfigurationError` when an AI feature is invoked.
+
 ## What NOT to place in this module
 
 - **Business Logic**: Do not mutate database state here. This module is purely functional—it receives inputs and returns validated outputs.

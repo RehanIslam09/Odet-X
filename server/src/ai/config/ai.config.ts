@@ -1,6 +1,8 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 /**
  * Centralized configuration for the AI module.
- * Future configurations (like environment variable mapping) should happen here.
  */
 
 export const aiConfig = {
@@ -10,19 +12,17 @@ export const aiConfig = {
   provider: 'anthropic',
 
   /**
+   * Provider specific configuration
+   */
+  anthropic: {
+    apiKey: process.env.ANTHROPIC_API_KEY || '',
+  },
+
+  /**
    * Model identifiers grouped by capability tiers.
    */
   models: {
-    /**
-     * Tier for deterministic, structured JSON output with small context.
-     * E.g., Auto-labeling, quick classification.
-     */
-    fastJson: 'claude-3-haiku-20240307',
-    
-    /**
-     * Tier for generative, large-context, reasoning-heavy output.
-     * E.g., Project deconstruction, note summarization.
-     */
+    fastJson: process.env.AI_DEFAULT_MODEL || 'claude-3-haiku-20240307',
     deepContext: 'claude-3-sonnet-20240229',
   },
 
@@ -30,7 +30,6 @@ export const aiConfig = {
    * Timeouts for provider requests.
    */
   timeouts: {
-    // 30 seconds for standard requests
-    standard: 30000,
+    standard: parseInt(process.env.AI_REQUEST_TIMEOUT || '30000', 10),
   }
 };

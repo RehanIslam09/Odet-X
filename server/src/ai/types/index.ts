@@ -21,16 +21,6 @@ export interface AIRequestOptions {
    * The capability tier required for this request.
    */
   tier: AIModelTier;
-  
-  /**
-   * Contextual data to inject into the prompt (e.g., Project Description, Task Notes).
-   */
-  context: string;
-  
-  /**
-   * The specific instruction or user query for the model.
-   */
-  intent: string;
 
   /**
    * Optional custom timeout in milliseconds.

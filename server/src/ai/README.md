@@ -6,24 +6,27 @@ This module is the foundational layer for all AI capabilities in the AI Project 
 
 - **Abstraction & Decoupling**: Application business logic never talks directly to an AI provider SDK (e.g., Anthropic or OpenAI). It talks to the `AIService`.
 - **Validation**: All structured outputs from the LLM are strictly validated through Zod pipelines before they reach the rest of the application.
-- **Prompt Organization**: Prompts are composed centrally using shared utilities to ensure immutability of system instructions and secure injection of user context.
+- **Prompt Infrastructure**: The `src/ai/prompts` directory acts as a lightweight library for defining and assembling prompts from `PromptTemplate` objects and registering them securely.
 
 ## Architectural Boundaries
 
 1. **Application Service**: Coordinates the overall workflow (e.g., retrieving a project, mapping data, saving tasks).
 2. **AI Service**: Orchestrates the AI request.
-3. **Prompt Builder**: Formats the prompt using pure functions.
-4. **Provider Interface**: A generic contract defining supported AI capabilities (e.g., `generateStructured`).
-5. **Concrete Provider**: Implements the Provider Interface for a specific vendor (e.g., Anthropic).
-6. **Response Validator**: Enforces schema correctness on LLM responses.
+3. **Prompt Builder**: Formats the prompt using pure functions and structural XML delimiters.
+4. **Prompt Validator**: Enforces schema and integrity checks on Prompt definitions before they run.
+5. **Prompt Registry**: A lightweight store organizing prompts by name.
+6. **Provider Interface**: A generic contract defining supported AI capabilities.
+7. **Concrete Provider**: Implements the Provider Interface for a specific vendor (e.g., Anthropic).
+8. **Response Validator**: Enforces schema correctness on LLM responses.
 
 ## How to Integrate Future Features
 
 When building a new AI feature:
-1. Define the necessary context and user intent.
-2. If it requires a structured response, define a Zod schema.
-3. Call `aiService.generateStructuredData(schema, context, intent)` from your business service.
-4. **Never** include business rules (e.g., "save to database") inside the AI module. The AI module only returns validated data; the caller decides what to do with it.
+1. Define a `PromptTemplate` incorporating the necessary metadata and static sections (using `GLOBAL_SYSTEM_BEHAVIOR`).
+2. Register the template on app startup via `promptRegistry.register()`.
+3. In your business service, retrieve the template, clone it to append dynamic user sections (e.g., `context` and `intent`).
+4. Call `aiService.generateStructuredData(clonedTemplate, schema, options)`.
+5. **Never** include business rules (e.g., "save to database") inside the AI module. The AI module only returns validated data; the caller decides what to do with it.
 
 ## Local Development & Setup
 

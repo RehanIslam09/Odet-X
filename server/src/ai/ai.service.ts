@@ -2,7 +2,9 @@ import { ZodSchema } from 'zod';
 import { AIProvider } from './providers/base.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { AIRequestOptions } from './types';
-import { buildPrompt } from './prompts/prompt.builder';
+import { buildPrompt } from './prompts/builder/prompt.builder';
+import { validatePromptTemplate } from './prompts/validation/prompt.validator';
+import { PromptTemplate } from './prompts/types';
 import { validateAIResponse } from './validation/ai-response.validator';
 import { AIBaseError } from './errors/ai.errors';
 
@@ -14,36 +16,36 @@ export class AIService {
   private provider: AIProvider;
 
   constructor() {
-    // For Phase 19.1, we directly instantiate the single provider we have.
-    // In future phases, this could be injected via a factory or DI container.
     this.provider = new AnthropicProvider();
   }
 
   /**
    * Generates and validates structured data from the AI provider.
    *
-   * @param systemInstructions The immutable system rules for this feature.
+   * @param template The structured prompt template containing all sections.
    * @param schema The Zod schema representing the expected output shape.
-   * @param options The context, intent, and tier for the request.
+   * @param options The tier and timeout for the request.
    * @returns The validated data matching the provided Zod schema.
-   * @throws AIBaseError or its subclasses (e.g., AIProviderError, AIValidationError) on failure.
    */
   public async generateStructuredData<T>(
-    systemInstructions: string,
+    template: PromptTemplate,
     schema: ZodSchema<T>,
     options: AIRequestOptions
   ): Promise<T> {
     try {
-      // 1. Build the prompt
-      const fullPrompt = buildPrompt(systemInstructions, options.context, options.intent);
+      // 1. Validate the template dynamically provided by the caller
+      validatePromptTemplate(template);
 
-      // 2. Delegate to the provider interface
+      // 2. Build the prompt
+      const fullPrompt = buildPrompt(template);
+
+      // 3. Delegate to the provider interface
       const rawResponse = await this.provider.generateStructured(fullPrompt, schema, options);
 
-      // 3. Validate the response
+      // 4. Validate the response
       const validatedData = validateAIResponse(rawResponse, schema);
 
-      // 4. Return result
+      // 5. Return result
       return validatedData;
     } catch (error) {
       // Re-throw custom AI errors directly, allowing the application to handle them.

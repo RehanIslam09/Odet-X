@@ -8,6 +8,7 @@ import {
   remove,
   update,
   updateNotes,
+  generateLabels,
 } from "@/controllers/task.controller.js";
 
 import { authenticate } from "@/middleware/auth.middleware.js";
@@ -19,6 +20,7 @@ import {
   taskQuerySchema,
   updateTaskSchema,
   updateTaskNotesSchema,
+  generateTaskLabelsSchema,
 } from "@/validators/task.validator.js";
 
 const router = Router();
@@ -44,5 +46,6 @@ router.delete("/:id", remove);
 // ---------------------------------------------------------------------------
 router.patch("/:id/notes", validate(updateTaskNotesSchema), updateNotes);
 router.post("/:id/archive", archive);
+router.post("/:id/generate-labels", validate(generateTaskLabelsSchema), generateLabels);
 
 export default router;

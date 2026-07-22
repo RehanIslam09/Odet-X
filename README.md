@@ -601,6 +601,8 @@ ai-project-manager/
 ```bash
 git clone https://github.com/RehanIslam09/Odet-X.git
 cd Odet-X
+git clone https://github.com/RehanIslam09/Odet-X.git
+cd Odet-X
 ```
 
 ### 2. Install Dependencies

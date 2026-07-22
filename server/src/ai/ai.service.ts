@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { ZodSchema } from 'zod';
 import { AIProvider } from './providers/base.provider.js';
-import { AnthropicProvider } from './providers/anthropic.provider.js';
+import { AIProviderFactory } from './providers/provider.factory.js';
 import { AIRequestOptions, AIExecutionResult, AIExecutionMetadata , AIModelTier } from './types/index.js';
 import { buildPrompt } from './prompts/builder/prompt.builder.js';
 import { validatePromptTemplate } from './prompts/validation/prompt.validator.js';
@@ -16,10 +16,19 @@ import { aiConfig } from './config/ai.config.js';
  * Application services should interact exclusively with this service.
  */
 export class AIService {
-  private provider: AIProvider;
+  private customProvider?: AIProvider;
 
-  constructor() {
-    this.provider = new AnthropicProvider();
+  constructor(provider?: AIProvider) {
+    if (provider) {
+      this.customProvider = provider;
+    }
+  }
+
+  private get provider(): AIProvider {
+    if (this.customProvider) {
+      return this.customProvider;
+    }
+    return AIProviderFactory.getProvider();
   }
 
   /**

@@ -1,5 +1,6 @@
 import { AIProvider } from './base.provider.js';
 import { AnthropicProvider } from './anthropic.provider.js';
+import { GeminiProvider } from './gemini.provider.js';
 import { aiConfig } from '../config/ai.config.js';
 import { AIConfigurationError } from '../errors/ai.errors.js';
 
@@ -29,9 +30,12 @@ export class AIProviderFactory {
       case 'anthropic':
         provider = new AnthropicProvider();
         break;
+      case 'gemini':
+        provider = new GeminiProvider();
+        break;
       default:
         throw new AIConfigurationError(
-          `Unsupported or unregistered AI provider: '${providerName}'. Currently supported provider is 'anthropic'.`
+          `Unsupported or unregistered AI provider: '${providerName}'. Supported providers are 'anthropic', 'gemini'.`
         );
     }
 

@@ -28,6 +28,10 @@ export const aiConfig = {
    */
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
+    models: {
+      fastJson: process.env.GEMINI_FAST_MODEL || 'gemini-3.6-flash',
+      deepContext: process.env.GEMINI_DEEP_MODEL || 'gemini-3.6-flash',
+    },
   },
 
   /**

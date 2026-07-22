@@ -1,30 +1,83 @@
-# AI Execution Pipeline & Reliability Framework
+---
+title: "AI Request Execution Pipeline"
+description: "Authoritative specification for the 7-step execution pipeline enforced by AIService for all LLM calls."
+status: "active"
+owner: "AI Architecture Team"
+last_updated: "2026-07-22"
+last_reviewed: "2026-07-22"
+implemented_phase: "Phase 19"
+current_since: "Phase 19"
+related_documents:
+  - "docs/architecture/ai-subsystem.md"
+  - "docs/ai/prompt-engineering.md"
+superseded_by: null
+review_frequency: "quarterly"
+---
 
-This document outlines the execution lifecycle of every AI request within the platform.
+[Docs Wiki Portal](../README.md) > [AI](README.md) > Execution Pipeline
 
-## Execution Lifecycle
+# AI Request Execution Pipeline
 
-To guarantee consistency, observability, and security, every AI generation request strictly follows this 7-step lifecycle orchestrated by the `AIService`:
+This document defines the 7-step execution pipeline executed by `AIService` for every LLM request.
 
-1. **Initialization**: A unique `executionId` is generated, and a high-resolution timer begins. The requested `tier` is resolved into a concrete model name using `aiConfig.models`.
-2. **Prompt Validation**: The provided `PromptTemplate` is structurally validated against rules (e.g., must contain `system` and `intent` sections).
-3. **Prompt Construction**: The template sections are deterministically assembled and wrapped in XML-style tags to mitigate prompt injection.
-4. **Provider Execution**: The unified prompt is passed to the concrete provider (e.g., Anthropic), which handles network communication and timeout enforcement.
-5. **Response Validation**: The provider's raw output is run through a strict Zod schema pipeline. If the output is malformed, an `AIValidationError` is thrown.
-6. **Logging**: The `AIService` emits a structured log entry containing the `executionId`, model, provider, duration, and prompt metadata.
-7. **Return**: The service returns an `AIExecutionResult<T>`, containing both the strictly typed business `data` and the observability `metadata`.
+---
 
-## Observability Philosophy
+## 📋 Table of Contents
+1. [The 7-Step Lifecycle](#1-the-7-step-lifecycle)
+2. [Lifecycle Diagram](#2-lifecycle-diagram)
+3. [Observability & Structured Logging](#3-observability--structured-logging)
 
-Our logging and metadata strategy is built around observability without compromising privacy:
+---
 
-- **Centralized Logging**: Logging is owned by the `AIService` rather than the Provider. This ensures logs have full context (prompt metadata, exact execution times, and validation status) which the Provider abstraction is oblivious to.
-- **No PII Leaks**: We explicitly **DO NOT** log user prompts, AI text responses, or API keys. Only metadata (durations, provider, prompt name/version) is logged.
-- **Deterministic Execution Context**: Every request is tagged with an `executionId` to allow tracking failures through external log aggregators seamlessly.
+## 1. The 7-Step Lifecycle
 
-## Debugging Workflow
+1. **Initialization & Context Setup:** Generate a unique `executionId` (UUID v4), record request start timestamp, and resolve abstract model tier (`fast-json` or `deep-context`) into concrete model string (`claude-3-haiku` or `claude-3-5-sonnet`).
+2. **Template Retrieval & Validation:** Retrieve `PromptTemplate` from `PromptRegistry` and run `validatePromptTemplate`.
+3. **Prompt Construction:** Invoke `PromptBuilder` to format system instructions and wrap context/intent in XML tags (`<system>`, `<context>`, `<intent>`).
+4. **Provider Dispatch:** Pass compiled prompt to `AIProvider.generateStructured()`, attaching timeout `AbortController` (30,000ms default).
+5. **Zod Schema Response Validation:** Pass raw JSON string output through the feature's Zod schema (e.g. `GenerateTasksResponseSchema`). If validation fails, throw `AIValidationError`.
+6. **Observability & Logging:** Log execution metadata (`executionId`, prompt template name/version, duration, model tier, status) to logger. Deliberately omit raw prompt context, user data, or API keys.
+7. **Typed Result Return:** Wrap validated data in `AIExecutionResult<T>` envelope containing `data` and execution `metadata`.
 
-When debugging an AI failure:
-1. Locate the `executionId` in the server logs.
-2. The log will clearly indicate whether the failure occurred during **Prompt Validation** (bad code), **Provider Execution** (network/rate limit/timeout), or **Response Validation** (LLM hallucinated bad JSON).
-3. Check the `promptName` and `promptVersion` in the metadata to identify the exact prompt responsible.
+---
+
+## 2. Lifecycle Diagram
+
+```mermaid
+sequenceDiagram
+    participant Svc as Domain Service
+    participant AI as AIService Facade
+    participant Reg as PromptRegistry
+    participant Prov as AnthropicProvider
+    participant Zod as Zod Validator
+    participant Log as Logger
+
+    Svc->>AI: generateStructuredData(template, schema, options)
+    AI->>AI: 1. Generate executionId & resolve model tier
+    AI->>Reg: 2. Retrieve & validate PromptTemplate
+    AI->>AI: 3. Build XML-delimited prompt string
+    AI->>Prov: 4. Dispatch request with timeout
+    Prov-->>AI: Raw JSON string response
+    AI->>Zod: 5. Parse & validate JSON against schema
+    Zod-->>AI: Validated DTO object
+    AI->>Log: 6. Emit structured log (executionId, duration)
+    AI-->>Svc: 7. Return AIExecutionResult<T>
+```
+
+---
+
+## 3. Observability & Structured Logging
+
+Execution logs output JSON objects structured as follows:
+
+```json
+{
+  "level": "info",
+  "executionId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "promptName": "project-to-tasks",
+  "promptVersion": "1.0.0",
+  "model": "claude-3-5-sonnet-20240620",
+  "durationMs": 1420,
+  "status": "success"
+}
+```

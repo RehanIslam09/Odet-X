@@ -5,17 +5,34 @@ import { AIService } from '../ai.service.js';
 import { PromptTemplate } from '../prompts/types.js';
 import { AIConfigurationError } from '../errors/ai.errors.js';
 import { AIModelTier } from '../types/index.js';
+import { AIProvider } from '../providers/base.provider.js';
 
 // Mocking the provider logic since we are only testing execution lifecycle
-class MockProvider {
-  async generateStructured(prompt: string, _schema: any, _options: any) {
+class MockProvider implements AIProvider {
+  public readonly providerName = 'mock-provider';
+
+  public getModelForTier(tier: AIModelTier): string {
+    return tier === AIModelTier.DEEP_CONTEXT ? 'mock-deep-model' : 'mock-fast-model';
+  }
+
+  async generateStructured<T>(prompt: string, _schema: any, _options: any) {
     if (prompt.includes('fail-provider')) {
       throw new Error('Provider simulated failure');
     }
     if (prompt.includes('empty-response')) {
-      return null;
+      return null as any;
     }
-    return { status: 'ok', generated: true };
+    return {
+      data: { status: 'ok', generated: true } as T,
+      metadata: {
+        model: 'mock-fast-model',
+        usage: {
+          inputTokens: 10,
+          outputTokens: 5,
+          totalTokens: 15,
+        },
+      },
+    };
   }
 }
 

@@ -47,3 +47,62 @@ export interface AIRequestOptions {
    */
   timeoutMs?: number;
 }
+
+/**
+ * Token usage counts reported by the underlying AI provider.
+ */
+export interface AIProviderUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
+/**
+ * Metadata captured directly from the provider execution layer.
+ */
+export interface AIProviderMetadata {
+  model: string;
+  usage?: AIProviderUsage;
+}
+
+/**
+ * Enhanced response object returned by concrete AIProvider implementations.
+ */
+export interface AIProviderResponse<T> {
+  data: T;
+  metadata: AIProviderMetadata;
+}
+
+/**
+ * High-level normalized error categories for observability.
+ */
+export type AIErrorCategory =
+  | 'PROVIDER_ERROR'
+  | 'VALIDATION_ERROR'
+  | 'CONFIGURATION_ERROR'
+  | 'TIMEOUT_ERROR'
+  | 'UNKNOWN_ERROR';
+
+/**
+ * Standardized telemetry event emitted for every AI capability request.
+ */
+export interface AITelemetryEvent {
+  executionId: string;
+  timestamp: string;
+  provider: string;
+  tier: AIModelTier;
+  model: string;
+  promptName: string;
+  promptVersion: string;
+  durationMs: number;
+  success: boolean;
+  usage?: AIProviderUsage;
+  errorType?: string;
+  errorCategory?: AIErrorCategory;
+  errorMessage?: string;
+}
+
+/**
+ * Listener interface for telemetry events (used for test assertions and future sinks).
+ */
+export type AITelemetryListener = (event: AITelemetryEvent) => void;

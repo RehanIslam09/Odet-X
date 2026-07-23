@@ -58,25 +58,38 @@ export class GeminiProvider implements AIProvider {
     // 1. Prompt Block Inspection
     if (response.promptFeedback?.blockReason) {
       throw new AIProviderError(
-        `Gemini prompt was blocked with reason: ${response.promptFeedback.blockReason}`
+        `Gemini prompt was blocked with reason: ${response.promptFeedback.blockReason}`,
+        undefined,
+        'SAFETY_REFUSAL'
       );
     }
 
     // 2. Candidate Existence Check
     const candidate = response.candidates?.[0];
     if (!candidate) {
-      throw new AIProviderError('Gemini API returned no response candidates.');
+      throw new AIProviderError(
+        'Gemini API returned no response candidates.',
+        undefined,
+        'UNKNOWN_ERROR'
+      );
     }
 
     // 3. FinishReason Policy: MAX_TOKENS Truncation Check
     if (candidate.finishReason === 'MAX_TOKENS') {
-      throw new AIProviderError('Gemini output truncated due to max_tokens limit');
+      throw new AIProviderError(
+        'Gemini output truncated due to max_tokens limit',
+        undefined,
+        'MAX_TOKENS_TRUNCATION'
+      );
     }
 
     // 4. FinishReason Policy: ONLY 'STOP' proceeds to JSON parsing
     if (candidate.finishReason !== 'STOP') {
+      const isSafety = candidate.finishReason === 'SAFETY' || candidate.finishReason === 'RECITATION';
       throw new AIProviderError(
-        `Gemini candidate generation terminated with finishReason: ${candidate.finishReason || 'UNKNOWN'}`
+        `Gemini candidate generation terminated with finishReason: ${candidate.finishReason || 'UNKNOWN'}`,
+        undefined,
+        isSafety ? 'SAFETY_REFUSAL' : 'UNKNOWN_ERROR'
       );
     }
 
@@ -89,7 +102,11 @@ export class GeminiProvider implements AIProvider {
     const cleanedText = this.cleanMarkdownFences(rawText);
 
     if (!cleanedText) {
-      throw new AIProviderError('Gemini API returned an empty text response.');
+      throw new AIProviderError(
+        'Gemini API returned an empty text response.',
+        undefined,
+        'STRUCTURED_PARSE_ERROR'
+      );
     }
 
     // 6. JSON Parsing & Normalization
@@ -98,7 +115,9 @@ export class GeminiProvider implements AIProvider {
       parsedData = JSON.parse(cleanedText);
     } catch (parseError: any) {
       throw new AIProviderError(
-        `Failed to parse JSON response from Gemini API: ${parseError?.message || 'Syntax error'}`
+        `Failed to parse JSON response from Gemini API: ${parseError?.message || 'Syntax error'}`,
+        parseError,
+        'STRUCTURED_PARSE_ERROR'
       );
     }
 
@@ -127,20 +146,34 @@ export class GeminiProvider implements AIProvider {
     }
 
     if (status === 429) {
-      throw new AIProviderError('Gemini API rate limit or quota exceeded (status 429).', error);
+      throw new AIProviderError('Gemini API rate limit or quota exceeded (status 429).', error, 'RATE_LIMIT_ERROR');
     }
 
     if (status === 500 || status === 503 || status === 504) {
-      throw new AIProviderError(`Gemini API service error (status ${status}).`, error);
+      throw new AIProviderError(`Gemini API service error (status ${status}).`, error, 'SERVER_ERROR');
     }
 
     if (status === 400) {
-      throw new AIProviderError(`Gemini API request validation error (status 400).`, error);
+      throw new AIProviderError(`Gemini API request validation error (status 400).`, error, 'UNKNOWN_ERROR');
+    }
+
+    if (
+      error?.code === 'ECONNRESET' ||
+      error?.code === 'ENOTFOUND' ||
+      error?.code === 'ETIMEDOUT' ||
+      error?.name === 'FetchError'
+    ) {
+      throw new AIProviderError(
+        `Gemini provider connection failed: ${error?.message || 'Network error'}`,
+        error,
+        'NETWORK_ERROR'
+      );
     }
 
     throw new AIProviderError(
       `Gemini provider execution failed: ${error?.message || 'Unknown error'}`,
-      error
+      error,
+      'UNKNOWN_ERROR'
     );
   }
 
@@ -219,7 +252,7 @@ export class GeminiProvider implements AIProvider {
 
       // Handle caller/external abort if signal was aborted externally without provider timeout
       if (controller.signal.aborted || error?.name === 'AbortError') {
-        throw new AIProviderError('Gemini API request was aborted by caller', error);
+        throw new AIProviderError('Gemini API request was aborted by caller', error, 'UNKNOWN_ERROR');
       }
 
       this.mapAndThrowError(error);

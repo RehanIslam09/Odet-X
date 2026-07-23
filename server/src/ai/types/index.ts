@@ -96,6 +96,10 @@ export interface AITelemetryEvent {
   promptVersion: string;
   durationMs: number;
   success: boolean;
+  attempt?: number;
+  isFallback?: boolean;
+  fallbackFromProvider?: string;
+  primaryErrorCategory?: AIErrorCategory;
   usage?: AIProviderUsage;
   errorType?: string;
   errorCategory?: AIErrorCategory;

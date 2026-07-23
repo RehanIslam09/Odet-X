@@ -19,9 +19,18 @@ import {
   AIProviderError,
   AITimeoutError,
   AIValidationError,
+  AIFallbackExecutionError,
 } from './errors/ai.errors.js';
+import { isFallbackEligible } from './utils/fallback-policy.js';
 import { aiLogger } from './utils/logger.js';
 import { aiConfig } from './config/ai.config.js';
+
+interface AIAttemptContext {
+  attempt: number;
+  isFallback: boolean;
+  fallbackFromProvider?: string;
+  primaryErrorCategory?: AIErrorCategory;
+}
 
 /**
  * The central orchestration layer for all AI features.
@@ -29,10 +38,19 @@ import { aiConfig } from './config/ai.config.js';
  */
 export class AIService {
   private customProvider?: AIProvider;
+  private customFallbackProvider?: AIProvider;
 
-  constructor(provider?: AIProvider) {
+  /**
+   * Constructs AIService.
+   * @param provider Optional custom primary AIProvider instance (primarily for test/custom injection seam).
+   * @param fallbackProvider Optional custom alternate AIProvider instance (primarily for test/custom injection seam).
+   */
+  constructor(provider?: AIProvider, fallbackProvider?: AIProvider) {
     if (provider) {
       this.customProvider = provider;
+    }
+    if (fallbackProvider) {
+      this.customFallbackProvider = fallbackProvider;
     }
   }
 
@@ -44,21 +62,19 @@ export class AIService {
   }
 
   /**
-   * Generates and validates structured data from the AI provider.
-   *
-   * @param template The structured prompt template containing all sections.
-   * @param schema The Zod schema representing the expected output shape.
-   * @param options The tier and timeout for the request.
-   * @returns The validated data and execution metadata.
+   * Executes a single provider attempt (Primary or Alternate), performing prompt construction,
+   * provider invocation, schema validation, timing, and telemetry logging.
    */
-  public async generateStructuredData<T>(
+  private async executeSingleAttempt<T>(
+    provider: AIProvider,
     template: PromptTemplate,
     schema: ZodSchema<T>,
-    options: AIRequestOptions
+    options: AIRequestOptions,
+    executionId: string,
+    attemptContext: AIAttemptContext
   ): Promise<AIExecutionResult<T>> {
-    const executionId = crypto.randomUUID();
-    const startTime = Date.now();
-    const provider = this.provider;
+    const attemptStartedAtMs = Date.now();
+    const attemptStartedMonotonic = performance.now();
 
     let model = 'unknown';
     try {
@@ -70,11 +86,10 @@ export class AIService {
     let providerResponse: AIProviderResponse<unknown> | undefined;
 
     try {
-      if (!aiConfig.provider) {
+      if (!aiConfig.provider && !this.customProvider) {
         throw new AIConfigurationError('AI provider is not configured.');
       }
 
-      // Re-evaluate model if initially unknown
       if (model === 'unknown') {
         model = provider.getModelForTier(options.tier);
       }
@@ -87,14 +102,19 @@ export class AIService {
 
       // 3. Provider Execution
       providerResponse = await provider.generateStructured(fullPrompt, schema, options);
-      if (providerResponse === undefined || providerResponse === null || providerResponse.data === undefined || providerResponse.data === null) {
+      if (
+        providerResponse === undefined ||
+        providerResponse === null ||
+        providerResponse.data === undefined ||
+        providerResponse.data === null
+      ) {
         throw new AIConfigurationError('Provider returned an empty response.');
       }
 
       // 4. Response Validation
       const validatedData = validateAIResponse(providerResponse.data, schema);
 
-      const durationMs = Date.now() - startTime;
+      const durationMs = Math.round(performance.now() - attemptStartedMonotonic);
       const concreteModel = providerResponse.metadata.model || model;
 
       // 5. Execution Metadata
@@ -110,7 +130,7 @@ export class AIService {
       // 6. Telemetry Logging (Success Path)
       aiLogger.logExecution({
         executionId,
-        timestamp: new Date(startTime).toISOString(),
+        timestamp: new Date(attemptStartedAtMs).toISOString(),
         provider: provider.providerName,
         tier: options.tier,
         model: concreteModel,
@@ -118,6 +138,10 @@ export class AIService {
         promptVersion: template.metadata.version,
         durationMs,
         success: true,
+        attempt: attemptContext.attempt,
+        isFallback: attemptContext.isFallback,
+        ...(attemptContext.fallbackFromProvider && { fallbackFromProvider: attemptContext.fallbackFromProvider }),
+        ...(attemptContext.primaryErrorCategory && { primaryErrorCategory: attemptContext.primaryErrorCategory }),
         ...(providerResponse.metadata.usage && { usage: providerResponse.metadata.usage }),
       });
 
@@ -127,13 +151,12 @@ export class AIService {
         metadata,
       };
     } catch (error: any) {
-      const durationMs = Date.now() - startTime;
+      const durationMs = Math.round(performance.now() - attemptStartedMonotonic);
 
       const promptName = template?.metadata?.name || 'unknown';
       const promptVersion = template?.metadata?.version || 'unknown';
       const providerName = provider.providerName;
 
-      // Retain provider-reported usage if response envelope was received prior to failure (e.g. Zod validation failure)
       const usage = providerResponse?.metadata?.usage;
 
       const errorCategory = this.mapErrorToCategory(error);
@@ -143,7 +166,7 @@ export class AIService {
       // Telemetry Logging (Failure Path)
       aiLogger.logExecution({
         executionId,
-        timestamp: new Date(startTime).toISOString(),
+        timestamp: new Date(attemptStartedAtMs).toISOString(),
         provider: providerName,
         tier: options.tier,
         model,
@@ -151,20 +174,135 @@ export class AIService {
         promptVersion,
         durationMs,
         success: false,
+        attempt: attemptContext.attempt,
+        isFallback: attemptContext.isFallback,
+        ...(attemptContext.fallbackFromProvider && { fallbackFromProvider: attemptContext.fallbackFromProvider }),
+        ...(attemptContext.primaryErrorCategory && { primaryErrorCategory: attemptContext.primaryErrorCategory }),
         ...(usage && { usage }),
         errorType,
         errorCategory,
         errorMessage,
       });
 
-      // Re-throw custom AI errors directly, allowing the application to handle them.
+      // Re-throw error so caller / AIService orchestration can inspect it
       if (error instanceof AIBaseError) {
         throw error;
       }
 
-      // Wrap unexpected errors
       throw new Error(`Unexpected failure in AIService: ${(error as Error).message}`, { cause: error });
     }
+  }
+
+  /**
+   * Generates and validates structured data from the AI provider, executing a single
+   * alternate provider fallback attempt if the primary provider fails in a fallback-eligible manner.
+   *
+   * @param template The structured prompt template containing all sections.
+   * @param schema The Zod schema representing the expected output shape.
+   * @param options The tier and timeout for the request.
+   * @returns The validated data and execution metadata.
+   */
+  public async generateStructuredData<T>(
+    template: PromptTemplate,
+    schema: ZodSchema<T>,
+    options: AIRequestOptions
+  ): Promise<AIExecutionResult<T>> {
+    const executionId = crypto.randomUUID();
+    const requestStartMonotonic = performance.now();
+    const totalTimeoutMs = options.timeoutMs || aiConfig.timeouts.standard;
+
+    const primaryProvider = this.provider;
+    const primaryProviderName = primaryProvider.providerName;
+
+    // Attempt 1: Primary Provider Execution
+    try {
+      return await this.executeSingleAttempt(
+        primaryProvider,
+        template,
+        schema,
+        { ...options, timeoutMs: totalTimeoutMs },
+        executionId,
+        { attempt: 1, isFallback: false }
+      );
+    } catch (primaryError: any) {
+      // 1. Evaluate Fallback Eligibility
+      const eligible = isFallbackEligible(primaryError);
+
+      // 2. Canonical Alternate Provider Identity
+      const alternateProviderName =
+        this.customFallbackProvider?.providerName ??
+        AIProviderFactory.resolveAlternateProviderName(primaryProviderName);
+
+      // 3. Monotonic Latency Budget Calculation
+      const elapsedMs = Math.round(performance.now() - requestStartMonotonic);
+      const remainingTimeoutMs = Math.max(0, totalTimeoutMs - elapsedMs);
+
+      if (!eligible || !alternateProviderName || remainingTimeoutMs < 3000) {
+        // Fallback is NOT authorized -> Re-throw original primary error directly without re-wrapping
+        throw primaryError;
+      }
+
+      // 4. Lazy Alternate Provider Resolution (Attempt 2)
+      let alternateProvider: AIProvider;
+      try {
+        alternateProvider =
+          this.customFallbackProvider ||
+          AIProviderFactory.getProvider(alternateProviderName);
+      } catch (constructionError: any) {
+        // Alternate provider construction failed (e.g. missing API key AIConfigurationError)
+        const normPrimary = this.normalizeToAIBaseError(primaryError, primaryProviderName);
+        const normFallback = this.normalizeToAIBaseError(constructionError, alternateProviderName);
+
+        throw new AIFallbackExecutionError(
+          `AI request failed on both primary provider (${primaryProviderName}) and fallback provider (${alternateProviderName}).`,
+          normPrimary,
+          normFallback,
+          primaryProviderName,
+          alternateProviderName
+        );
+      }
+
+      const primaryErrorCategory = this.mapErrorToCategory(primaryError);
+
+      try {
+        return await this.executeSingleAttempt(
+          alternateProvider,
+          template,
+          schema,
+          { ...options, timeoutMs: remainingTimeoutMs },
+          executionId,
+          {
+            attempt: 2,
+            isFallback: true,
+            fallbackFromProvider: primaryProviderName,
+            primaryErrorCategory,
+          }
+        );
+      } catch (fallbackError: any) {
+        // Double Failure: Both Primary and Fallback attempts failed
+        const normPrimary = this.normalizeToAIBaseError(primaryError, primaryProviderName);
+        const normFallback = this.normalizeToAIBaseError(fallbackError, alternateProvider.providerName);
+
+        throw new AIFallbackExecutionError(
+          `AI request failed on both primary provider (${primaryProviderName}) and fallback provider (${alternateProvider.providerName}).`,
+          normPrimary,
+          normFallback,
+          primaryProviderName,
+          alternateProvider.providerName
+        );
+      }
+    }
+  }
+
+  /**
+   * Helper to normalize unknown errors to AIBaseError subclasses for AIFallbackExecutionError context.
+   */
+  private normalizeToAIBaseError(error: unknown, _providerName: string): AIBaseError {
+    if (error instanceof AIBaseError) {
+      return error;
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return new AIProviderError(`Provider execution failed: ${message}`, error, 'UNKNOWN_ERROR');
   }
 
   /**

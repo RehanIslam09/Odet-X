@@ -44,6 +44,25 @@ export class AIProviderFactory {
   }
 
   /**
+   * Resolves the deterministic alternate provider name for a given primary provider.
+   * Returns null if no registered alternate provider mapping exists.
+   *
+   * @param primaryName The primary provider name.
+   * @returns The alternate provider name or null.
+   */
+  public static resolveAlternateProviderName(primaryName?: string): string | null {
+    if (!primaryName) return null;
+    const normalized = primaryName.toLowerCase().trim();
+    if (normalized === 'anthropic') {
+      return 'gemini';
+    }
+    if (normalized === 'gemini') {
+      return 'anthropic';
+    }
+    return null;
+  }
+
+  /**
    * Resets the internal provider instance cache.
    * Used for lifecycle management and test isolation.
    */

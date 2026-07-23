@@ -117,7 +117,7 @@ describe('GeminiProvider (EXP-01..04, WP-02A..02D Invariants)', () => {
 
     await assert.rejects(
       () => provider.generateStructured('prompt', testSchema, { tier: AIModelTier.FAST_JSON }),
-      (err: any) => err instanceof AIProviderError && err.message.includes('no response candidates')
+      (err: any) => err instanceof AIProviderError && err.failureReason === 'UNKNOWN_ERROR' && err.message.includes('no response candidates')
     );
   });
 
@@ -129,7 +129,7 @@ describe('GeminiProvider (EXP-01..04, WP-02A..02D Invariants)', () => {
 
     await assert.rejects(
       () => provider.generateStructured('prompt', testSchema, { tier: AIModelTier.FAST_JSON }),
-      (err: any) => err instanceof AIProviderError && err.message.includes('finishReason: SAFETY')
+      (err: any) => err instanceof AIProviderError && err.failureReason === 'SAFETY_REFUSAL' && err.message.includes('finishReason: SAFETY')
     );
   });
 
@@ -141,7 +141,7 @@ describe('GeminiProvider (EXP-01..04, WP-02A..02D Invariants)', () => {
 
     await assert.rejects(
       () => provider.generateStructured('prompt', testSchema, { tier: AIModelTier.FAST_JSON }),
-      (err: any) => err instanceof AIProviderError && err.message.includes('finishReason: RECITATION')
+      (err: any) => err instanceof AIProviderError && err.failureReason === 'SAFETY_REFUSAL' && err.message.includes('finishReason: RECITATION')
     );
   });
 
@@ -153,7 +153,7 @@ describe('GeminiProvider (EXP-01..04, WP-02A..02D Invariants)', () => {
 
     await assert.rejects(
       () => provider.generateStructured('prompt', testSchema, { tier: AIModelTier.FAST_JSON }),
-      (err: any) => err instanceof AIProviderError && err.message.includes('max_tokens limit')
+      (err: any) => err instanceof AIProviderError && err.failureReason === 'MAX_TOKENS_TRUNCATION' && err.message.includes('max_tokens limit')
     );
   });
 
@@ -165,7 +165,7 @@ describe('GeminiProvider (EXP-01..04, WP-02A..02D Invariants)', () => {
 
     await assert.rejects(
       () => provider.generateStructured('prompt', testSchema, { tier: AIModelTier.FAST_JSON }),
-      (err: any) => err instanceof AIProviderError && err.message.includes('finishReason: FUTURE_REASON_XYZ')
+      (err: any) => err instanceof AIProviderError && err.failureReason === 'UNKNOWN_ERROR' && err.message.includes('finishReason: FUTURE_REASON_XYZ')
     );
   });
 

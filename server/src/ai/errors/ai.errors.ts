@@ -1,4 +1,18 @@
 /**
+ * Strongly-typed failure reason taxonomy for AI provider execution failures.
+ */
+export type AIProviderFailureReason =
+  | 'NETWORK_ERROR'
+  | 'TIMEOUT_ERROR'
+  | 'RATE_LIMIT_ERROR'
+  | 'SERVER_ERROR'
+  | 'STRUCTURED_PARSE_ERROR'
+  | 'SAFETY_REFUSAL'
+  | 'MAX_TOKENS_TRUNCATION'
+  | 'AUTHENTICATION_ERROR'
+  | 'UNKNOWN_ERROR';
+
+/**
  * Base error class for all AI module exceptions.
  */
 export class AIBaseError extends Error {
@@ -11,10 +25,18 @@ export class AIBaseError extends Error {
 
 /**
  * Thrown when the underlying AI provider fails (e.g., 500, rate limit).
+ * Carries a failureReason property for deterministic fallback classification.
  */
 export class AIProviderError extends AIBaseError {
-  constructor(message: string, public readonly originalError?: unknown) {
+  public readonly failureReason: AIProviderFailureReason;
+
+  constructor(
+    message: string,
+    public readonly originalError?: unknown,
+    failureReason: AIProviderFailureReason = 'UNKNOWN_ERROR'
+  ) {
     super(message);
+    this.failureReason = failureReason;
   }
 }
 
@@ -41,6 +63,22 @@ export class AIConfigurationError extends AIBaseError {
  */
 export class AITimeoutError extends AIBaseError {
   constructor(message: string) {
+    super(message);
+  }
+}
+
+/**
+ * Thrown when both primary and fallback AI provider execution attempts fail.
+ * Preserves the original primary error and fallback error for operational auditing.
+ */
+export class AIFallbackExecutionError extends AIBaseError {
+  constructor(
+    message: string,
+    public readonly primaryError: AIBaseError,
+    public readonly fallbackError: AIBaseError,
+    public readonly primaryProvider: string,
+    public readonly fallbackProvider: string
+  ) {
     super(message);
   }
 }

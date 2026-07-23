@@ -310,21 +310,21 @@ The AI subsystem (`server/src/ai/`) is architected as an untrusted data processi
 
 ```mermaid
 flowchart TD
-    Svc[Domain Service e.g. project-ai.service.ts] -->|generateStructuredData| Facade[AIService Facade]
-    
-    subgraph AI Subsystem Boundary
-        Facade -->|1. Fetch Template| Registry[PromptRegistry]
-        Facade -->|2. Validate Structure| Validator[PromptValidator]
-        Facade -->|3. Assemble XML| Builder[PromptBuilder]
-        Facade -->|4. Dispatch Request| Contract[AIProvider Interface]
-        Contract --> Provider[AnthropicProvider]
-        Provider --> SDK[@anthropic-ai/sdk]
-        SDK --> API[Anthropic API]
-        API --> RawJSON[Raw JSON String Response]
-        RawJSON --> ZodVal[Zod Response Schema Validator]
+    Svc["Domain Service (project-ai.service.ts)"] -->|"generateStructuredData"| Facade["AIService Facade"]
+
+    subgraph "AI Subsystem Boundary"
+        Facade -->|"1. Fetch Template"| Registry["PromptRegistry"]
+        Facade -->|"2. Validate Structure"| Validator["PromptValidator"]
+        Facade -->|"3. Assemble XML"| Builder["PromptBuilder"]
+        Facade -->|"4. Dispatch Request"| Contract["AIProvider Interface"]
+        Contract --> Provider["AnthropicProvider"]
+        Provider --> SDK["Anthropic SDK"]
+        SDK --> API["Anthropic API"]
+        API --> RawJSON["Raw JSON Response"]
+        RawJSON --> ZodVal["Zod Response Validator"]
     end
 
-    ZodVal -->|5. Return Typed DTO| Svc
+    ZodVal -->|"5. Return Typed DTO"| Svc
 ```
 
 ### 1. Architectural Guardrails & Prompt Injection Defense
@@ -599,8 +599,6 @@ ai-project-manager/
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/RehanIslam09/Odet-X.git
-cd Odet-X
 git clone https://github.com/RehanIslam09/Odet-X.git
 cd Odet-X
 ```

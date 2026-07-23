@@ -1,7 +1,7 @@
 import { ZodSchema } from 'zod';
 import { GoogleGenAI, GenerateContentConfig, GenerateContentResponse } from '@google/genai';
 import { AIProvider } from './base.provider.js';
-import { AIModelTier, AIRequestOptions } from '../types/index.js';
+import { AIModelTier, AIRequestOptions, AIProviderResponse, AIProviderUsage } from '../types/index.js';
 import { aiConfig } from '../config/ai.config.js';
 import { AIConfigurationError, AIProviderError, AITimeoutError } from '../errors/ai.errors.js';
 import { getGeminiResponseSchema } from './gemini-schema.adapter.js';
@@ -10,6 +10,7 @@ import { getGeminiResponseSchema } from './gemini-schema.adapter.js';
  * Concrete implementation of the AIProvider for Google Gemini.
  */
 export class GeminiProvider implements AIProvider {
+  public readonly providerName = 'gemini';
   private readonly client: GoogleGenAI;
 
   constructor() {
@@ -26,7 +27,7 @@ export class GeminiProvider implements AIProvider {
   /**
    * Resolves the configured model identifier for a given AI capability tier.
    */
-  private getModelForTier(tier?: AIModelTier): string {
+  public getModelForTier(tier?: AIModelTier): string {
     const requestedTier = tier || AIModelTier.FAST_JSON;
     switch (requestedTier) {
       case AIModelTier.DEEP_CONTEXT:
@@ -151,7 +152,7 @@ export class GeminiProvider implements AIProvider {
     prompt: string,
     schema: ZodSchema<T>,
     options: AIRequestOptions
-  ): Promise<T> {
+  ): Promise<AIProviderResponse<T>> {
     const model = this.getModelForTier(options.tier);
     const jsonSchema = getGeminiResponseSchema(schema);
     const timeoutMs = options.timeoutMs || aiConfig.timeouts.standard;
@@ -182,7 +183,34 @@ export class GeminiProvider implements AIProvider {
         throw new AITimeoutError(`Gemini API request timed out after ${timeoutMs}ms`);
       }
 
-      return this.processResponse<T>(response);
+      const parsedData = this.processResponse<T>(response);
+
+      // Extract usage metadata strictly without fabricating zero usage
+      let usage: AIProviderUsage | undefined;
+      if (
+        typeof response.usageMetadata?.promptTokenCount === 'number' &&
+        typeof response.usageMetadata?.candidatesTokenCount === 'number'
+      ) {
+        const inputTokens = response.usageMetadata.promptTokenCount;
+        const outputTokens = response.usageMetadata.candidatesTokenCount;
+        const totalTokens =
+          typeof response.usageMetadata.totalTokenCount === 'number'
+            ? response.usageMetadata.totalTokenCount
+            : inputTokens + outputTokens;
+        usage = {
+          inputTokens,
+          outputTokens,
+          totalTokens,
+        };
+      }
+
+      return {
+        data: parsedData,
+        metadata: {
+          model,
+          ...(usage && { usage }),
+        },
+      };
     } catch (error: any) {
       // Authoritative internal timeout invariant: timedOut === true is the sole provider timeout signal
       if (timedOut) {

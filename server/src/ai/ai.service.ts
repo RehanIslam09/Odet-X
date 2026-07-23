@@ -2,12 +2,24 @@ import crypto from 'crypto';
 import { ZodSchema } from 'zod';
 import { AIProvider } from './providers/base.provider.js';
 import { AIProviderFactory } from './providers/provider.factory.js';
-import { AIRequestOptions, AIExecutionResult, AIExecutionMetadata , AIModelTier } from './types/index.js';
+import {
+  AIRequestOptions,
+  AIExecutionResult,
+  AIExecutionMetadata,
+  AIProviderResponse,
+  AIErrorCategory,
+} from './types/index.js';
 import { buildPrompt } from './prompts/builder/prompt.builder.js';
 import { validatePromptTemplate } from './prompts/validation/prompt.validator.js';
 import { PromptTemplate } from './prompts/types.js';
 import { validateAIResponse } from './validation/ai-response.validator.js';
-import { AIBaseError, AIConfigurationError } from './errors/ai.errors.js';
+import {
+  AIBaseError,
+  AIConfigurationError,
+  AIProviderError,
+  AITimeoutError,
+  AIValidationError,
+} from './errors/ai.errors.js';
 import { aiLogger } from './utils/logger.js';
 import { aiConfig } from './config/ai.config.js';
 
@@ -46,18 +58,25 @@ export class AIService {
   ): Promise<AIExecutionResult<T>> {
     const executionId = crypto.randomUUID();
     const startTime = Date.now();
-    
-    // Resolve configuration model for logging purposes
+    const provider = this.provider;
+
     let model = 'unknown';
     try {
-      model = this.resolveModelFromTier(options);
+      model = provider.getModelForTier(options.tier);
     } catch {
-      // Defer throwing so we can log it properly
+      // Defer throwing so we can capture failure telemetry if config/tier resolution fails
     }
+
+    let providerResponse: AIProviderResponse<unknown> | undefined;
 
     try {
       if (!aiConfig.provider) {
         throw new AIConfigurationError('AI provider is not configured.');
+      }
+
+      // Re-evaluate model if initially unknown
+      if (model === 'unknown') {
+        model = provider.getModelForTier(options.tier);
       }
 
       // 1. Prompt Validation
@@ -67,35 +86,39 @@ export class AIService {
       const fullPrompt = buildPrompt(template);
 
       // 3. Provider Execution
-      const rawResponse = await this.provider.generateStructured(fullPrompt, schema, options);
-      if (rawResponse === undefined || rawResponse === null) {
+      providerResponse = await provider.generateStructured(fullPrompt, schema, options);
+      if (providerResponse === undefined || providerResponse === null || providerResponse.data === undefined || providerResponse.data === null) {
         throw new AIConfigurationError('Provider returned an empty response.');
       }
 
       // 4. Response Validation
-      const validatedData = validateAIResponse(rawResponse, schema);
+      const validatedData = validateAIResponse(providerResponse.data, schema);
 
       const durationMs = Date.now() - startTime;
+      const concreteModel = providerResponse.metadata.model || model;
 
       // 5. Execution Metadata
       const metadata: AIExecutionMetadata = {
         executionId,
-        provider: aiConfig.provider,
-        model,
+        provider: provider.providerName,
+        model: concreteModel,
         durationMs,
         promptName: template.metadata.name,
         promptVersion: template.metadata.version,
       };
 
-      // 6. Logging (Success)
+      // 6. Telemetry Logging (Success Path)
       aiLogger.logExecution({
         executionId,
-        provider: metadata.provider,
-        model: metadata.model,
-        promptName: metadata.promptName,
-        promptVersion: metadata.promptVersion,
-        executionTimeMs: durationMs,
+        timestamp: new Date(startTime).toISOString(),
+        provider: provider.providerName,
+        tier: options.tier,
+        model: concreteModel,
+        promptName: template.metadata.name,
+        promptVersion: template.metadata.version,
+        durationMs,
         success: true,
+        ...(providerResponse.metadata.usage && { usage: providerResponse.metadata.usage }),
       });
 
       // 7. Return Result
@@ -103,46 +126,82 @@ export class AIService {
         data: validatedData,
         metadata,
       };
-    } catch (error) {
+    } catch (error: any) {
       const durationMs = Date.now() - startTime;
-      
+
       const promptName = template?.metadata?.name || 'unknown';
       const promptVersion = template?.metadata?.version || 'unknown';
-      
-      // 6. Logging (Failure)
+      const providerName = provider.providerName;
+
+      // Retain provider-reported usage if response envelope was received prior to failure (e.g. Zod validation failure)
+      const usage = providerResponse?.metadata?.usage;
+
+      const errorCategory = this.mapErrorToCategory(error);
+      const errorMessage = this.getSanitizedErrorMessage(errorCategory);
+      const errorType = error instanceof Error ? error.constructor.name : 'UnknownError';
+
+      // Telemetry Logging (Failure Path)
       aiLogger.logExecution({
         executionId,
-        provider: aiConfig.provider || 'unknown',
+        timestamp: new Date(startTime).toISOString(),
+        provider: providerName,
+        tier: options.tier,
         model,
         promptName,
         promptVersion,
-        executionTimeMs: durationMs,
+        durationMs,
         success: false,
-        errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
-        errorMessage: error instanceof Error ? error.message : String(error),
+        ...(usage && { usage }),
+        errorType,
+        errorCategory,
+        errorMessage,
       });
 
       // Re-throw custom AI errors directly, allowing the application to handle them.
       if (error instanceof AIBaseError) {
         throw error;
       }
-      
+
       // Wrap unexpected errors
       throw new Error(`Unexpected failure in AIService: ${(error as Error).message}`, { cause: error });
     }
   }
 
   /**
-   * Helper to resolve model name from tier for observability logging.
+   * Maps normalized application AI errors to standardized telemetry error categories.
    */
-  private resolveModelFromTier(options: AIRequestOptions): string {
-    switch (options.tier) {
-      case AIModelTier.FAST_JSON:
-        return aiConfig.models.fastJson;
-      case AIModelTier.DEEP_CONTEXT:
-        return aiConfig.models.deepContext;
+  private mapErrorToCategory(error: unknown): AIErrorCategory {
+    if (error instanceof AITimeoutError) {
+      return 'TIMEOUT_ERROR';
+    }
+    if (error instanceof AIValidationError) {
+      return 'VALIDATION_ERROR';
+    }
+    if (error instanceof AIConfigurationError) {
+      return 'CONFIGURATION_ERROR';
+    }
+    if (error instanceof AIProviderError) {
+      return 'PROVIDER_ERROR';
+    }
+    return 'UNKNOWN_ERROR';
+  }
+
+  /**
+   * Returns a safe, static error description guaranteed not to leak prompts, raw AI outputs, or sensitive PII.
+   */
+  private getSanitizedErrorMessage(category: AIErrorCategory): string {
+    switch (category) {
+      case 'TIMEOUT_ERROR':
+        return 'AI request timed out';
+      case 'VALIDATION_ERROR':
+        return 'AI response failed validation';
+      case 'CONFIGURATION_ERROR':
+        return 'AI provider configuration error';
+      case 'PROVIDER_ERROR':
+        return 'AI provider execution error';
+      case 'UNKNOWN_ERROR':
       default:
-        throw new AIConfigurationError(`Unsupported model tier: ${options.tier}`);
+        return 'Unknown AI execution error';
     }
   }
 }

@@ -32,10 +32,7 @@ describe('AI Execution Framework', () => {
   const options = { tier: AIModelTier.FAST_JSON as const };
 
   it('should successfully execute the lifecycle and return metadata', async () => {
-    const aiService = new AIService();
-    
-    // Inject mock provider
-    (aiService as any).provider = new MockProvider();
+    const aiService = new AIService(new MockProvider() as any);
 
     const result = await aiService.generateStructuredData(mockTemplate, schema, options);
     
@@ -52,8 +49,7 @@ describe('AI Execution Framework', () => {
   });
 
   it('should throw an error on empty provider response', async () => {
-    const aiService = new AIService();
-    (aiService as any).provider = new MockProvider();
+    const aiService = new AIService(new MockProvider() as any);
 
     const emptyTemplate: PromptTemplate = {
       ...mockTemplate,
@@ -67,8 +63,7 @@ describe('AI Execution Framework', () => {
   });
 
   it('should propagate provider failures securely', async () => {
-    const aiService = new AIService();
-    (aiService as any).provider = new MockProvider();
+    const aiService = new AIService(new MockProvider() as any);
 
     const failTemplate: PromptTemplate = {
       ...mockTemplate,

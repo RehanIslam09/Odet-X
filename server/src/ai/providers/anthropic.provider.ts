@@ -1,7 +1,7 @@
 import { ZodSchema } from 'zod';
 import Anthropic from '@anthropic-ai/sdk';
 import { AIProvider } from './base.provider.js';
-import { AIRequestOptions, AIModelTier } from '../types/index.js';
+import { AIRequestOptions, AIModelTier, AIProviderResponse, AIProviderUsage } from '../types/index.js';
 import { aiConfig } from '../config/ai.config.js';
 import { 
   AIBaseError, 
@@ -14,6 +14,7 @@ import {
  * Concrete implementation of the AIProvider for Anthropic.
  */
 export class AnthropicProvider implements AIProvider {
+  public readonly providerName = 'anthropic';
   private client: Anthropic;
 
   constructor() {
@@ -27,14 +28,27 @@ export class AnthropicProvider implements AIProvider {
     });
   }
 
+  /**
+   * Maps an internal AIModelTier to the concrete Anthropic model string.
+   */
+  public getModelForTier(tier: AIModelTier): string {
+    switch (tier) {
+      case AIModelTier.FAST_JSON:
+        return aiConfig.models.fastJson;
+      case AIModelTier.DEEP_CONTEXT:
+        return aiConfig.models.deepContext;
+      default:
+        throw new AIConfigurationError(`Unsupported model tier: ${tier}`);
+    }
+  }
+
   public async generateStructured<T>(
     prompt: string,
     schema: ZodSchema<T>,
     options: AIRequestOptions
-  ): Promise<T> {
+  ): Promise<AIProviderResponse<T>> {
     const model = this.getModelForTier(options.tier);
     const timeoutMs = options.timeoutMs || aiConfig.timeouts.standard;
-
 
     try {
       // Append a specific instruction to ensure the model outputs valid JSON.
@@ -75,9 +89,28 @@ export class AnthropicProvider implements AIProvider {
         throw new AIProviderError(`Failed to parse LLM output as JSON. Raw output: ${rawText.substring(0, 100)}...`, err);
       }
       
-      // Note: We return raw parsed JSON. Validation happens centrally in the ai-response.validator.ts 
-      // as orchestrated by the AIService.
-      return parsedJson as T;
+      // Extract usage metadata strictly without fabricating zero usage
+      let usage: AIProviderUsage | undefined;
+      if (
+        typeof response.usage?.input_tokens === 'number' &&
+        typeof response.usage?.output_tokens === 'number'
+      ) {
+        const inputTokens = response.usage.input_tokens;
+        const outputTokens = response.usage.output_tokens;
+        usage = {
+          inputTokens,
+          outputTokens,
+          totalTokens: inputTokens + outputTokens,
+        };
+      }
+
+      return {
+        data: parsedJson as T,
+        metadata: {
+          model,
+          ...(usage && { usage }),
+        },
+      };
     } catch (error: any) {
       this.mapAndThrowError(error);
     }
@@ -110,19 +143,5 @@ export class AnthropicProvider implements AIProvider {
     }
 
     throw new AIProviderError(`Unexpected error during AI generation: ${error.message || 'Unknown'}`, error);
-  }
-
-  /**
-   * Maps an internal AIModelTier to the concrete Anthropic model string.
-   */
-  private getModelForTier(tier: AIModelTier): string {
-    switch (tier) {
-      case AIModelTier.FAST_JSON:
-        return aiConfig.models.fastJson;
-      case AIModelTier.DEEP_CONTEXT:
-        return aiConfig.models.deepContext;
-      default:
-        throw new AIConfigurationError(`Unsupported model tier: ${tier}`);
-    }
   }
 }

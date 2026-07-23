@@ -25,6 +25,7 @@ export class AnthropicProvider implements AIProvider {
     
     this.client = new Anthropic({
       apiKey,
+      maxRetries: 1, // Explicitly bound SDK-internal retries (1 initial request + max 1 retry = max 2 HTTP attempts)
     });
   }
 
@@ -70,9 +71,9 @@ export class AnthropicProvider implements AIProvider {
       );
 
       const contentBlock = response.content[0];
-      if (!contentBlock) throw new AIProviderError('No content received from Anthropic');
+      if (!contentBlock) throw new AIProviderError('No content received from Anthropic', undefined, 'SERVER_ERROR');
       if (contentBlock.type !== 'text') {
-        throw new AIProviderError(`Unexpected content type received from Anthropic: ${contentBlock.type}`);
+        throw new AIProviderError(`Unexpected content type received from Anthropic: ${contentBlock.type}`, undefined, 'STRUCTURED_PARSE_ERROR');
       }
 
       let rawText = (contentBlock as any).text.trim();
@@ -86,7 +87,11 @@ export class AnthropicProvider implements AIProvider {
       try {
         parsedJson = JSON.parse(rawText);
       } catch (err) {
-        throw new AIProviderError(`Failed to parse LLM output as JSON. Raw output: ${rawText.substring(0, 100)}...`, err);
+        throw new AIProviderError(
+          `Failed to parse LLM output as JSON. Raw output: ${rawText.substring(0, 100)}...`,
+          err,
+          'STRUCTURED_PARSE_ERROR'
+        );
       }
       
       // Extract usage metadata strictly without fabricating zero usage
@@ -119,7 +124,7 @@ export class AnthropicProvider implements AIProvider {
   }
 
   /**
-   * Maps Anthropic SDK errors into our custom error hierarchy.
+   * Maps Anthropic SDK errors into our custom error hierarchy with normalized failure reasons.
    */
   private mapAndThrowError(error: any): never {
     if (error instanceof AIBaseError) {
@@ -130,18 +135,36 @@ export class AnthropicProvider implements AIProvider {
       throw new AITimeoutError(`Anthropic API timed out after configured limit.`);
     }
 
+    if (error instanceof Anthropic.APIConnectionError) {
+      throw new AIProviderError(`Anthropic connection failure: ${error.message}`, error, 'NETWORK_ERROR');
+    }
+
     if (error instanceof Anthropic.AuthenticationError) {
       throw new AIConfigurationError('Anthropic authentication failed. Check your API key.');
     }
 
     if (error instanceof Anthropic.RateLimitError) {
-      throw new AIProviderError('Anthropic rate limit exceeded.', error);
+      throw new AIProviderError('Anthropic rate limit exceeded.', error, 'RATE_LIMIT_ERROR');
+    }
+
+    if (error instanceof Anthropic.InternalServerError) {
+      throw new AIProviderError(`Anthropic server error: ${error.message}`, error, 'SERVER_ERROR');
     }
 
     if (error instanceof Anthropic.APIError) {
-      throw new AIProviderError(`Anthropic API error: ${error.message}`, error);
+      const status = error.status;
+      if (status === 429) {
+        throw new AIProviderError('Anthropic rate limit exceeded.', error, 'RATE_LIMIT_ERROR');
+      }
+      if (typeof status === 'number' && status >= 500) {
+        throw new AIProviderError(`Anthropic API server error: ${error.message}`, error, 'SERVER_ERROR');
+      }
+      if (status === 401 || status === 403) {
+        throw new AIConfigurationError('Anthropic authentication failed. Check your API key.');
+      }
+      throw new AIProviderError(`Anthropic API error: ${error.message}`, error, 'UNKNOWN_ERROR');
     }
 
-    throw new AIProviderError(`Unexpected error during AI generation: ${error.message || 'Unknown'}`, error);
+    throw new AIProviderError(`Unexpected error during AI generation: ${error.message || 'Unknown'}`, error, 'UNKNOWN_ERROR');
   }
 }

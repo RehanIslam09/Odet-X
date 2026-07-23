@@ -83,6 +83,8 @@ export type AIErrorCategory =
   | 'TIMEOUT_ERROR'
   | 'UNKNOWN_ERROR';
 
+import { AIRoutingStrategy, AIRoutingReasonCode } from '../routing/types.js';
+
 /**
  * Standardized telemetry event emitted for every AI capability request.
  */
@@ -100,6 +102,9 @@ export interface AITelemetryEvent {
   isFallback?: boolean;
   fallbackFromProvider?: string;
   primaryErrorCategory?: AIErrorCategory;
+  routingStrategy?: AIRoutingStrategy;
+  routingReasonCode?: AIRoutingReasonCode;
+  candidateProviders?: string[];
   usage?: AIProviderUsage;
   errorType?: string;
   errorCategory?: AIErrorCategory;

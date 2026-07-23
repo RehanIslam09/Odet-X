@@ -24,12 +24,18 @@ import {
 import { isFallbackEligible } from './utils/fallback-policy.js';
 import { aiLogger } from './utils/logger.js';
 import { aiConfig } from './config/ai.config.js';
+import { AIRouter } from './routing/index.js';
+
+import { AIRoutingStrategy, AIRoutingReasonCode, AIRoutingDecision } from './routing/types.js';
 
 interface AIAttemptContext {
   attempt: number;
   isFallback: boolean;
   fallbackFromProvider?: string;
   primaryErrorCategory?: AIErrorCategory;
+  routingStrategy?: AIRoutingStrategy;
+  routingReasonCode?: AIRoutingReasonCode;
+  candidateProviders?: string[];
 }
 
 /**
@@ -52,13 +58,6 @@ export class AIService {
     if (fallbackProvider) {
       this.customFallbackProvider = fallbackProvider;
     }
-  }
-
-  private get provider(): AIProvider {
-    if (this.customProvider) {
-      return this.customProvider;
-    }
-    return AIProviderFactory.getProvider();
   }
 
   /**
@@ -86,7 +85,7 @@ export class AIService {
     let providerResponse: AIProviderResponse<unknown> | undefined;
 
     try {
-      if (!aiConfig.provider && !this.customProvider) {
+      if (!provider) {
         throw new AIConfigurationError('AI provider is not configured.');
       }
 
@@ -142,6 +141,9 @@ export class AIService {
         isFallback: attemptContext.isFallback,
         ...(attemptContext.fallbackFromProvider && { fallbackFromProvider: attemptContext.fallbackFromProvider }),
         ...(attemptContext.primaryErrorCategory && { primaryErrorCategory: attemptContext.primaryErrorCategory }),
+        ...(attemptContext.routingStrategy && { routingStrategy: attemptContext.routingStrategy }),
+        ...(attemptContext.routingReasonCode && { routingReasonCode: attemptContext.routingReasonCode }),
+        ...(attemptContext.candidateProviders && { candidateProviders: attemptContext.candidateProviders }),
         ...(providerResponse.metadata.usage && { usage: providerResponse.metadata.usage }),
       });
 
@@ -178,6 +180,9 @@ export class AIService {
         isFallback: attemptContext.isFallback,
         ...(attemptContext.fallbackFromProvider && { fallbackFromProvider: attemptContext.fallbackFromProvider }),
         ...(attemptContext.primaryErrorCategory && { primaryErrorCategory: attemptContext.primaryErrorCategory }),
+        ...(attemptContext.routingStrategy && { routingStrategy: attemptContext.routingStrategy }),
+        ...(attemptContext.routingReasonCode && { routingReasonCode: attemptContext.routingReasonCode }),
+        ...(attemptContext.candidateProviders && { candidateProviders: attemptContext.candidateProviders }),
         ...(usage && { usage }),
         errorType,
         errorCategory,
@@ -211,7 +216,16 @@ export class AIService {
     const requestStartMonotonic = performance.now();
     const totalTimeoutMs = options.timeoutMs || aiConfig.timeouts.standard;
 
-    const primaryProvider = this.provider;
+    let primaryProvider: AIProvider;
+    let routingDecision: AIRoutingDecision | undefined;
+
+    if (this.customProvider) {
+      primaryProvider = this.customProvider;
+    } else {
+      routingDecision = AIRouter.selectInitialProvider({ tier: options.tier });
+      primaryProvider = AIProviderFactory.getProvider(routingDecision.selectedProvider);
+    }
+
     const primaryProviderName = primaryProvider.providerName;
 
     // Attempt 1: Primary Provider Execution
@@ -222,7 +236,15 @@ export class AIService {
         schema,
         { ...options, timeoutMs: totalTimeoutMs },
         executionId,
-        { attempt: 1, isFallback: false }
+        {
+          attempt: 1,
+          isFallback: false,
+          ...(routingDecision && {
+            routingStrategy: routingDecision.routingStrategy,
+            routingReasonCode: routingDecision.routingReasonCode,
+            candidateProviders: routingDecision.candidateProviders,
+          }),
+        }
       );
     } catch (primaryError: any) {
       // 1. Evaluate Fallback Eligibility

@@ -1,5 +1,5 @@
 import { ZodSchema } from 'zod';
-import { GoogleGenAI, GenerateContentConfig, GenerateContentResponse, ApiError } from '@google/genai';
+import { GoogleGenAI, GenerateContentConfig, GenerateContentResponse } from '@google/genai';
 import { AIProvider } from './base.provider.js';
 import { AIModelTier, AIRequestOptions } from '../types/index.js';
 import { aiConfig } from '../config/ai.config.js';

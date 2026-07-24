@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 
 import { ProjectHeader } from "@/features/projects/components/ProjectHeader";
 import { ProjectSummaryCards } from "@/features/projects/components/ProjectSummaryCards";
+import { ProjectAISummaryCard } from "@/features/projects/components/ProjectAISummaryCard";
 import { ProjectTasks } from "@/features/projects/components/ProjectTasks";
 import { EditProjectDialog } from "@/features/projects/components/EditProjectDialog";
 import { DeleteProjectDialog } from "@/features/projects/components/DeleteProjectDialog";
@@ -112,6 +113,8 @@ export default function ProjectDetailPage() {
         summary={summaryData!}
         isLoading={isSummaryLoading}
       />
+
+      <ProjectAISummaryCard project={project} />
 
       <ProjectTasks projectId={project.id} />
 

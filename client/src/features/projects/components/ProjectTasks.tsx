@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
+import { Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -9,6 +10,7 @@ import { TaskList } from "@/features/tasks/components/TaskList";
 import { CreateTaskDialog } from "@/features/tasks/components/CreateTaskDialog";
 import { EditTaskDialog } from "@/features/tasks/components/EditTaskDialog";
 import { DeleteTaskDialog } from "@/features/tasks/components/DeleteTaskDialog";
+import { GenerateTasksDialog } from "@/features/projects/components/GenerateTasksDialog";
 
 import type { Task, TaskStatus, TaskPriority } from "@/features/tasks/types/tasks.types";
 import { useTasks, useArchiveTask } from "@/features/tasks/hooks";
@@ -31,6 +33,7 @@ export function ProjectTasks({ projectId }: ProjectTasksProps) {
 
   // Dialog management targets
   const [createOpen, setCreateOpen] = useState(false);
+  const [generateTasksOpen, setGenerateTasksOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
 
@@ -60,9 +63,20 @@ export function ProjectTasks({ projectId }: ProjectTasksProps) {
     <div className="flex flex-col gap-5 mt-8">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold tracking-tight">Tasks</h2>
-        <Button onClick={() => setCreateOpen(true)} size="sm" className="shadow-sm">
-          New Task
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setGenerateTasksOpen(true)}
+            className="gap-2 shadow-sm"
+          >
+            <Sparkles className="h-4 w-4 text-primary" />
+            Generate Tasks
+          </Button>
+          <Button onClick={() => setCreateOpen(true)} size="sm" className="shadow-sm">
+            New Task
+          </Button>
+        </div>
       </div>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}>
@@ -128,6 +142,12 @@ export function ProjectTasks({ projectId }: ProjectTasksProps) {
         onOpenChange={setCreateOpen}
         initialProjectId={projectId}
         fixedProject={true}
+      />
+
+      <GenerateTasksDialog
+        projectId={projectId}
+        open={generateTasksOpen}
+        onOpenChange={setGenerateTasksOpen}
       />
 
       <EditTaskDialog

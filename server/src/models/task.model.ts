@@ -25,6 +25,9 @@ export interface ITask {
   dueDate: Date | null;
   estimatedTime: string | null;
   labels: string[];
+  dependencies: Types.ObjectId[];
+  position: number;
+  milestoneId: Types.ObjectId | null;
   completedAt: Date | null;
   archived: boolean;
   isDeleted: boolean;
@@ -108,6 +111,28 @@ const taskSchema = new Schema<ITaskDocument>(
       default: null,
     },
 
+    dependencies: {
+      type: [Schema.Types.ObjectId],
+      ref: "Task",
+      default: [],
+    },
+
+    position: {
+      type: Number,
+      default: 1,
+      min: 1,
+      validate: {
+        validator: Number.isInteger,
+        message: "{VALUE} is not an integer position.",
+      },
+    },
+
+    milestoneId: {
+      type: Schema.Types.ObjectId,
+      ref: "Milestone",
+      default: null,
+    },
+
     archived: {
       type: Boolean,
       default: false,
@@ -179,6 +204,9 @@ taskSchema.pre("save", async function () {
 
 // 1. Dashboard queries: filtered by owner + isDeleted + archived, sorted by updatedAt
 taskSchema.index({ owner: 1, isDeleted: 1, archived: 1, updatedAt: -1 });
+
+// Prerequisite Lookup Index: Efficiently resolves tasks that depend on a given task ID
+taskSchema.index({ owner: 1, dependencies: 1 });
 
 // 2. Project views: filtered by owner + isDeleted + archived + projectId, sorted by updatedAt
 taskSchema.index({ owner: 1, isDeleted: 1, archived: 1, projectId: 1, updatedAt: -1 });

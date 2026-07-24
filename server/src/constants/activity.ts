@@ -13,6 +13,13 @@ export const ACTIVITY_TYPES = {
   TASK_ARCHIVED: "task.archived",
   TASK_RESTORED: "task.restored", // from archive
   TASK_DELETED: "task.deleted",
+
+  AI_TASKS_GENERATED: "ai.tasks_generated",
+  AI_SUMMARY_GENERATED: "ai.summary_generated",
+  AI_LABELS_GENERATED: "ai.labels_generated",
+  AI_PLAN_GENERATED: "ai.plan_generated",
+  AI_PLAN_COMMITTED: "ai.plan_committed",
+  AI_PLAN_DISCARDED: "ai.plan_discarded",
 } as const;
 
 export type ActivityType = (typeof ACTIVITY_TYPES)[keyof typeof ACTIVITY_TYPES];

@@ -13,6 +13,8 @@ import {
   generateSummary,
 } from "@/controllers/project.controller.js";
 
+import planRoutes from "@/routes/plan.routes.js";
+
 import { authenticate } from "@/middleware/auth.middleware.js";
 import { validate } from "@/middleware/validate.js";
 import { validateQuery } from "@/middleware/validate-query.js";
@@ -29,6 +31,11 @@ const router = Router();
 
 // All project routes require authentication.
 router.use(authenticate);
+
+// ---------------------------------------------------------------------------
+// Planning Engine Sub-resource Routes (/projects/:projectId/plans)
+// ---------------------------------------------------------------------------
+router.use("/:projectId/plans", planRoutes);
 
 // ---------------------------------------------------------------------------
 // Collection

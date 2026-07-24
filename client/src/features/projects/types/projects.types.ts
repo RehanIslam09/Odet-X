@@ -9,6 +9,12 @@
 // Domain Model
 // ---------------------------------------------------------------------------
 
+export interface ProjectAISummary {
+  summary: string;
+  highlights: string[];
+  risks: string[];
+}
+
 /**
  * A project as returned by the API.
  * Sensitive/internal fields (isDeleted, __v) are stripped by the backend
@@ -22,6 +28,7 @@ export interface Project {
   color: string;
   archived: boolean;
   owner: string;
+  aiSummary?: ProjectAISummary;
   createdAt: string;
   updatedAt: string;
 }

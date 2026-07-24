@@ -1,9 +1,11 @@
-import { Calendar, Clock, Folder, Tag } from "lucide-react";
+import { Calendar, Clock, Folder, Tag, Sparkles, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 
+import { Button } from "@/components/ui/button.js";
 import type { Task } from "../types/tasks.types.js";
 import { useProject } from "@/features/projects/hooks/useProject.js";
+import { useGenerateTaskLabels } from "@/features/ai";
 import { TaskStatusBadge } from "./TaskStatusBadge.js";
 import { TaskPriorityBadge } from "./TaskPriorityBadge.js";
 import { isTaskOverdue } from "../utils/task.utils.js";
@@ -15,6 +17,8 @@ interface TaskPropertiesPanelProps {
 export function TaskPropertiesPanel({ task }: TaskPropertiesPanelProps) {
   const { data: projectRes } = useProject(task.projectId ?? undefined);
   const project = projectRes?.project;
+
+  const { mutate: generateLabels, isPending: isGeneratingLabels } = useGenerateTaskLabels(task.id);
 
   const isOverdue = isTaskOverdue(task.dueDate, task.status);
 
@@ -103,9 +107,31 @@ export function TaskPropertiesPanel({ task }: TaskPropertiesPanelProps) {
 
         {/* Labels */}
         <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-2 text-muted-foreground w-28 shrink-0 mt-1">
-            <Tag className="h-4 w-4" />
-            <span>Labels</span>
+          <div className="flex flex-col gap-1 w-28 shrink-0 mt-1">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Tag className="h-4 w-4" />
+              <span>Labels</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => generateLabels()}
+              disabled={isGeneratingLabels}
+              className="h-6 px-1.5 text-[11px] gap-1 w-fit text-muted-foreground hover:text-foreground -ml-1 mt-0.5"
+              title="Auto-generate AI labels for this task"
+            >
+              {isGeneratingLabels ? (
+                <>
+                  <RefreshCw className="h-3 w-3 animate-spin text-primary" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3 w-3 text-primary" />
+                  AI Labels
+                </>
+              )}
+            </Button>
           </div>
           <div className="flex-1 min-w-0 flex flex-wrap justify-end gap-1.5">
             {task.labels && task.labels.length > 0 ? (

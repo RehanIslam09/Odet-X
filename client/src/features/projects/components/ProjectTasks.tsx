@@ -11,9 +11,11 @@ import { CreateTaskDialog } from "@/features/tasks/components/CreateTaskDialog";
 import { EditTaskDialog } from "@/features/tasks/components/EditTaskDialog";
 import { DeleteTaskDialog } from "@/features/tasks/components/DeleteTaskDialog";
 import { GenerateTasksDialog } from "@/features/projects/components/GenerateTasksDialog";
+import { PlanProjectDialog } from "@/features/projects/components/planning/PlanProjectDialog";
 
 import type { Task, TaskStatus, TaskPriority } from "@/features/tasks/types/tasks.types";
 import { useTasks, useArchiveTask } from "@/features/tasks/hooks";
+import { useActivePlanDraft } from "@/features/ai/hooks/usePlanDraft";
 
 interface ProjectTasksProps {
   projectId: string;
@@ -34,6 +36,8 @@ export function ProjectTasks({ projectId }: ProjectTasksProps) {
   // Dialog management targets
   const [createOpen, setCreateOpen] = useState(false);
   const [generateTasksOpen, setGenerateTasksOpen] = useState(false);
+  const [planProjectOpen, setPlanProjectOpen] = useState(false);
+  const [planInitialDraftId, setPlanInitialDraftId] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
 
@@ -54,16 +58,45 @@ export function ProjectTasks({ projectId }: ProjectTasksProps) {
   }), [page, limit, debouncedSearch, status, priority, projectId, sort]);
 
   const { data: tasksData, isLoading, isFetching } = useTasks(queryParams);
+  const { data: activeDraft } = useActivePlanDraft(projectId);
 
   const mappedTasks = tasksData?.items || [];
 
   const { mutate: archiveTask } = useArchiveTask();
+
+  const hasActiveDraft = Boolean(activeDraft && activeDraft.status === "draft");
 
   return (
     <div className="flex flex-col gap-5 mt-8">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold tracking-tight">Tasks</h2>
         <div className="flex items-center gap-2">
+          {hasActiveDraft && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => {
+                setPlanInitialDraftId(activeDraft!.id);
+                setPlanProjectOpen(true);
+              }}
+              className="gap-2 shadow-sm bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Sparkles className="h-4 w-4" />
+              Resume Draft
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setPlanInitialDraftId(null);
+              setPlanProjectOpen(true);
+            }}
+            className="gap-2 shadow-sm border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
+          >
+            <Sparkles className="h-4 w-4" />
+            Plan Project
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -148,6 +181,13 @@ export function ProjectTasks({ projectId }: ProjectTasksProps) {
         projectId={projectId}
         open={generateTasksOpen}
         onOpenChange={setGenerateTasksOpen}
+      />
+
+      <PlanProjectDialog
+        projectId={projectId}
+        open={planProjectOpen}
+        onOpenChange={setPlanProjectOpen}
+        initialDraftId={planInitialDraftId}
       />
 
       <EditTaskDialog

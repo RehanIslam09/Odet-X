@@ -367,7 +367,7 @@ export async function updateTask(
 }
 /**
  * Updates task notes.
- * 
+ *
  * This method specifically bypasses the standard `recordActivity` pipeline.
  * Frequent autosaves should not generate "Task Updated" spam.
  * Mongoose `save()` behavior preserves `__v` optimistic concurrency control.
@@ -456,6 +456,20 @@ export async function deleteTask(
   userId: string,
 ): Promise<void> {
   const task = await assertTaskOwnership(taskId, userId);
+
+  // WP-01 Dependency Deletion Guard: Block deletion if task is a prerequisite for active tasks
+  const dependentTaskCount = await Task.countDocuments({
+    owner: new Types.ObjectId(userId),
+    isDeleted: false,
+    dependencies: task._id,
+  });
+
+  if (dependentTaskCount > 0) {
+    throw new ConflictError(
+      `Cannot delete task because it is a prerequisite for ${dependentTaskCount} active task(s).`
+    );
+  }
+
   task.isDeleted = true;
   await task.save();
 

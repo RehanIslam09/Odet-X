@@ -8,10 +8,11 @@ import type { Task } from "@/features/tasks/types/tasks.types";
  * - POST /api/v1/projects/:id/generate-tasks
  * - POST /api/v1/projects/:id/generate-summary
  * - POST /api/v1/tasks/:id/generate-labels
+ * - Phase 25 Planning Engine Endpoints: /api/v1/projects/:id/plans
  */
 
 // ---------------------------------------------------------------------------
-// Generate Tasks
+// Generate Tasks (Phase 24 Legacy direct task generation)
 // ---------------------------------------------------------------------------
 
 export interface GenerateTasksDto {
@@ -36,4 +37,60 @@ export interface GenerateSummaryResponseData {
 
 export interface GenerateLabelsResponseData {
   task: Task;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 25 Planning Engine Types
+// ---------------------------------------------------------------------------
+
+export type PlanDraftStatus = "draft" | "committed" | "discarded";
+
+export interface PlanDraftTask {
+  tempId: string;
+  title: string;
+  description: string;
+  priority: "none" | "low" | "medium" | "high" | "urgent";
+  estimatedTime: string | null;
+  position: number;
+  dependencies: string[];
+  milestoneTempId: string | null;
+}
+
+export interface PlanDraftMilestone {
+  tempId: string;
+  title: string;
+  description: string;
+  targetDate: string | null;
+  position: number;
+}
+
+export interface PlanDraft {
+  id: string;
+  owner: string;
+  projectId: string;
+  status: PlanDraftStatus;
+  promptDescription: string;
+  tasks: PlanDraftTask[];
+  milestones: PlanDraftMilestone[];
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GeneratePlanDto {
+  description: string;
+}
+
+export interface UpdatePlanDraftDto {
+  tasks?: PlanDraftTask[];
+  milestones?: PlanDraftMilestone[];
+}
+
+export interface CommitPlanResultData {
+  draftId: string;
+  projectId: string;
+  taskCount: number;
+  milestoneCount: number;
+  tasks: Task[];
+  milestones: unknown[];
 }

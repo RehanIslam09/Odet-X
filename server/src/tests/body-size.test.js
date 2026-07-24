@@ -1,8 +1,9 @@
+/* global fetch, console */
 import app from "../app.js";
 
 const server = app.listen(0, async () => {
   const port = server.address().port;
-  
+
   const testPayload = async (name, payload) => {
     const body = JSON.stringify({ notes: payload });
     try {
@@ -29,6 +30,6 @@ const server = app.listen(0, async () => {
   await testPayload("Above 100KB", above100);
   await testPayload("Near 250KB", near250);
   await testPayload("Above 250KB", above250);
-  
+
   server.close();
 });

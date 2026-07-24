@@ -3,8 +3,8 @@
 
 > **Document Status:** Canonical Roadmap
 > **Roadmap Scope:** Phase 25 onward
-> **Last Completed Phase:** Phase 24 — Frontend Foundation & AI Integration
-> **Next Phase:** Phase 25 — AI Project Planning Engine
+> **Last Completed Phase:** Phase 26 — AI Evaluation & Quality Foundation
+> **Next Phase:** Phase 27 — Read-Only Project Copilot
 > **Architecture:** React + TypeScript + Express + MongoDB + Multi-Provider AI Platform
 
 ---

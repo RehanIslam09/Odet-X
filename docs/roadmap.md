@@ -3,8 +3,8 @@
 
 > **Document Status:** Canonical Roadmap
 > **Roadmap Scope:** Phase 25 onward
-> **Last Completed Phase:** Phase 27 — Read-Only Project Copilot
-> **Next Phase:** Phase 28 — Controlled AI Actions
+> **Last Completed Phase:** Phase 28 — Controlled AI Actions
+> **Next Milestone:** Phase 29 Planning (TBD)
 > **Architecture:** React + TypeScript + Express + MongoDB + Multi-Provider AI Platform
 
 ---

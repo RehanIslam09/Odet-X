@@ -2,6 +2,7 @@
   "name": "@ai-project-manager/server",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "description": "Backend API for AI Project Manager",
   "type": "module",
   "main": "dist/index.js",

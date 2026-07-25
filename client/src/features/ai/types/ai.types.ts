@@ -94,3 +94,44 @@ export interface CommitPlanResultData {
   tasks: Task[];
   milestones: unknown[];
 }
+
+// ---------------------------------------------------------------------------
+// Phase 27 Read-Only Project Copilot Types
+// ---------------------------------------------------------------------------
+
+export type CopilotMessageRole = "user" | "assistant";
+
+export interface CopilotHistoryMessage {
+  role: CopilotMessageRole;
+  content: string;
+}
+
+export interface CopilotReference {
+  type: "project" | "task" | "milestone";
+  id: string;
+  label: string;
+}
+
+export interface QueryCopilotDto {
+  question: string;
+  history?: CopilotHistoryMessage[];
+}
+
+export interface CopilotResultData {
+  answer: string;
+  references: CopilotReference[];
+  unmappedReferenceCount: number;
+  executionId: string;
+  provider: string;
+  model: string;
+}
+
+/** UI-only ephemeral conversation item */
+export interface CopilotConversationMessage {
+  id: string;
+  role: CopilotMessageRole;
+  content: string;
+  references?: CopilotReference[];
+  timestamp: Date;
+  isError?: boolean;
+}

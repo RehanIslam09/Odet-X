@@ -1,4 +1,4 @@
-import { Archive, ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { Archive, ArrowLeft, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,16 @@ interface ProjectHeaderProps {
   onEdit: () => void;
   onArchive: () => void;
   onDelete: () => void;
+  onAskCopilot?: () => void;
 }
 
-export function ProjectHeader({ project, onEdit, onArchive, onDelete }: ProjectHeaderProps) {
+export function ProjectHeader({
+  project,
+  onEdit,
+  onArchive,
+  onDelete,
+  onAskCopilot,
+}: ProjectHeaderProps) {
   const navigate = useNavigate();
 
   return (
@@ -56,7 +63,18 @@ export function ProjectHeader({ project, onEdit, onArchive, onDelete }: ProjectH
         )}
       </div>
 
-      <div className="flex items-center gap-2 mt-4 md:mt-0">
+      <div className="flex items-center gap-2 mt-4 md:mt-0 flex-wrap">
+        {onAskCopilot && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onAskCopilot}
+            className="gap-2 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20 font-medium"
+          >
+            <Sparkles className="h-4 w-4" />
+            Ask Copilot
+          </Button>
+        )}
         <Button variant="outline" size="sm" onClick={onEdit} className="gap-2">
           <Pencil className="h-4 w-4" />
           Edit

@@ -1,6 +1,7 @@
 {
   "name": "ai-project-manager",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\" \"npm run worker:dev --prefix server\"",
     "dev:client": "npm run dev --prefix client",

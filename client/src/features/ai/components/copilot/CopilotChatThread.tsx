@@ -1,14 +1,20 @@
 import { useEffect, useRef } from "react";
 import { HelpCircle, Loader2, Sparkles } from "lucide-react";
-import type { CopilotConversationMessage } from "@/features/ai/types/ai.types";
+import type { ActionCardLifecycleState, CopilotConversationMessage } from "@/features/ai/types/ai.types";
 import { CopilotMessageItem } from "./CopilotMessageItem";
 import { Button } from "@/components/ui/button";
 
 interface CopilotChatThreadProps {
+  projectId?: string;
   messages: CopilotConversationMessage[];
   isPending: boolean;
   onSelectSuggestedQuestion: (question: string) => void;
   onSelectReference?: (type: "project" | "task" | "milestone", id: string) => void;
+  onActionStateChange?: (
+    messageId: string,
+    status: ActionCardLifecycleState,
+    appliedMessage?: string,
+  ) => void;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -19,10 +25,12 @@ const SUGGESTED_QUESTIONS = [
 ];
 
 export function CopilotChatThread({
+  projectId = "",
   messages,
   isPending,
   onSelectSuggestedQuestion,
   onSelectReference,
+  onActionStateChange,
 }: CopilotChatThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +49,7 @@ export function CopilotChatThread({
 
         <h3 className="text-base font-semibold text-foreground">Ask about your project</h3>
         <p className="text-xs leading-relaxed text-muted-foreground max-w-xs mt-1 mb-6">
-          Copilot analyzes your project tasks, milestones, and activity to answer questions about blockers, risks, and progress.
+          Copilot analyzes your project tasks, milestones, and activity to answer questions and propose controlled actions.
         </p>
 
         <div className="w-full max-w-xs flex flex-col gap-2">
@@ -72,8 +80,10 @@ export function CopilotChatThread({
       {messages.map((message: CopilotConversationMessage) => (
         <CopilotMessageItem
           key={message.id}
+          projectId={projectId}
           message={message}
           onSelectReference={onSelectReference}
+          onActionStateChange={onActionStateChange}
         />
       ))}
 

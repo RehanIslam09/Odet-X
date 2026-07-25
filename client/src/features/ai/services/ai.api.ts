@@ -10,6 +10,10 @@ import type {
   CommitPlanResultData,
   QueryCopilotDto,
   CopilotResultData,
+  ActionDryRunDto,
+  ActionDryRunResultData,
+  ActionConfirmDto,
+  ActionConfirmResultData,
 } from "@/features/ai/types/ai.types";
 
 // ---------------------------------------------------------------------------
@@ -25,17 +29,7 @@ interface ApiResponse<T> {
 // ---------------------------------------------------------------------------
 // AI API Module
 // ---------------------------------------------------------------------------
-// All functions use the centralized apiClient — never raw axios or fetch.
-// Follows the authApi, projectsApi, and tasksApi resource object pattern.
 
-/**
- * All AI and Planning endpoint bindings.
- *
- * Responsibilities:
- * - Construct HTTP requests for backend AI and Planning routes
- * - Pass typed payloads and extract typed response envelopes
- * - Delegate error handling & token authorization to centralized apiClient
- */
 export const aiApi = {
   /**
    * Generates tasks for a project based on a prompt description.
@@ -84,10 +78,6 @@ export const aiApi = {
   // Phase 25 Planning Engine Endpoints
   // ---------------------------------------------------------------------------
 
-  /**
-   * Generates an AI project plan draft.
-   * Calls POST /projects/:projectId/plans
-   */
   generatePlan: async (
     projectId: string,
     data: GeneratePlanDto,
@@ -99,10 +89,6 @@ export const aiApi = {
     return response.data.data;
   },
 
-  /**
-   * Retrieves the active uncommitted plan draft for a project, or null if none exists.
-   * Calls GET /projects/:projectId/plans/active
-   */
   getActivePlanDraft: async (
     projectId: string,
   ): Promise<PlanDraft | null> => {
@@ -112,10 +98,6 @@ export const aiApi = {
     return response.data.data;
   },
 
-  /**
-   * Retrieves a persisted plan draft by ID.
-   * Calls GET /projects/:projectId/plans/:draftId
-   */
   getPlanDraft: async (
     projectId: string,
     draftId: string,
@@ -126,10 +108,6 @@ export const aiApi = {
     return response.data.data;
   },
 
-  /**
-   * Updates an uncommitted plan draft.
-   * Calls PATCH /projects/:projectId/plans/:draftId
-   */
   updatePlanDraft: async (
     projectId: string,
     draftId: string,
@@ -142,10 +120,6 @@ export const aiApi = {
     return response.data.data;
   },
 
-  /**
-   * Discards an uncommitted plan draft.
-   * Calls DELETE /projects/:projectId/plans/:draftId
-   */
   discardPlanDraft: async (
     projectId: string,
     draftId: string,
@@ -156,10 +130,6 @@ export const aiApi = {
     return response.data.data;
   },
 
-  /**
-   * Commits a plan draft into permanent Tasks and Milestones.
-   * Calls POST /projects/:projectId/plans/:draftId/commit
-   */
   commitPlan: async (
     projectId: string,
     draftId: string,
@@ -175,16 +145,44 @@ export const aiApi = {
   // Phase 27 Read-Only Project Copilot Endpoint
   // ---------------------------------------------------------------------------
 
-  /**
-   * Queries the Read-Only AI Project Copilot.
-   * Calls POST /projects/:projectId/copilot
-   */
   queryCopilot: async (
     projectId: string,
     data: QueryCopilotDto,
   ): Promise<CopilotResultData> => {
     const response = await apiClient.post<ApiResponse<CopilotResultData>>(
       `/projects/${projectId}/copilot`,
+      data,
+    );
+    return response.data.data;
+  },
+
+  // ---------------------------------------------------------------------------
+  // Phase 28 Controlled Action Endpoints
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Computes a state diff (Before vs After) for a proposed action without mutating database state.
+   * Calls POST /copilot/actions/dry-run
+   */
+  dryRunAction: async (
+    data: ActionDryRunDto,
+  ): Promise<ActionDryRunResultData> => {
+    const response = await apiClient.post<ApiResponse<ActionDryRunResultData>>(
+      "/copilot/actions/dry-run",
+      data,
+    );
+    return response.data.data;
+  },
+
+  /**
+   * Confirms and executes an AI action using a signed confirmation token.
+   * Calls POST /copilot/actions/confirm
+   */
+  confirmAction: async (
+    data: ActionConfirmDto,
+  ): Promise<ActionConfirmResultData> => {
+    const response = await apiClient.post<ApiResponse<ActionConfirmResultData>>(
+      "/copilot/actions/confirm",
       data,
     );
     return response.data.data;

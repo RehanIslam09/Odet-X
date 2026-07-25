@@ -8,6 +8,7 @@ import {
   ResolvedReferenceItem,
 } from "@/domain/copilot-reference-resolver.js";
 import { ProjectCopilotResponseSchema } from "@/ai/schemas/project-copilot.schema.js";
+import { ProposedAction } from "@/ai/actions/action.types.js";
 
 // ---------------------------------------------------------------------------
 // Constants & Bounds
@@ -35,6 +36,7 @@ export interface QueryProjectCopilotOptions {
 export interface ProjectCopilotResult {
   answer: string;
   references: ResolvedReferenceItem[];
+  proposedAction: ProposedAction | null;
   unmappedReferenceCount: number;
   executionId: string;
   provider: string;
@@ -46,13 +48,14 @@ export interface ProjectCopilotResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Orchestrates AI execution for the Read-Only Project Copilot:
+ * Orchestrates AI execution for the Project Copilot:
  * 1. Validates user question and conversation history bounds.
  * 2. Serializes contextResult.context (excluding symbolicMap trust boundary).
  * 3. Builds prompt executable template using registered 'project-copilot' definition.
  * 4. Calls AIService with AIModelTier.DEEP_CONTEXT and ProjectCopilotResponseSchema.
  * 5. Resolves raw AI symbolic references through resolveCopilotReferences.
- * 6. Returns structured answer, server-resolved references, and AI execution metadata.
+ * 6. Validates proposed action symbolic target against trusted symbolicMap.
+ * 7. Returns structured answer, server-resolved references, validated proposed action, and AI execution metadata.
  *
  * Safety Invariant: Performs ZERO database queries or mutations.
  */
@@ -158,9 +161,27 @@ export async function queryProjectCopilot(
     contextResult.symbolicMap,
   );
 
+  // 6. Server-Side Action Target Grounding & Validation
+  let validatedProposedAction: ProposedAction | null = null;
+  const rawAction = aiResult.data.proposedAction;
+
+  if (rawAction && typeof rawAction === "object" && rawAction.action) {
+    if (rawAction.action === "CREATE_TASK") {
+      if (rawAction.targetRef === "project") {
+        validatedProposedAction = rawAction;
+      }
+    } else {
+      const mapEntry = contextResult.symbolicMap[rawAction.targetRef];
+      if (mapEntry && mapEntry.type === "task") {
+        validatedProposedAction = rawAction;
+      }
+    }
+  }
+
   return {
     answer: aiResult.data.answer,
     references: resolved.references,
+    proposedAction: validatedProposedAction,
     unmappedReferenceCount: resolved.unmappedReferenceCount,
     executionId: aiResult.metadata.executionId,
     provider: aiResult.metadata.provider,

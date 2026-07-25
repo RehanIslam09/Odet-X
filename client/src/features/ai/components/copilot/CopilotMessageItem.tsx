@@ -1,13 +1,25 @@
 import { CheckSquare, Flag, Folder, Sparkles, User as UserIcon } from "lucide-react";
-import type { CopilotConversationMessage, CopilotReference } from "@/features/ai/types/ai.types";
+import type { ActionCardLifecycleState, CopilotConversationMessage, CopilotReference } from "@/features/ai/types/ai.types";
 import { MarkdownRenderer } from "@/features/tasks/components/MarkdownRenderer";
+import { CopilotActionCard } from "./CopilotActionCard";
 
 interface CopilotMessageItemProps {
+  projectId?: string;
   message: CopilotConversationMessage;
   onSelectReference?: (type: "project" | "task" | "milestone", id: string) => void;
+  onActionStateChange?: (
+    messageId: string,
+    status: ActionCardLifecycleState,
+    appliedMessage?: string,
+  ) => void;
 }
 
-export function CopilotMessageItem({ message, onSelectReference }: CopilotMessageItemProps) {
+export function CopilotMessageItem({
+  projectId = "",
+  message,
+  onSelectReference,
+  onActionStateChange,
+}: CopilotMessageItemProps) {
   const isUser = message.role === "user";
 
   return (
@@ -43,6 +55,19 @@ export function CopilotMessageItem({ message, onSelectReference }: CopilotMessag
           <p className="whitespace-pre-wrap break-words">{message.content}</p>
         ) : (
           <MarkdownRenderer content={message.content} variant="copilot" />
+        )}
+
+        {/* Action Proposal Card */}
+        {!isUser && message.proposedAction && (
+          <CopilotActionCard
+            projectId={projectId}
+            messageId={message.id}
+            proposedAction={message.proposedAction}
+            references={message.references}
+            initialStatus={message.actionStatus || "proposed"}
+            initialAppliedMessage={message.appliedMessage}
+            onActionStateChange={onActionStateChange}
+          />
         )}
 
         {/* References Section */}

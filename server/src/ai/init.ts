@@ -3,6 +3,7 @@ import { projectToTasksPrompt } from './prompts/definitions/project-tasks.prompt
 import { taskAutoLabelPrompt } from './prompts/definitions/task-labels.prompt.js';
 import { projectSummaryPrompt } from './prompts/definitions/project-summary.prompt.js';
 import { projectPlanPrompt } from './prompts/definitions/project-plan.prompt.js';
+import { projectCopilotPrompt } from './prompts/definitions/project-copilot.prompt.js';
 
 /**
  * Initializes the AI subsystem by registering all known prompts into the central registry.
@@ -13,4 +14,5 @@ export function initializeAI() {
   promptRegistry.register(taskAutoLabelPrompt);
   promptRegistry.register(projectSummaryPrompt);
   promptRegistry.register(projectPlanPrompt);
+  promptRegistry.register(projectCopilotPrompt);
 }

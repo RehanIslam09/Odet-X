@@ -8,6 +8,8 @@ import type {
   PlanDraft,
   UpdatePlanDraftDto,
   CommitPlanResultData,
+  QueryCopilotDto,
+  CopilotResultData,
 } from "@/features/ai/types/ai.types";
 
 // ---------------------------------------------------------------------------
@@ -165,6 +167,25 @@ export const aiApi = {
     const response = await apiClient.post<ApiResponse<CommitPlanResultData>>(
       `/projects/${projectId}/plans/${draftId}/commit`,
       {},
+    );
+    return response.data.data;
+  },
+
+  // ---------------------------------------------------------------------------
+  // Phase 27 Read-Only Project Copilot Endpoint
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Queries the Read-Only AI Project Copilot.
+   * Calls POST /projects/:projectId/copilot
+   */
+  queryCopilot: async (
+    projectId: string,
+    data: QueryCopilotDto,
+  ): Promise<CopilotResultData> => {
+    const response = await apiClient.post<ApiResponse<CopilotResultData>>(
+      `/projects/${projectId}/copilot`,
+      data,
     );
     return response.data.data;
   },

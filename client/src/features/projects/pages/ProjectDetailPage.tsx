@@ -20,6 +20,7 @@ import { ProjectTasks } from "@/features/projects/components/ProjectTasks";
 import { EditProjectDialog } from "@/features/projects/components/EditProjectDialog";
 import { DeleteProjectDialog } from "@/features/projects/components/DeleteProjectDialog";
 import { EntityActivityTimeline } from "@/features/activity/components/EntityActivityTimeline";
+import { ProjectCopilotSheet } from "@/features/ai/components/copilot/ProjectCopilotSheet";
 
 /**
  * The Project Detail Workspace.
@@ -42,9 +43,10 @@ export default function ProjectDetailPage() {
 
   const { mutate: archiveProject } = useArchiveProject();
 
-  // Dialog state
+  // Dialog & Sheet state
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
 
   // ---------------------------------------------------------------------------
   // Render States
@@ -107,6 +109,7 @@ export default function ProjectDetailPage() {
         onEdit={() => setEditOpen(true)}
         onArchive={() => archiveProject(project.id)}
         onDelete={() => setDeleteOpen(true)}
+        onAskCopilot={() => setCopilotOpen(true)}
       />
 
       <ProjectSummaryCards
@@ -135,6 +138,12 @@ export default function ProjectDetailPage() {
           // Redirect safely to projects list after deletion
           navigate("/projects", { replace: true });
         }}
+      />
+
+      <ProjectCopilotSheet
+        projectId={project.id}
+        open={copilotOpen}
+        onOpenChange={setCopilotOpen}
       />
     </motion.div>
   );

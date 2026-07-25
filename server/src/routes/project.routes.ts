@@ -12,6 +12,7 @@ import {
   generateTasks,
   generateSummary,
 } from "@/controllers/project.controller.js";
+import { queryCopilot } from "@/controllers/copilot.controller.js";
 
 import planRoutes from "@/routes/plan.routes.js";
 
@@ -26,6 +27,7 @@ import {
   generateProjectTasksSchema,
   generateProjectSummarySchema,
 } from "@/validators/project.validator.js";
+import { copilotQuerySchema } from "@/validators/copilot.validator.js";
 
 const router = Router();
 
@@ -78,5 +80,8 @@ router.post("/:id/generate-tasks", validate(generateProjectTasksSchema), generat
 
 // POST /projects/:id/generate-summary (AI Project Summary)
 router.post("/:id/generate-summary", validate(generateProjectSummarySchema), generateSummary);
+
+// POST /projects/:projectId/copilot (Read-Only AI Project Copilot)
+router.post("/:projectId/copilot", validate(copilotQuerySchema), queryCopilot);
 
 export default router;

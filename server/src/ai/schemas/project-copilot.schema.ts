@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ProposedActionSchema } from "../actions/action.types.js";
 
 /**
  * Zod schema for symbolic references returned by the Copilot AI model.
@@ -11,7 +12,9 @@ export const ProjectCopilotReferenceSchema = z.object({
 });
 
 /**
- * Zod schema for structured output from the Read-Only Project Copilot AI model.
+ * Zod schema for structured output from the Project Copilot AI model.
+ * Composes canonical ProposedActionSchema from Phase 28 WP-01 foundation.
+ * Single canonical no-action state: `proposedAction: null`.
  */
 export const ProjectCopilotResponseSchema = z.object({
   answer: z
@@ -20,6 +23,7 @@ export const ProjectCopilotResponseSchema = z.object({
     .min(1, "Copilot answer cannot be empty")
     .max(10000, "Copilot answer cannot exceed 10,000 characters"),
   references: z.array(ProjectCopilotReferenceSchema).max(20, "Maximum 20 references allowed").default([]),
+  proposedAction: ProposedActionSchema.nullable().optional(),
 });
 
 export type ProjectCopilotReference = z.infer<typeof ProjectCopilotReferenceSchema>;

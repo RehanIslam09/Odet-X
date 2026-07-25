@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useProjectCopilot } from "@/features/ai/hooks/useProjectCopilot";
 import type {
+  ActionCardLifecycleState,
   CopilotConversationMessage,
   CopilotHistoryMessage,
   CopilotResultData,
@@ -46,6 +47,20 @@ export function ProjectCopilotSheet({
     setMessages([]);
   };
 
+  const handleActionStateChange = (
+    messageId: string,
+    status: ActionCardLifecycleState,
+    appliedMessage?: string,
+  ) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId
+          ? { ...msg, actionStatus: status, appliedMessage }
+          : msg,
+      ),
+    );
+  };
+
   const handleSubmitQuestion = async (question: string) => {
     // 1. Derive bounded prior conversation history (max 6 messages / 3 turns)
     const validPriorMessages = messages.filter((m) => !m.isError);
@@ -80,6 +95,8 @@ export function ProjectCopilotSheet({
         role: "assistant",
         content: result.answer,
         references: result.references,
+        proposedAction: result.proposedAction || null,
+        actionStatus: result.proposedAction ? "proposed" : undefined,
         timestamp: new Date(),
       };
 
@@ -142,7 +159,7 @@ export function ProjectCopilotSheet({
                 Project Copilot
               </SheetTitle>
               <SheetDescription className="text-xs text-muted-foreground mt-1 truncate">
-                Ask questions using your project context
+                Ask questions & review proposed project actions
               </SheetDescription>
             </div>
           </div>
@@ -161,18 +178,20 @@ export function ProjectCopilotSheet({
           )}
         </SheetHeader>
 
-        {/* Scrollable Conversation Thread */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-4">
+        {/* Chat Thread */}
+        <div className="flex-1 overflow-y-auto px-4 min-h-0">
           <CopilotChatThread
+            projectId={projectId}
             messages={messages}
             isPending={copilotMutation.isPending}
             onSelectSuggestedQuestion={handleSubmitQuestion}
             onSelectReference={handleSelectReference}
+            onActionStateChange={handleActionStateChange}
           />
         </div>
 
-        {/* Bounded Input Form */}
-        <div className="shrink-0 p-4 border-t border-border bg-background/95 backdrop-blur-xs">
+        {/* Input Form Footer */}
+        <div className="p-4 border-t border-border bg-background/95 backdrop-blur-xs shrink-0">
           <CopilotInputForm
             onSubmit={handleSubmitQuestion}
             isPending={copilotMutation.isPending}

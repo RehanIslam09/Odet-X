@@ -9,6 +9,7 @@ import type { Task } from "@/features/tasks/types/tasks.types";
  * - POST /api/v1/projects/:id/generate-summary
  * - POST /api/v1/tasks/:id/generate-labels
  * - Phase 25 Planning Engine Endpoints: /api/v1/projects/:id/plans
+ * - Phase 27 & 28 Project Copilot & Controlled Actions
  */
 
 // ---------------------------------------------------------------------------
@@ -96,8 +97,22 @@ export interface CommitPlanResultData {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 27 Read-Only Project Copilot Types
+// Phase 27 & 28 Controlled AI Actions & Project Copilot Types
 // ---------------------------------------------------------------------------
+
+export type AllowedActionType =
+  | "CREATE_TASK"
+  | "UPDATE_TASK_STATUS"
+  | "UPDATE_TASK_PRIORITY"
+  | "UPDATE_TASK_DUE_DATE"
+  | "ADD_TASK_LABEL";
+
+export interface ProposedAction {
+  action: AllowedActionType;
+  targetRef: string;
+  arguments: Record<string, unknown>;
+  explanation: string;
+}
 
 export type CopilotMessageRole = "user" | "assistant";
 
@@ -120,11 +135,14 @@ export interface QueryCopilotDto {
 export interface CopilotResultData {
   answer: string;
   references: CopilotReference[];
+  proposedAction?: ProposedAction | null;
   unmappedReferenceCount: number;
   executionId: string;
   provider: string;
   model: string;
 }
+
+export type ActionCardLifecycleState = "proposed" | "reviewing" | "applied" | "failed" | "expired";
 
 /** UI-only ephemeral conversation item */
 export interface CopilotConversationMessage {
@@ -132,6 +150,52 @@ export interface CopilotConversationMessage {
   role: CopilotMessageRole;
   content: string;
   references?: CopilotReference[];
+  proposedAction?: ProposedAction | null;
+  actionStatus?: ActionCardLifecycleState;
+  appliedMessage?: string;
   timestamp: Date;
   isError?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 28 Action Dry-Run & Confirmation DTOs
+// ---------------------------------------------------------------------------
+
+export interface ActionDryRunDto {
+  projectId: string;
+  proposedAction: ProposedAction;
+}
+
+export interface DryRunTarget {
+  id: string;
+  label: string;
+  type: "project" | "task";
+}
+
+export interface DryRunStateDiff {
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+}
+
+export interface ActionDryRunResultData {
+  dryRun: {
+    actionType: AllowedActionType;
+    target: DryRunTarget;
+    diff: DryRunStateDiff;
+    explanation: string;
+    expectedVersion: number | null;
+  };
+  confirmationToken: string;
+  expiresAt: string;
+}
+
+export interface ActionConfirmDto {
+  confirmationToken: string;
+}
+
+export interface ActionConfirmResultData {
+  actionType: AllowedActionType;
+  targetId: string;
+  executedAt: string;
+  updatedEntity?: unknown;
 }

@@ -3,6 +3,7 @@ import Project from "@/models/project.model.js";
 import Task from "@/models/task.model.js";
 import Milestone from "@/models/milestone.model.js";
 import Activity from "@/models/activity.model.js";
+import { getProjectMemoriesForCopilot } from "@/services/project-memory.service.js";
 import { ACTIVITY_TYPES } from "@/constants/activity.js";
 import { TaskPriority, TaskStatus } from "@/constants/task.js";
 import { NotFoundError } from "@/utils/app-error.js";
@@ -61,6 +62,11 @@ export interface CopilotActivityContext {
   timestamp: string;
 }
 
+export interface CopilotMemoryContext {
+  content: string;
+  updatedAt: string;
+}
+
 export interface CopilotTruncationMetadata {
   totalTasks: number;
   includedTasks: number;
@@ -69,6 +75,8 @@ export interface CopilotTruncationMetadata {
   includedMilestones: number;
   totalActivity: number;
   includedActivity: number;
+  totalMemories?: number;
+  includedMemories?: number;
 }
 
 export interface CopilotContextDTO {
@@ -76,6 +84,7 @@ export interface CopilotContextDTO {
   milestones: CopilotMilestoneContext[];
   tasks: CopilotTaskContext[];
   recentActivity: CopilotActivityContext[];
+  memories?: CopilotMemoryContext[];
   truncation: CopilotTruncationMetadata;
 }
 
@@ -185,15 +194,17 @@ const PRIORITY_WEIGHTS: Record<string, number> = {
  *
  * Enforces:
  * 1. Strict project ownership check `{ _id: projectId, owner: userId, isDeleted: false }`.
- * 2. Owner-scoped retrieval of tasks, milestones, and activities.
+ * 2. Owner-scoped retrieval of tasks, milestones, activities, and explicit project memories.
  * 3. Single reference timestamp for overdue classification.
  * 4. Deterministic categorization, sorting, and budgeting caps:
  *    - Max 40 tasks (overdue -> urgent/high -> standard -> max 10 completed).
  *    - Max 5 milestones.
  *    - Max 10 recent activities.
+ *    - Max 20 explicit project memories (per-memory max 500 chars, aggregate max 10,000 chars).
  * 5. Accurate truncation metadata computation (`isTruncated`).
  * 6. Safe field inclusion — no ObjectIds, owner IDs, notes, or internal Mongoose fields.
  * 7. Server-managed symbolic reference mapping (`project`, `ms_1`..`ms_M`, `task_1`..`task_N`).
+ *    Note: Memories explicitly DO NOT participate in symbolicMap.
  * 8. Dependency and milestone assignment filtering after budgeting (no dangling refs).
  * 9. ZERO database mutations.
  */
@@ -368,7 +379,10 @@ export async function buildCopilotContext(
   // Apply Activity Budget (Max 10)
   const selectedActivities = rawActivities.slice(0, COPILOT_MAX_ACTIVITIES);
 
-  // 5. Build Symbolic Reference Map and DTOs over SELECTED items ONLY
+  // 5. Query Project Memories (Owner + Project Scope, newest updated first, max 20, max 10k aggregate chars)
+  const memoryRetrieval = await getProjectMemoriesForCopilot(userId, projectId);
+
+  // 6. Build Symbolic Reference Map and DTOs over SELECTED items ONLY
   const symbolicMap: Record<string, SymbolicEntityMapItem> = {};
   const taskIdToSymbolicRef = new Map<string, string>();
   const milestoneIdToSymbolicRef = new Map<string, string>();
@@ -451,6 +465,12 @@ export async function buildCopilotContext(
     timestamp: act.createdAt ? act.createdAt.toISOString() : new Date().toISOString(),
   }));
 
+  // Format selected project memories safely
+  const memoryDTOs: CopilotMemoryContext[] = memoryRetrieval.memories.map((m) => ({
+    content: m.content,
+    updatedAt: m.updatedAt ? m.updatedAt.toISOString() : new Date().toISOString(),
+  }));
+
   // Build Project DTO
   const projectDTO: CopilotProjectContext = {
     ref: "project",
@@ -469,17 +489,20 @@ export async function buildCopilotContext(
   const includedTasksCount = taskDTOs.length;
   const includedMilestonesCount = milestoneDTOs.length;
   const includedActivityCount = activityDTOs.length;
+  const includedMemoriesCount = memoryDTOs.length;
 
   const isTruncated =
     includedTasksCount < totalTasksCount ||
     includedMilestonesCount < totalMilestonesCount ||
-    includedActivityCount < totalActivityCount;
+    includedActivityCount < totalActivityCount ||
+    includedMemoriesCount < memoryRetrieval.totalCount;
 
   const context: CopilotContextDTO = {
     project: projectDTO,
     milestones: milestoneDTOs,
     tasks: taskDTOs,
     recentActivity: activityDTOs,
+    memories: memoryDTOs,
     truncation: {
       totalTasks: totalTasksCount,
       includedTasks: includedTasksCount,
@@ -488,6 +511,8 @@ export async function buildCopilotContext(
       includedMilestones: includedMilestonesCount,
       totalActivity: totalActivityCount,
       includedActivity: includedActivityCount,
+      totalMemories: memoryRetrieval.totalCount,
+      includedMemories: includedMemoriesCount,
     },
   };
 

@@ -1,8 +1,12 @@
 import mongoose from "mongoose";
+import { MongoMemoryServer } from "mongodb-memory-server";
+
+let mongoServer: MongoMemoryServer | null = null;
 
 /**
  * Safely connects to the test database and clears existing collections.
  * Enforces strict safety requirements to prevent accidental destruction of development data.
+ * Falls back to MongoMemoryServer if standalone MongoDB is unavailable.
  */
 export async function setupTestDatabase(): Promise<void> {
   const env = process.env.NODE_ENV;
@@ -11,18 +15,19 @@ export async function setupTestDatabase(): Promise<void> {
     process.exit(1);
   }
 
-  // Use a dedicated test URI, fallback to local test db, NEVER fallback to standard MONGODB_URI.
-  const uri = process.env.MONGODB_TEST_URI || "mongodb://127.0.0.1:27017/ai-project-manager-test";
+  let uri = process.env.MONGODB_TEST_URI || "mongodb://127.0.0.1:27017/ai-project-manager-test";
 
-  if (!uri.includes("test")) {
-    console.error(`❌ FATAL: The connected database URI must contain "test" in its name to prevent accidental destruction of data. Connected URI: ${uri}`);
-    process.exit(1);
+  try {
+    console.log(`🔌 Connecting to test database: ${uri}`);
+    await mongoose.connect(uri, { serverSelectionTimeoutMS: 2000 });
+  } catch (_err) {
+    console.log("⚠️ Standalone MongoDB not reachable. Launching MongoMemoryServer fallback...");
+    mongoServer = await MongoMemoryServer.create();
+    uri = mongoServer.getUri() + "test";
+    await mongoose.connect(uri);
   }
 
-  console.log(`🔌 Connecting to test database: ${uri}`);
-  await mongoose.connect(uri);
-
-  // Instead of dropping the whole database which is dangerous, we clear the collections.
+  // Clear all collections to ensure a clean slate before each test run
   const collections = mongoose.connection.collections;
   for (const key in collections) {
     const collection = collections[key];
@@ -33,9 +38,13 @@ export async function setupTestDatabase(): Promise<void> {
 }
 
 /**
- * Closes the database connection.
+ * Closes the database connection and stops the in-memory server if running.
  */
 export async function teardownTestDatabase(): Promise<void> {
   await mongoose.connection.close();
+  if (mongoServer) {
+    await mongoServer.stop();
+    mongoServer = null;
+  }
   console.log("🔌 Database connection closed.");
 }

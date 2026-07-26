@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import AxiosError from "axios";
+import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 
 import { projectMemoryApi } from "@/features/projects/services/project-memory.api";
 import { ProjectMemoriesCard } from "./ProjectMemoriesCard";
@@ -67,9 +67,7 @@ describe("ProjectMemoriesCard Component & OCC 409 Lifecycle Tests", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Project Memories")).toBeInTheDocument();
-      expect(
-        screen.getByText("Use Postgres for database persistence"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Use Postgres for database persistence")).toBeInTheDocument();
     });
 
     expect(
@@ -183,7 +181,14 @@ describe("ProjectMemoriesCard Component & OCC 409 Lifecycle Tests", () => {
     // Initial list fetch returns version 0
     vi.mocked(projectMemoryApi.list).mockResolvedValueOnce({
       items: [memoryV0],
-      pagination: { page: 1, limit: 25, total: 1, totalPages: 1, hasNextPage: false, hasPreviousPage: false },
+      pagination: {
+        page: 1,
+        limit: 25,
+        total: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
     });
 
     render(<ProjectMemoriesCard projectId="proj-1" />, { wrapper: createWrapper() });
@@ -200,15 +205,37 @@ describe("ProjectMemoriesCard Component & OCC 409 Lifecycle Tests", () => {
     expect(screen.getByText("Version: 0")).toBeInTheDocument();
 
     // Prepare 409 error response for first attempt
-    const error409 = new AxiosError.AxiosError("Conflict error");
-    (error409 as any).response = { status: 409, data: { message: "Conflict" } };
+    const response409 = {
+      status: 409,
+      statusText: "Conflict",
+      headers: {},
+      config: {
+        headers: {},
+      } as InternalAxiosRequestConfig,
+      data: { message: "Conflict" },
+    } satisfies AxiosResponse;
+
+    const error409 = new AxiosError(
+      "Conflict error",
+      "ERR_BAD_RESPONSE",
+      undefined,
+      undefined,
+      response409,
+    );
 
     vi.mocked(projectMemoryApi.update).mockRejectedValueOnce(error409);
 
     // Mock next list query to return version 1
     vi.mocked(projectMemoryApi.list).mockResolvedValueOnce({
       items: [memoryV1],
-      pagination: { page: 1, limit: 25, total: 1, totalPages: 1, hasNextPage: false, hasPreviousPage: false },
+      pagination: {
+        page: 1,
+        limit: 25,
+        total: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
     });
 
     // A & B: User clicks save, first PATCH sends expectedVersion: 0, server returns 409
@@ -260,7 +287,14 @@ describe("ProjectMemoriesCard Component & OCC 409 Lifecycle Tests", () => {
           version: 0,
         },
       ],
-      pagination: { page: 1, limit: 25, total: 26, totalPages: 2, hasNextPage: true, hasPreviousPage: false },
+      pagination: {
+        page: 1,
+        limit: 25,
+        total: 26,
+        totalPages: 2,
+        hasNextPage: true,
+        hasPreviousPage: false,
+      },
     });
 
     render(<ProjectMemoriesCard projectId="proj-1" />, { wrapper: createWrapper() });
@@ -281,7 +315,14 @@ describe("ProjectMemoriesCard Component & OCC 409 Lifecycle Tests", () => {
           version: 0,
         },
       ],
-      pagination: { page: 2, limit: 25, total: 26, totalPages: 2, hasNextPage: false, hasPreviousPage: true },
+      pagination: {
+        page: 2,
+        limit: 25,
+        total: 26,
+        totalPages: 2,
+        hasNextPage: false,
+        hasPreviousPage: true,
+      },
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
@@ -295,7 +336,14 @@ describe("ProjectMemoriesCard Component & OCC 409 Lifecycle Tests", () => {
     // After deletion, list query refetch for page 2 returns 0 items
     vi.mocked(projectMemoryApi.list).mockResolvedValueOnce({
       items: [],
-      pagination: { page: 2, limit: 25, total: 25, totalPages: 1, hasNextPage: false, hasPreviousPage: true },
+      pagination: {
+        page: 2,
+        limit: 25,
+        total: 25,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: true,
+      },
     });
 
     // Page 1 recovery query fetch
@@ -310,7 +358,14 @@ describe("ProjectMemoriesCard Component & OCC 409 Lifecycle Tests", () => {
           version: 0,
         },
       ],
-      pagination: { page: 1, limit: 25, total: 25, totalPages: 1, hasNextPage: false, hasPreviousPage: false },
+      pagination: {
+        page: 1,
+        limit: 25,
+        total: 25,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
     });
 
     fireEvent.click(screen.getByLabelText("Delete memory"));
@@ -342,7 +397,14 @@ describe("ProjectMemoriesCard Component & OCC 409 Lifecycle Tests", () => {
           version: 0,
         },
       ],
-      pagination: { page: 1, limit: 25, total: 1, totalPages: 1, hasNextPage: false, hasPreviousPage: false },
+      pagination: {
+        page: 1,
+        limit: 25,
+        total: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
     });
 
     render(<ProjectMemoriesCard projectId="proj-1" isArchived={true} />, {

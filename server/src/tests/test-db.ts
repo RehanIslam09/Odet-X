@@ -20,7 +20,7 @@ export async function setupTestDatabase(): Promise<void> {
   try {
     console.log(`🔌 Connecting to test database: ${uri}`);
     await mongoose.connect(uri, { serverSelectionTimeoutMS: 2000 });
-  } catch (_err) {
+  } catch {
     console.log("⚠️ Standalone MongoDB not reachable. Launching MongoMemoryServer fallback...");
     mongoServer = await MongoMemoryServer.create();
     uri = mongoServer.getUri() + "test";

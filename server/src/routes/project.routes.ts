@@ -15,6 +15,7 @@ import {
 import { queryCopilot } from "@/controllers/copilot.controller.js";
 
 import planRoutes from "@/routes/plan.routes.js";
+import projectMemoryRoutes from "@/routes/project-memory.routes.js";
 
 import { authenticate } from "@/middleware/auth.middleware.js";
 import { validate } from "@/middleware/validate.js";
@@ -35,9 +36,10 @@ const router = Router();
 router.use(authenticate);
 
 // ---------------------------------------------------------------------------
-// Planning Engine Sub-resource Routes (/projects/:projectId/plans)
+// Sub-resource Routes (/projects/:projectId/*)
 // ---------------------------------------------------------------------------
 router.use("/:projectId/plans", planRoutes);
+router.use("/:projectId/memories", projectMemoryRoutes);
 
 // ---------------------------------------------------------------------------
 // Collection

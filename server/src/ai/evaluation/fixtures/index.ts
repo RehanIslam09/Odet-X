@@ -4,3 +4,6 @@ export * from './planning/saas-auth.fixture.js';
 export * from './copilot/blockers.fixture.js';
 export * from './copilot/overdue-risks.fixture.js';
 export * from './copilot/prompt-injection.fixture.js';
+export * from './proactive-intelligence/types.js';
+export * from './proactive-intelligence/signal-fixtures.js';
+export * from './proactive-intelligence/enrichment-fixtures.js';

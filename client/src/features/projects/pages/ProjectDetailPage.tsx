@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ProjectHeader } from "@/features/projects/components/ProjectHeader";
 import { ProjectSummaryCards } from "@/features/projects/components/ProjectSummaryCards";
 import { ProjectAISummaryCard } from "@/features/projects/components/ProjectAISummaryCard";
+import { ProjectRecommendationsCard } from "@/features/projects/components/recommendations/ProjectRecommendationsCard";
 import { ProjectMemoriesCard } from "@/features/projects/components/memories/ProjectMemoriesCard";
 import { ProjectTasks } from "@/features/projects/components/ProjectTasks";
 import { EditProjectDialog } from "@/features/projects/components/EditProjectDialog";
@@ -119,6 +120,11 @@ export default function ProjectDetailPage() {
       />
 
       <ProjectAISummaryCard project={project} />
+
+      <ProjectRecommendationsCard
+        projectId={project.id}
+        isArchived={project.archived}
+      />
 
       <ProjectMemoriesCard
         projectId={project.id}

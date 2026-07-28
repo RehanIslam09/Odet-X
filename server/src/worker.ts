@@ -2,6 +2,7 @@ import cron from "node-cron";
 import mongoose from "mongoose";
 import { connectDatabase } from "./config/database.js";
 import { processTaskReminders } from "./jobs/notification.jobs.js";
+import { processProactiveIntelligenceJob } from "./jobs/proactive-intelligence.jobs.js";
 
 let isShuttingDown = false;
 let isJobRunning = false;
@@ -49,6 +50,7 @@ const runJobs = async () => {
 
   try {
     await processTaskReminders();
+    await processProactiveIntelligenceJob();
     console.log(`[Worker] Successfully finished processing jobs.`);
   } catch (error) {
     console.error("[Worker] Error during job execution:", error);

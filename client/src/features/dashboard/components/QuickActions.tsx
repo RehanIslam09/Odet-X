@@ -20,7 +20,7 @@ export function QuickActions() {
   const navigate = useNavigate();
 
   return (
-    <div className="flex h-full flex-col gap-3 rounded-xl border bg-card p-6 shadow-sm">
+    <div className="flex h-auto flex-col gap-3 rounded-xl border bg-card p-6 shadow-sm">
       <h2 className="text-sm font-semibold tracking-tight text-foreground">
         Quick actions
       </h2>

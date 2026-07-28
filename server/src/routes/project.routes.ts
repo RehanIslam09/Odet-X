@@ -16,6 +16,7 @@ import { queryCopilot } from "@/controllers/copilot.controller.js";
 
 import planRoutes from "@/routes/plan.routes.js";
 import projectMemoryRoutes from "@/routes/project-memory.routes.js";
+import { projectRecommendationSubRoutes } from "@/routes/project-recommendation.routes.js";
 
 import { authenticate } from "@/middleware/auth.middleware.js";
 import { validate } from "@/middleware/validate.js";
@@ -40,6 +41,7 @@ router.use(authenticate);
 // ---------------------------------------------------------------------------
 router.use("/:projectId/plans", planRoutes);
 router.use("/:projectId/memories", projectMemoryRoutes);
+router.use("/:projectId/recommendations", projectRecommendationSubRoutes);
 
 // ---------------------------------------------------------------------------
 // Collection

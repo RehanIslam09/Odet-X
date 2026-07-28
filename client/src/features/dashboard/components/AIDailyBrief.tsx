@@ -59,7 +59,7 @@ export function AIDailyBrief() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
-      className="flex h-full flex-col rounded-xl border bg-card p-6 shadow-sm"
+      className="flex h-auto flex-col rounded-xl border bg-card p-6 shadow-sm"
     >
       <div className="mb-1 flex items-center justify-between">
         <div className="flex items-center gap-2">

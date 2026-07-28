@@ -8,6 +8,7 @@ import dashboardRoutes from "@/routes/dashboard.routes.js";
 import activityRoutes from "@/routes/activity.routes.js";
 import notificationRoutes from "@/routes/notification.routes.js";
 import copilotActionRoutes from "@/routes/copilot-action.routes.js";
+import { workspaceRecommendationRoutes } from "@/routes/project-recommendation.routes.js";
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use("/users", userRoutes);
 router.use("/activities", activityRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/copilot/actions", copilotActionRoutes);
+router.use("/recommendations", workspaceRecommendationRoutes);
 
 export default router;

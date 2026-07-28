@@ -4,3 +4,9 @@ export { useCreateProject } from "@/features/projects/hooks/useCreateProject";
 export { useUpdateProject } from "@/features/projects/hooks/useUpdateProject";
 export { useArchiveProject } from "@/features/projects/hooks/useArchiveProject";
 export { useDeleteProject } from "@/features/projects/hooks/useDeleteProject";
+export {
+  useProjectRecommendations,
+  useWorkspaceRecommendations,
+  useDismissRecommendation,
+  recommendationKeys,
+} from "@/features/projects/hooks/useProjectRecommendations";

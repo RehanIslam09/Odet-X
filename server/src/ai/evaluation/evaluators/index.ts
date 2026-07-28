@@ -7,3 +7,5 @@ export * from "./action-schema-validity.evaluator.js";
 export * from "./action-reference-validity.evaluator.js";
 export * from "./action-safety-boundary.evaluator.js";
 export * from "./action-groundedness.evaluator.js";
+export * from "./proactive-intelligence/signal-evaluator.js";
+export * from "./proactive-intelligence/recommendation-evaluator.js";

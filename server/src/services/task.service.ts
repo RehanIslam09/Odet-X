@@ -1,7 +1,9 @@
 import { SortOrder, Types } from "mongoose";
 
-import Task, { ITaskDocument } from "@/models/task.model.js";
 import Project, { IProjectDocument } from "@/models/project.model.js";
+import Task, { ITaskDocument } from "@/models/task.model.js";
+import User from "@/models/user.model.js";
+import { provisionPersonalWorkspace } from "@/services/workspace.service.js";
 
 import type {
   CreateTaskDto,
@@ -10,41 +12,18 @@ import type {
   UpdateTaskNotesDto,
 } from "@/validators/task.validator.js";
 
-import { NotFoundError, ConflictError } from "@/utils/app-error.js";
-import { recordActivity, recordActivities, BaseActivityPayload } from "@/services/activity.service.js";
+import { ConflictError, NotFoundError } from "@/utils/app-error.js";
+import { BaseActivityPayload, recordActivities, recordActivity } from "@/services/activity.service.js";
 import { ACTIVITY_TYPES } from "@/constants/activity.js";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export interface PaginatedResult<T> {
-  items: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasNextPage: boolean;
-    hasPreviousPage: boolean;
-  };
-}
+import type { PaginatedResult } from "./project.service.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/**
- * Asserts that a project exists, is not deleted, and belongs to the user.
- *
- * Prevents linking tasks to projects the user does not own or that do not exist.
- */
 async function validateProjectOwnership(
-  projectId: string | Types.ObjectId,
+  projectId: Types.ObjectId,
   userId: string,
 ): Promise<IProjectDocument> {
   const project = await Project.findOne({
@@ -60,12 +39,6 @@ async function validateProjectOwnership(
   return project;
 }
 
-/**
- * Asserts that a task exists and belongs to the requesting user.
- *
- * Scopes updates and retrievals. Returns 404 NotFound if the task doesn't exist
- * or has been soft-deleted, preventing database enumeration of IDs.
- */
 async function assertTaskOwnership(
   taskId: string,
   userId: string,
@@ -74,7 +47,7 @@ async function assertTaskOwnership(
     _id: taskId,
     owner: new Types.ObjectId(userId),
     isDeleted: false,
-  }).select("-notes");
+  });
 
   if (!task) {
     throw new NotFoundError("Task not found.");
@@ -83,48 +56,88 @@ async function assertTaskOwnership(
   return task;
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // ---------------------------------------------------------------------------
-// Service Methods
+// Create
 // ---------------------------------------------------------------------------
 
-/**
- * Creates a new task. Scopes ownership to the authenticated user.
- *
- * If a `projectId` is referenced, verifies project existence and ownership.
- */
 export async function createTask(
   userId: string,
-  data: CreateTaskDto,
+  data: CreateTaskDto & { dependencies?: string[]; position?: number; milestoneId?: string | null; notes?: string },
+  explicitWorkspaceId?: string,
 ): Promise<ITaskDocument> {
-  const ownerId = new Types.ObjectId(userId);
-  let projectObjId: Types.ObjectId | null = null;
+    let targetWorkspaceId: Types.ObjectId;
 
   if (data.projectId) {
-    projectObjId = new Types.ObjectId(data.projectId);
-    await validateProjectOwnership(projectObjId, userId);
+    const projectObjId = new Types.ObjectId(data.projectId);
+    const project = await validateProjectOwnership(projectObjId, userId);
+
+    if (project.workspaceId) {
+      targetWorkspaceId = project.workspaceId;
+    } else {
+      const userDoc = await User.findById(userId);
+      const personal = await provisionPersonalWorkspace({
+        _id: userId,
+        name: userDoc?.name || "User",
+        username: userDoc?.username || "user",
+      });
+      targetWorkspaceId = personal.workspace._id as Types.ObjectId;
+    }
+  } else if (explicitWorkspaceId) {
+    targetWorkspaceId = new Types.ObjectId(explicitWorkspaceId);
+  } else {
+    const userDoc = await User.findById(userId);
+    const personal = await provisionPersonalWorkspace({
+      _id: userId,
+      name: userDoc?.name || "User",
+      username: userDoc?.username || "user",
+    });
+    targetWorkspaceId = personal.workspace._id as Types.ObjectId;
+  }
+
+  const position = typeof data.position === "number" ? data.position : 1;
+
+  if (data.dependencies && data.dependencies.length > 0) {
+    const depObjectIds = data.dependencies.map((id) => new Types.ObjectId(id));
+    const validCount = await Task.countDocuments({
+      _id: { $in: depObjectIds },
+      owner: new Types.ObjectId(userId),
+      isDeleted: false,
+    });
+
+    if (validCount !== data.dependencies.length) {
+      throw new NotFoundError("One or more prerequisite tasks do not exist or belong to another user.");
+    }
   }
 
   const task = await Task.create({
-    owner: ownerId,
-    projectId: projectObjId,
+    owner: new Types.ObjectId(userId),
+    workspaceId: targetWorkspaceId,
+    projectId: data.projectId ? new Types.ObjectId(data.projectId) : null,
+    milestoneId: data.milestoneId ? new Types.ObjectId(data.milestoneId) : null,
     title: data.title,
     description: data.description ?? "",
+    notes: data.notes ?? "",
     status: data.status ?? "todo",
     priority: data.priority ?? "none",
-    dueDate: data.dueDate ?? null,
-    estimatedTime: data.estimatedTime ?? null,
+    dueDate: data.dueDate ? new Date(data.dueDate) : null,
     labels: data.labels ?? [],
+    position,
+    dependencies: data.dependencies ? data.dependencies.map((id) => new Types.ObjectId(id)) : [],
   });
 
   await recordActivity({
     owner: userId,
     actorId: userId,
+    ...(task.workspaceId && { workspaceId: task.workspaceId.toString() }),
     type: ACTIVITY_TYPES.TASK_CREATED,
     entityType: "task",
     entityId: task._id.toString(),
-    projectId: task.projectId?.toString() ?? null,
+    projectId: task.projectId ? task.projectId.toString() : null,
     contextProjectIds: task.projectId ? [task.projectId.toString()] : [],
-    taskId: task._id.toString(),
     metadata: {
       taskTitle: task.title,
     },
@@ -133,88 +146,141 @@ export async function createTask(
   return task;
 }
 
-/**
- * Retrieves a single task, including full notes, verifying ownership boundaries.
- */
+// ---------------------------------------------------------------------------
+// Read (Single Task)
+// ---------------------------------------------------------------------------
+
 export async function getTaskById(
   taskId: string,
   userId: string,
 ): Promise<ITaskDocument> {
-  const task = await Task.findOne({
-    _id: taskId,
-    owner: new Types.ObjectId(userId),
-    isDeleted: false,
-  });
-
-  if (!task) {
-    throw new NotFoundError("Task not found.");
-  }
-
-  return task;
+  return assertTaskOwnership(taskId, userId);
 }
 
-/**
- * Lists, filters, and paginates tasks.
- *
- * Filters: Status, Priority, Project, Search (Regex over title, description, and labels).
- * Sorts by whitelisted fields. Scopes only to owner and non-deleted.
- */
+// ---------------------------------------------------------------------------
+// Read (List with Filtering, Pagination, Sorting)
+// ---------------------------------------------------------------------------
+
 export async function listTasks(
   userId: string,
-  query: TaskQueryDto,
+  query: TaskQueryDto & Record<string, any>,
+  explicitWorkspaceId?: string,
 ): Promise<PaginatedResult<ITaskDocument>> {
-  const { page, limit, search, status, priority, projectId, sort, archived, quickFilter } = query;
-
-  // 1. Build Filter Context
-  const filter: Record<string, any> = {
-    owner: new Types.ObjectId(userId),
-    isDeleted: false,
+  const {
+    page = 1,
+    limit = 10,
+    search,
+    status,
+    priority,
+    projectId,
+    milestoneId,
+    label,
     archived,
+    dueDate,
+    sort,
+    sortBy,
+    sortOrder,
+  } = query;
+
+  let targetWorkspaceId: Types.ObjectId;
+  if (explicitWorkspaceId) {
+    targetWorkspaceId = new Types.ObjectId(explicitWorkspaceId);
+  } else {
+    const userDoc = await User.findById(userId);
+    const personal = await provisionPersonalWorkspace({
+      _id: userId,
+      name: userDoc?.name || "User",
+      username: userDoc?.username || "user",
+    });
+    targetWorkspaceId = personal.workspace._id as Types.ObjectId;
+  }
+
+  const filter: Record<string, unknown> = {
+    owner: new Types.ObjectId(userId),
+    workspaceId: targetWorkspaceId,
+    isDeleted: false,
   };
 
-  if (status !== "all") {
+  if (archived !== undefined) {
+    filter.archived = archived;
+  } else {
+    filter.archived = false;
+  }
+
+  if (projectId !== undefined && projectId !== "all") {
+    if (projectId === null) {
+      filter.projectId = null;
+    } else {
+      filter.projectId = new Types.ObjectId(projectId);
+    }
+  }
+
+  if (milestoneId !== undefined && milestoneId !== "all") {
+    if (milestoneId === null) {
+      filter.milestoneId = null;
+    } else {
+      filter.milestoneId = new Types.ObjectId(milestoneId);
+    }
+  }
+
+  if (status !== undefined && status !== "all") {
     filter.status = status;
   }
 
-  if (priority !== "all") {
+  if (priority !== undefined && priority !== "all") {
     filter.priority = priority;
   }
 
-  if (projectId !== "all") {
-    filter.projectId = new Types.ObjectId(projectId);
+  if (label !== undefined && typeof label === "string" && label.trim().length > 0) {
+    filter.labels = label.trim();
   }
 
-  // Handle Quick Filters
-  if (quickFilter === "completed") {
-    filter.status = "done";
-  } else if (quickFilter === "due-today") {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-    filter.dueDate = { $gte: todayStart, $lte: todayEnd };
-  } else if (quickFilter === "overdue") {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    filter.dueDate = { $lt: todayStart };
-    filter.status = { $nin: ["done", "cancelled"] };
-  }
-
-  if (search) {
-    const searchRegex = { $regex: escapeRegex(search), $options: "i" };
+  if (search && typeof search === "string" && search.trim().length > 0) {
+    const safeRegex = escapeRegex(search.trim());
     filter.$or = [
-      { title: searchRegex },
-      { description: searchRegex },
-      { labels: searchRegex },
+      { title: { $regex: safeRegex, $options: "i" } },
+      { description: { $regex: safeRegex, $options: "i" } },
+      { labels: { $regex: safeRegex, $options: "i" } },
     ];
   }
 
-  // 2. Build Sorting Options
-  const sortField = sort.startsWith("-") ? sort.slice(1) : sort;
-  const sortOrder: SortOrder = sort.startsWith("-") ? -1 : 1;
-  const sortExpression: Record<string, SortOrder> = { [sortField]: sortOrder };
+  if (dueDate !== undefined) {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
-  // 3. Paginate
+    if (dueDate === "overdue") {
+      filter.dueDate = { $lt: startOfDay };
+      filter.status = { $ne: "done" };
+    } else if (dueDate === "today") {
+      filter.dueDate = { $gte: startOfDay, $lte: endOfDay };
+    } else if (dueDate === "upcoming") {
+      filter.dueDate = { $gt: endOfDay };
+    } else if (dueDate === "no_date") {
+      filter.dueDate = null;
+    }
+  }
+
+  let sortField = sortBy;
+  let sortDirection: SortOrder = sortOrder === "asc" ? 1 : -1;
+
+  if (sort && typeof sort === "string") {
+    if (sort.startsWith("-")) {
+      sortField = sort.slice(1);
+      sortDirection = -1;
+    } else {
+      sortField = sort;
+      sortDirection = 1;
+    }
+  }
+
+  sortField = sortField || "updatedAt";
+  const sortExpression: Record<string, SortOrder> = { [sortField]: sortDirection };
+
+  if (sortField !== "updatedAt") {
+    sortExpression.updatedAt = -1;
+  }
+
   const skip = (page - 1) * limit;
 
   const [total, items] = await Promise.all([
@@ -237,17 +303,14 @@ export async function listTasks(
   };
 }
 
-/**
- * Updates an existing task.
- *
- * Verifies task ownership.
- * If modifying `projectId`, verifies the new project's existence and ownership.
- * Triggers pre-save Mongoose hooks for completedAt sync and labels normalization.
- */
+// ---------------------------------------------------------------------------
+// Update
+// ---------------------------------------------------------------------------
+
 export async function updateTask(
   taskId: string,
   userId: string,
-  data: UpdateTaskDto,
+  data: UpdateTaskDto & { dependencies?: string[]; position?: number; milestoneId?: string | null; notes?: string },
 ): Promise<ITaskDocument> {
   const task = await assertTaskOwnership(taskId, userId);
   const events: BaseActivityPayload[] = [];
@@ -256,6 +319,7 @@ export async function updateTask(
   const baseEvent = {
     owner: userId,
     actorId: userId,
+    ...(task.workspaceId && { workspaceId: task.workspaceId.toString() }),
     entityType: "task" as const,
     entityId: task._id.toString(),
     taskId: task._id.toString(),
@@ -263,7 +327,6 @@ export async function updateTask(
     contextProjectIds: task.projectId ? [task.projectId.toString()] : [],
   };
 
-  // If project is changing, validate access to the new project
   if (data.projectId !== undefined) {
     if (data.projectId === null && task.projectId !== null) {
       const fromProject = await Project.findById(task.projectId);
@@ -299,7 +362,23 @@ export async function updateTask(
         },
       });
       task.projectId = projectObjId;
+      if (toProject.workspaceId) {
+        task.workspaceId = toProject.workspaceId;
+      }
     }
+  }
+
+  if (data.dependencies !== undefined) {
+    task.dependencies = data.dependencies.map((id) => new Types.ObjectId(id));
+    genericUpdate = true;
+  }
+  if (data.position !== undefined) {
+    task.position = data.position;
+    genericUpdate = true;
+  }
+  if (data.milestoneId !== undefined) {
+    task.milestoneId = data.milestoneId ? new Types.ObjectId(data.milestoneId) : null;
+    genericUpdate = true;
   }
 
   if (data.title !== undefined && data.title !== task.title) {
@@ -365,13 +444,7 @@ export async function updateTask(
 
   return task;
 }
-/**
- * Updates task notes.
- *
- * This method specifically bypasses the standard `recordActivity` pipeline.
- * Frequent autosaves should not generate "Task Updated" spam.
- * Mongoose `save()` behavior preserves `__v` optimistic concurrency control.
- */
+
 export async function updateTaskNotes(
   taskId: string,
   userId: string,
@@ -383,14 +456,10 @@ export async function updateTaskNotes(
     isDeleted: false,
   };
 
-  // If expectedVersion is provided, make the update atomic and conditional
   if (data.expectedVersion !== undefined) {
     query.__v = data.expectedVersion;
   }
 
-  // Use findOneAndUpdate to atomically apply the notes and increment __v
-  // runValidators: false is safe here because notes validation already occurred via Zod,
-  // but true is safer if Mongoose has custom schema constraints.
   const task = await Task.findOneAndUpdate(
     query,
     {
@@ -401,9 +470,6 @@ export async function updateTaskNotes(
   );
 
   if (!task) {
-    // If the document wasn't found, we must distinguish between:
-    // 1. Task doesn't exist / deleted / wrong owner -> 404
-    // 2. Task exists but __v mismatched -> 409 Conflict
     const exists = await Task.exists({
       _id: taskId,
       owner: new Types.ObjectId(userId),
@@ -417,12 +483,9 @@ export async function updateTaskNotes(
     }
   }
 
-  // Explicitly ZERO Activity events generated here.
   return task;
 }
-/**
- * Toggles the archived state of a task.
- */
+
 export async function toggleTaskArchive(
   taskId: string,
   userId: string,
@@ -434,6 +497,7 @@ export async function toggleTaskArchive(
   await recordActivity({
     owner: userId,
     actorId: userId,
+    ...(task.workspaceId && { workspaceId: task.workspaceId.toString() }),
     type: task.archived ? ACTIVITY_TYPES.TASK_ARCHIVED : ACTIVITY_TYPES.TASK_RESTORED,
     entityType: "task",
     entityId: task._id.toString(),
@@ -448,16 +512,12 @@ export async function toggleTaskArchive(
   return task;
 }
 
-/**
- * Soft deletes a task. Sets `isDeleted: true` to prevent visibility in user queries.
- */
 export async function deleteTask(
   taskId: string,
   userId: string,
 ): Promise<void> {
   const task = await assertTaskOwnership(taskId, userId);
 
-  // WP-01 Dependency Deletion Guard: Block deletion if task is a prerequisite for active tasks
   const dependentTaskCount = await Task.countDocuments({
     owner: new Types.ObjectId(userId),
     isDeleted: false,
@@ -476,6 +536,7 @@ export async function deleteTask(
   await recordActivity({
     owner: userId,
     actorId: userId,
+    ...(task.workspaceId && { workspaceId: task.workspaceId.toString() }),
     type: ACTIVITY_TYPES.TASK_DELETED,
     entityType: "task",
     entityId: task._id.toString(),

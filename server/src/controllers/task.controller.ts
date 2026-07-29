@@ -42,8 +42,9 @@ function getValidatedTaskQuery(req: Request): TaskQueryDto {
 export const list = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const query = getValidatedTaskQuery(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const result = await listTasks(userId, query);
+  const result = await listTasks(userId, query, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Tasks retrieved successfully.",
@@ -76,8 +77,9 @@ export const getOne = asyncHandler(async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 export const create = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
+  const workspaceId = req.workspace?._id?.toString();
 
-  const task = await createTask(userId, req.body);
+  const task = await createTask(userId, req.body, workspaceId);
 
   sendSuccessResponse(res, {
     statusCode: 201,
@@ -104,14 +106,16 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
     },
   });
 });
+
 // ---------------------------------------------------------------------------
 // PATCH /tasks/:id/notes
 // ---------------------------------------------------------------------------
 export const updateNotes = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const id = getRequiredTaskId(req);
+  const { notes } = req.body;
 
-  const task = await updateTaskNotes(id, userId, req.body);
+  const task = await updateTaskNotes(id, userId, notes);
 
   sendSuccessResponse(res, {
     message: "Task notes updated successfully.",
@@ -120,6 +124,7 @@ export const updateNotes = asyncHandler(async (req: Request, res: Response) => {
     },
   });
 });
+
 // ---------------------------------------------------------------------------
 // POST /tasks/:id/archive
 // ---------------------------------------------------------------------------
@@ -158,13 +163,12 @@ export const generateLabels = asyncHandler(async (req: Request, res: Response) =
   const userId = req.user!._id.toString();
   const id = getRequiredTaskId(req);
 
-  const task = await generateLabelsForTask(id, userId);
+  const labels = await generateLabelsForTask(id, userId);
 
   sendSuccessResponse(res, {
-    statusCode: 201,
-    message: "Labels generated and applied successfully.",
+    message: "Labels generated successfully.",
     data: {
-      task: task.toJSON(),
+      labels,
     },
   });
 });

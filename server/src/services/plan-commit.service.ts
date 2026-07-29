@@ -44,24 +44,15 @@ async function assertActiveProjectForCommit(
 
 /**
  * Safely commits a validated PlanDraft into permanent Milestone and Task documents.
- *
- * Safety Invariants:
- * 1. Re-verifies project existence, non-archival, and ownership.
- * 2. Re-verifies draft ownership, status === "draft", and non-expiration.
- * 3. Re-runs validatePlan for 100% structural and DAG cycle validity.
- * 4. Allocates all permanent ObjectIds server-side before reference translation.
- * 5. Dry-runs schema validations prior to database writes.
- * 6. Executes controlled writes with precise compensating cleanup (targets only allocated ObjectIds)
- *    to preserve atomic all-or-cleaned-up safety on standalone MongoDB instances.
- * 7. Transitions draft status to 'committed' and logs AI_PLAN_COMMITTED activity.
  */
 export async function commitPlan(
   userId: string,
   projectId: string,
   draftId: string
 ): Promise<CommitPlanResult> {
-  // 1. Project Re-verification
-  await assertActiveProjectForCommit(projectId, userId);
+  // 1. Project Re-verification & Workspace Identity Extraction
+  const project = await assertActiveProjectForCommit(projectId, userId);
+  const targetWorkspaceId = project.workspaceId || null;
 
   // 2. Draft Authorization & Expiration Verification
   const draft = await PlanDraft.findOne({
@@ -100,33 +91,35 @@ export async function commitPlan(
   const milestoneMap = new Map<string, Types.ObjectId>();
   const taskMap = new Map<string, Types.ObjectId>();
 
-  // Pass 1: Allocate milestone ObjectIds
   for (const ms of validatedPlan.milestones) {
     milestoneMap.set(ms.tempId, new Types.ObjectId());
   }
 
-  // Pass 2: Allocate task ObjectIds
   for (const t of validatedPlan.tasks) {
     taskMap.set(t.tempId, new Types.ObjectId());
   }
 
-  // Pass 3: Construct Milestones
   const userObjId = new Types.ObjectId(userId);
   const projectObjId = new Types.ObjectId(projectId);
 
-  const milestonesToInsert = validatedPlan.milestones.map((ms) => ({
-    _id: milestoneMap.get(ms.tempId)!,
-    owner: userObjId,
-    projectId: projectObjId,
-    title: ms.title,
-    description: ms.description || "",
-    targetDate: ms.targetDate,
-    position: ms.position,
-    isDeleted: false,
-  }));
+  const milestonesToInsert: any[] = validatedPlan.milestones.map((ms) => {
+    const obj: any = {
+      _id: milestoneMap.get(ms.tempId)!,
+      owner: userObjId,
+      projectId: projectObjId,
+      title: ms.title,
+      description: ms.description || "",
+      targetDate: ms.targetDate,
+      position: ms.position,
+      isDeleted: false,
+    };
+    if (targetWorkspaceId) {
+      obj.workspaceId = targetWorkspaceId;
+    }
+    return obj;
+  });
 
-  // Pass 4: Translate Task dependencies & milestone assignments
-  const tasksToInsert = validatedPlan.tasks.map((t) => {
+  const tasksToInsert: any[] = validatedPlan.tasks.map((t) => {
     const translatedDeps = t.dependencies.map((depTempId) => {
       const depObjectId = taskMap.get(depTempId);
       if (!depObjectId) {
@@ -144,7 +137,7 @@ export async function commitPlan(
       translatedMilestoneId = msObjectId;
     }
 
-    return {
+    const obj: any = {
       _id: taskMap.get(t.tempId)!,
       owner: userObjId,
       projectId: projectObjId,
@@ -161,6 +154,10 @@ export async function commitPlan(
       archived: false,
       isDeleted: false,
     };
+    if (targetWorkspaceId) {
+      obj.workspaceId = targetWorkspaceId;
+    }
+    return obj;
   });
 
   // 5. In-Memory Pre-Commit Schema Dry-Run Validation
@@ -192,7 +189,6 @@ export async function commitPlan(
       tasksInserted = true;
     }
 
-    // Transition draft status to 'committed' (atomic conditional update)
     const updatedDraft = await PlanDraft.findOneAndUpdate(
       { _id: draft._id, status: "draft" },
       { $set: { status: "committed" } },
@@ -203,10 +199,10 @@ export async function commitPlan(
       throw new ConflictError("Draft plan status changed or was committed concurrently.");
     }
 
-    // 7. Record AI_PLAN_COMMITTED Activity
     await recordActivity({
       owner: userId,
       actorId: userId,
+      ...(targetWorkspaceId && { workspaceId: targetWorkspaceId.toString() }),
       type: ACTIVITY_TYPES.AI_PLAN_COMMITTED,
       entityType: "project",
       entityId: projectId,
@@ -229,7 +225,6 @@ export async function commitPlan(
       milestones: milestonesToInsert,
     };
   } catch (error) {
-    // COMPENSATING CLEANUP: Precise cleanup targeting ONLY the pre-allocated IDs from this attempt
     if (tasksInserted && allocatedTaskIds.length > 0) {
       await Task.deleteMany({ _id: { $in: allocatedTaskIds }, owner: userObjId });
     }
@@ -237,7 +232,6 @@ export async function commitPlan(
       await Milestone.deleteMany({ _id: { $in: allocatedMilestoneIds }, owner: userObjId });
     }
 
-    // Ensure draft status is NOT reverted if another process already committed it
     if (!(error instanceof ConflictError)) {
       await PlanDraft.updateOne({ _id: draft._id, status: { $ne: "committed" } }, { $set: { status: "draft" } });
     }

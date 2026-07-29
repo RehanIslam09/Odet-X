@@ -75,8 +75,10 @@ async function runProactiveIntelligenceWorkerTests() {
     // -----------------------------------------------------------------------
     console.log("\n>> B. Testing Deterministic Candidate Ordering (updatedAt DESC, _id ASC)...");
 
-    const p1 = await Project.create({ owner: userA, name: "Proj 1", archived: false, isDeleted: false, updatedAt: new Date("2026-07-27T08:00:00Z") });
-    const p2 = await Project.create({ owner: userA, name: "Proj 2", archived: false, isDeleted: false, updatedAt: new Date("2026-07-27T09:00:00Z") });
+    const p1 = await Project.create({ owner: userA, name: "Proj 1", archived: false, isDeleted: false });
+    const p2 = await Project.create({ owner: userA, name: "Proj 2", archived: false, isDeleted: false });
+    await Project.collection.updateOne({ _id: p1._id }, { $set: { updatedAt: new Date("2026-07-27T08:00:00Z") } });
+    await Project.collection.updateOne({ _id: p2._id }, { $set: { updatedAt: new Date("2026-07-27T09:00:00Z") } });
 
     const orderedCandidates = await findProactiveCandidateProjects(50);
     assert.equal(orderedCandidates.length, 2);

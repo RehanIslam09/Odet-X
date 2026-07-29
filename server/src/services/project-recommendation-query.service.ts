@@ -23,14 +23,20 @@ export interface PaginatedRecommendationsResult {
 export async function listWorkspaceRecommendations(
   userId: string,
   query: RecommendationQueryDto,
+  explicitWorkspaceId?: string,
 ): Promise<PaginatedRecommendationsResult> {
   const ownerObjId = new Types.ObjectId(userId);
   const { page, limit, status, severity } = query;
 
   const filter: any = {
-    owner: ownerObjId,
     status: status || "ACTIVE",
   };
+
+  if (explicitWorkspaceId) {
+    filter.workspaceId = new Types.ObjectId(explicitWorkspaceId);
+  } else {
+    filter.owner = ownerObjId;
+  }
 
   if (severity) {
     filter.severity = severity;

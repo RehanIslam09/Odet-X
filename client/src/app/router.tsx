@@ -1,6 +1,7 @@
 import {
   createBrowserRouter,
   createRoutesFromElements,
+  Navigate,
   Outlet as RouteOutlet,
   Route,
 } from "react-router-dom";
@@ -22,7 +23,6 @@ import { AppearanceSettings } from "@/features/settings/components/AppearanceSet
 import { NotificationSettings } from "@/features/settings/components/NotificationSettings";
 import { SecuritySettings } from "@/features/settings/components/SecuritySettings";
 import { DangerZone } from "@/features/settings/components/DangerZone";
-import { Navigate } from "react-router-dom";
 import TasksPage from "@/features/tasks/pages/TasksPage";
 import TaskDetailPage from "@/features/tasks/pages/TaskDetailPage";
 import TaskNotesWorkspacePage from "@/features/tasks/pages/TaskNotesWorkspacePage";
@@ -30,24 +30,21 @@ import ActivityPage from "@/features/activity/pages/ActivityPage";
 import NotificationsPage from "@/features/notifications/pages/NotificationsPage";
 import ProtectedRoute from "@/routes/ProtectedRoute";
 import PublicRoute from "@/routes/PublicRoute";
+import { DefaultWorkspaceRedirect } from "@/features/workspaces/components/DefaultWorkspaceRedirect";
 
 /**
  * Application Router
  *
- * Protected Routes
- * ├── /
- * │     └── DashboardPage
- * ├── /projects
- * │     └── ProjectsDashboardPage
+ * Workspace-Prefixed Routes (/w/:workspaceSlug)
+ * ├── /w/:workspaceSlug/dashboard
+ * ├── /w/:workspaceSlug/projects
+ * ├── /w/:workspaceSlug/tasks
+ * ├── /w/:workspaceSlug/activities
+ * ├── /w/:workspaceSlug/notifications
+ * └── /w/:workspaceSlug/settings
  *
- * Public Routes
- * ├── /auth/login
- * └── /auth/register
- *
- * Utility Routes
- * ├── /session-expired
- * ├── /unauthorized
- * └── *
+ * Legacy Route Redirection
+ * └── / -> /w/:defaultWorkspaceSlug/dashboard
  */
 
 export const router = createBrowserRouter(
@@ -61,25 +58,23 @@ export const router = createBrowserRouter(
           </AuthBootstrap>
         }
       >
-        {/* Protected application */}
+        {/* Protected Workspace Application Routes */}
         <Route
-          path="/"
+          path="w/:workspaceSlug"
           element={
             <ProtectedRoute>
               <DashboardLayout />
             </ProtectedRoute>
           }
         >
+          {/* Index redirect to dashboard */}
+          <Route index element={<Navigate to="dashboard" replace />} />
+
           {/* AI Dashboard */}
-          <Route
-            index
-            element={<DashboardPage />}
-          />
+          <Route path="dashboard" element={<DashboardPage />} />
 
           {/* Projects */}
-          <Route
-            path="projects"
-          >
+          <Route path="projects">
             <Route index element={<ProjectsDashboardPage />} />
             <Route path=":projectId" element={<ProjectDetailPage />} />
           </Route>
@@ -113,6 +108,64 @@ export const router = createBrowserRouter(
           </Route>
         </Route>
 
+        {/* Legacy Un-prefixed Route Compatibility Redirections */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <DefaultWorkspaceRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="dashboard"
+          element={
+            <ProtectedRoute>
+              <DefaultWorkspaceRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="projects/*"
+          element={
+            <ProtectedRoute>
+              <DefaultWorkspaceRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="tasks/*"
+          element={
+            <ProtectedRoute>
+              <DefaultWorkspaceRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="activities/*"
+          element={
+            <ProtectedRoute>
+              <DefaultWorkspaceRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="notifications/*"
+          element={
+            <ProtectedRoute>
+              <DefaultWorkspaceRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="settings/*"
+          element={
+            <ProtectedRoute>
+              <DefaultWorkspaceRedirect />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Public authentication */}
         <Route
           path="auth"
@@ -122,34 +175,17 @@ export const router = createBrowserRouter(
             </PublicRoute>
           }
         >
-          <Route
-            path="login"
-            element={<LoginPage />}
-          />
-
-          <Route
-            path="register"
-            element={<RegisterPage />}
-          />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
         </Route>
       </Route>
 
       {/* Unguarded pages */}
-      <Route
-        path="session-expired"
-        element={<SessionExpiredPage />}
-      />
-
-      <Route
-        path="unauthorized"
-        element={<UnauthorizedPage />}
-      />
+      <Route path="session-expired" element={<SessionExpiredPage />} />
+      <Route path="unauthorized" element={<UnauthorizedPage />} />
 
       {/* 404 */}
-      <Route
-        path="*"
-        element={<NotFoundPage />}
-      />
+      <Route path="*" element={<NotFoundPage />} />
     </>,
   ),
 );

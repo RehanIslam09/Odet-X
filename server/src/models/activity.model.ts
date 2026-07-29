@@ -4,6 +4,7 @@ import { ACTIVITY_TYPES, ActivityType } from "@/constants/activity.js";
 export interface IActivity {
   owner: Types.ObjectId;
   actorId: Types.ObjectId;
+  workspaceId?: Types.ObjectId; // Phase 32: tenant boundary (required: false for migration safety)
   type: ActivityType;
   entityType: "project" | "task";
   entityId: Types.ObjectId;
@@ -20,6 +21,7 @@ const activitySchema = new Schema<IActivityDocument>(
   {
     owner: { type: Schema.Types.ObjectId, ref: "User", required: true },
     actorId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: false },
     type: { type: String, enum: Object.values(ACTIVITY_TYPES), required: true },
     entityType: { type: String, enum: ["project", "task"], required: true },
     entityId: { type: Schema.Types.ObjectId, required: true },
@@ -40,8 +42,11 @@ const activitySchema = new Schema<IActivityDocument>(
   },
 );
 
-// Indexes
-// Dashboard activity feed
+// Phase 32 - Workspace-scoped activity feed (primary tenant index)
+activitySchema.index({ workspaceId: 1, _id: -1 });
+// Phase 32 - Workspace + project activity feed
+activitySchema.index({ workspaceId: 1, projectId: 1, _id: -1 });
+// Legacy owner-scoped indexes (retained for backward compat during migration period)
 activitySchema.index({ owner: 1, _id: -1 });
 // Project activity feed (legacy)
 activitySchema.index({ owner: 1, projectId: 1, _id: -1 });

@@ -83,7 +83,7 @@ export async function updateProjectPlanDraft(
     milestones?: PlanMilestoneInput[];
   }
 ): Promise<IPlanDraftDocument> {
-  await assertActiveProjectForDraft(projectId, userId);
+  const project = await assertActiveProjectForDraft(projectId, userId);
 
   const draft = await PlanDraft.findOne({
     _id: new Types.ObjectId(draftId),
@@ -114,11 +114,14 @@ export async function updateProjectPlanDraft(
   const tasksToValidate = payload.tasks !== undefined ? payload.tasks : draft.tasks;
   const milestonesToValidate = payload.milestones !== undefined ? payload.milestones : draft.milestones;
 
-  // Pure domain re-validation before persistence
   const validated = validatePlan({
     tasks: tasksToValidate,
     milestones: milestonesToValidate,
   });
+
+  if (project.workspaceId) {
+    draft.workspaceId = project.workspaceId;
+  }
 
   draft.tasks = validated.tasks as unknown as IPlanDraftTask[];
   draft.milestones = validated.milestones as unknown as IPlanDraftMilestone[];
@@ -135,7 +138,7 @@ export async function discardProjectPlanDraft(
   projectId: string,
   draftId: string
 ): Promise<IPlanDraftDocument> {
-  await assertActiveProjectForDraft(projectId, userId);
+  const project = await assertActiveProjectForDraft(projectId, userId);
 
   const draft = await PlanDraft.findOne({
     _id: new Types.ObjectId(draftId),
@@ -161,6 +164,7 @@ export async function discardProjectPlanDraft(
   await recordActivity({
     owner: userId,
     actorId: userId,
+    ...(project.workspaceId && { workspaceId: project.workspaceId.toString() }),
     type: ACTIVITY_TYPES.AI_PLAN_DISCARDED,
     entityType: "project",
     entityId: projectId,

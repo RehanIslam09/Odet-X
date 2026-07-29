@@ -1,12 +1,27 @@
 import { Types } from "mongoose";
 import Project from "@/models/project.model.js";
 import Task from "@/models/task.model.js";
+import User from "@/models/user.model.js";
+import { provisionPersonalWorkspace } from "@/services/workspace.service.js";
 
 /**
- * Retrieves the complete Dashboard Analytics Overview for the authenticated user.
+ * Retrieves the complete Dashboard Analytics Overview for the authenticated user scoped to the active workspace.
  */
-export async function getDashboardOverview(userId: string) {
+export async function getDashboardOverview(userId: string, explicitWorkspaceId?: string) {
   const owner = new Types.ObjectId(userId);
+
+  let targetWorkspaceId: Types.ObjectId;
+  if (explicitWorkspaceId) {
+    targetWorkspaceId = new Types.ObjectId(explicitWorkspaceId);
+  } else {
+    const userDoc = await User.findById(userId);
+    const personal = await provisionPersonalWorkspace({
+      _id: userId,
+      name: userDoc?.name || "User",
+      username: userDoc?.username || "user",
+    });
+    targetWorkspaceId = personal.workspace._id as Types.ObjectId;
+  }
   
   // Use a single captured 'now' to prevent timing inconsistencies across queries
   const now = new Date();
@@ -22,16 +37,17 @@ export async function getDashboardOverview(userId: string) {
     recentProjectsDocs
   ] = await Promise.all([
     // Active Projects Count
-    Project.countDocuments({ owner, isDeleted: false, archived: false }),
+    Project.countDocuments({ owner, workspaceId: targetWorkspaceId, isDeleted: false, archived: false }),
     
     // Archived Projects Count
-    Project.countDocuments({ owner, isDeleted: false, archived: true }),
+    Project.countDocuments({ owner, workspaceId: targetWorkspaceId, isDeleted: false, archived: true }),
     
     // Task Summary Aggregation
     Task.aggregate([
       {
         $match: {
           owner,
+          workspaceId: targetWorkspaceId,
           isDeleted: false,
           archived: false
         }
@@ -83,6 +99,7 @@ export async function getDashboardOverview(userId: string) {
     // Attention Tasks (Overdue + Due Soon), limit 5
     Task.find({
       owner,
+      workspaceId: targetWorkspaceId,
       isDeleted: false,
       archived: false,
       status: { $nin: ["done", "cancelled"] },
@@ -98,7 +115,7 @@ export async function getDashboardOverview(userId: string) {
       .exec(),
 
     // Recent Projects (ordered by updatedAt desc), limit 4
-    Project.find({ owner, isDeleted: false, archived: false })
+    Project.find({ owner, workspaceId: targetWorkspaceId, isDeleted: false, archived: false })
       .select("name emoji color updatedAt")
       .sort({ updatedAt: -1 })
       .limit(4)
@@ -156,6 +173,7 @@ export async function getDashboardOverview(userId: string) {
         $match: {
           projectId: { $in: recentProjectIds },
           owner,
+          workspaceId: targetWorkspaceId,
           isDeleted: false,
           archived: false // Use Dashboard semantics: non-deleted, non-archived tasks
         }

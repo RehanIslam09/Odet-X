@@ -1,6 +1,9 @@
-import mongoose, { SortOrder, Types } from "mongoose";
+import { SortOrder, Types } from "mongoose";
 
 import Project, { IProjectDocument } from "@/models/project.model.js";
+import Task from "@/models/task.model.js";
+import User from "@/models/user.model.js";
+import { provisionPersonalWorkspace } from "@/services/workspace.service.js";
 
 import type {
   CreateProjectDto,
@@ -16,10 +19,6 @@ import { ACTIVITY_TYPES } from "@/constants/activity.js";
 // Types
 // ---------------------------------------------------------------------------
 
-/**
- * Pagination envelope returned by list operations.
- * Typed generically so it can be reused by future domain services.
- */
 export interface PaginatedResult<T> {
   items: T[];
   pagination: {
@@ -42,14 +41,6 @@ function escapeRegex(value: string): string {
 
 /**
  * Asserts that a project exists and belongs to the requesting user.
- *
- * Called before any mutating operation. Throws:
- * - `NotFoundError` if the project does not exist or is soft-deleted.
- * - `ForbiddenError` if the project exists but is owned by a different user.
- *
- * This two-step check is deliberate: returning 404 for an existing project
- * owned by another user prevents resource enumeration. An attacker cannot
- * distinguish "project does not exist" from "project exists but is not yours."
  */
 async function assertProjectOwnership(
   projectId: string,
@@ -69,55 +60,118 @@ async function assertProjectOwnership(
 }
 
 // ---------------------------------------------------------------------------
-// List
+// Create
 // ---------------------------------------------------------------------------
 
 /**
- * Returns a paginated, optionally filtered list of projects for a given user.
- *
- * All queries are scoped to `{ owner, isDeleted: false }`. A user can never
- * see another user's projects.
- *
- * Search:
- * - Case-insensitive regex on `name`. Simple and sufficient for low-to-medium
- *   project counts. When a workspace grows large enough to warrant it, this
- *   can be transparently replaced with a `$text` query or Atlas Search using
- *   the same API contract — the query param name and shape do not change.
- *
- * Sort:
- * - The `sort` param is pre-validated by Zod to be a whitelisted field.
- * - A leading `-` means descending; without it, ascending.
- *
- * Pagination:
- * - Uses `skip` + `limit`. Cursor-based pagination is more efficient at very
- *   large scale, but at project counts that justify a cursor approach, the
- *   workspace concept (not yet built) will have changed the query shape anyway.
- *   Revisit at that boundary.
+ * Creates a new project document anchored to the creator user and their target workspace.
  */
+export async function createProject(
+  userId: string,
+  data: Partial<CreateProjectDto> & { name: string },
+  explicitWorkspaceId?: string,
+): Promise<IProjectDocument> {
+  let targetWorkspaceId: Types.ObjectId;
+
+  if (explicitWorkspaceId) {
+    targetWorkspaceId = new Types.ObjectId(explicitWorkspaceId);
+  } else {
+    const userDoc = await User.findById(userId);
+    const personal = await provisionPersonalWorkspace({
+      _id: userId,
+      name: userDoc?.name || "User",
+      username: userDoc?.username || "user",
+    });
+    targetWorkspaceId = personal.workspace._id as Types.ObjectId;
+  }
+
+  const project = await Project.create({
+    owner: new Types.ObjectId(userId),
+    workspaceId: targetWorkspaceId,
+    name: data.name,
+    description: data.description ?? "",
+    emoji: data.emoji ?? "📁",
+    color: data.color ?? "#6366f1",
+  });
+
+  await recordActivity({
+    owner: userId,
+    actorId: userId,
+    ...(project.workspaceId && { workspaceId: project.workspaceId.toString() }),
+    type: ACTIVITY_TYPES.PROJECT_CREATED,
+    entityType: "project",
+    entityId: project._id.toString(),
+    projectId: project._id.toString(),
+    contextProjectIds: [project._id.toString()],
+    metadata: {
+      projectName: project.name,
+    },
+  });
+
+  return project;
+}
+
+// ---------------------------------------------------------------------------
+// Read (List)
+// ---------------------------------------------------------------------------
+
 export async function listProjects(
   userId: string,
   query: ProjectQueryDto,
+  explicitWorkspaceId?: string,
 ): Promise<PaginatedResult<IProjectDocument>> {
-  const { page, limit, search, sort, archived } = query;
+  const { page, limit, search, archived, sort, sortBy, sortOrder } = query as any;
 
-  // Base filter: always scoped to owner + not deleted
-  const filter = {
+  let targetWorkspaceId: Types.ObjectId;
+  if (explicitWorkspaceId) {
+    targetWorkspaceId = new Types.ObjectId(explicitWorkspaceId);
+  } else {
+    const userDoc = await User.findById(userId);
+    const personal = await provisionPersonalWorkspace({
+      _id: userId,
+      name: userDoc?.name || "User",
+      username: userDoc?.username || "user",
+    });
+    targetWorkspaceId = personal.workspace._id as Types.ObjectId;
+  }
+
+  const filter: Record<string, unknown> = {
     owner: new Types.ObjectId(userId),
+    workspaceId: targetWorkspaceId,
     isDeleted: false,
-    archived,
-    ...(search
-      ? { name: { $regex: escapeRegex(search), $options: "i" } }
-      : {}),
   };
 
-  // Parse sort string: "-updatedAt" → { updatedAt: -1 }, "name" → { name: 1 }
-  const sortField = sort.startsWith("-") ? sort.slice(1) : sort;
-  const sortOrder: SortOrder = sort.startsWith("-") ? -1 : 1;
-  const sortExpression: Record<string, SortOrder> = { [sortField]: sortOrder };
+  if (archived !== undefined) {
+    filter.archived = archived;
+  } else {
+    filter.archived = false;
+  }
+
+  if (search && search.trim().length > 0) {
+    filter.name = {
+      $regex: escapeRegex(search.trim()),
+      $options: "i",
+    };
+  }
+
+  let sortField = sortBy;
+  let sortDirection: SortOrder = sortOrder === "asc" ? 1 : -1;
+
+  if (sort && typeof sort === "string") {
+    if (sort.startsWith("-")) {
+      sortField = sort.slice(1);
+      sortDirection = -1;
+    } else {
+      sortField = sort;
+      sortDirection = 1;
+    }
+  }
+
+  sortField = sortField || "updatedAt";
+  const sortExpression: Record<string, SortOrder> = { [sortField]: sortDirection };
 
   const skip = (page - 1) * limit;
 
-  // Execute count and find in parallel — both share the same filter.
   const [total, items] = await Promise.all([
     Project.countDocuments(filter),
     Project.find(filter).sort(sortExpression).skip(skip).limit(limit).exec(),
@@ -139,12 +193,9 @@ export async function listProjects(
 }
 
 // ---------------------------------------------------------------------------
-// Get One
+// Read (Single)
 // ---------------------------------------------------------------------------
 
-/**
- * Retrieves a single project by ID, scoped to the requesting user.
- */
 export async function getProjectById(
   projectId: string,
   userId: string,
@@ -153,50 +204,9 @@ export async function getProjectById(
 }
 
 // ---------------------------------------------------------------------------
-// Create
-// ---------------------------------------------------------------------------
-
-/**
- * Creates a new project owned by the given user.
- *
- * The `owner` field is set server-side from the authenticated user —
- * it is never derived from the request body.
- */
-export async function createProject(
-  userId: string,
-  data: CreateProjectDto,
-): Promise<IProjectDocument> {
-  const project = await Project.create({
-    owner: new Types.ObjectId(userId),
-    ...data,
-  });
-
-  await recordActivity({
-    owner: userId,
-    actorId: userId,
-    type: ACTIVITY_TYPES.PROJECT_CREATED,
-    entityType: "project",
-    entityId: project._id.toString(),
-    projectId: project._id.toString(),
-    contextProjectIds: [project._id.toString()],
-    metadata: {
-      projectName: project.name,
-    },
-  });
-
-  return project;
-}
-
-// ---------------------------------------------------------------------------
 // Update
 // ---------------------------------------------------------------------------
 
-/**
- * Applies a partial update to a project after verifying ownership.
- *
- * Immutable fields (`owner`, `isDeleted`, `archived`) are not exposed
- * through this operation. Archive is a separate, intentional action.
- */
 export async function updateProject(
   projectId: string,
   userId: string,
@@ -204,7 +214,6 @@ export async function updateProject(
 ): Promise<IProjectDocument> {
   const project = await assertProjectOwnership(projectId, userId);
 
-  // Apply only the provided fields (partial update)
   let hasChanges = false;
   if (data.name !== undefined && data.name !== project.name) {
     project.name = data.name;
@@ -233,6 +242,7 @@ export async function updateProject(
     await recordActivity({
       owner: userId,
       actorId: userId,
+      ...(project.workspaceId && { workspaceId: project.workspaceId.toString() }),
       type: ACTIVITY_TYPES.PROJECT_UPDATED,
       entityType: "project",
       entityId: project._id.toString(),
@@ -251,15 +261,6 @@ export async function updateProject(
 // Archive / Unarchive
 // ---------------------------------------------------------------------------
 
-/**
- * Toggles the `archived` flag on a project.
- *
- * Archive is a separate operation from update to make the UX intent clear:
- * archiving is a lifecycle transition, not a field edit. This also prevents
- * a partial update from accidentally archiving a project.
- *
- * Returns the updated project.
- */
 export async function toggleProjectArchive(
   projectId: string,
   userId: string,
@@ -272,6 +273,7 @@ export async function toggleProjectArchive(
   await recordActivity({
     owner: userId,
     actorId: userId,
+    ...(project.workspaceId && { workspaceId: project.workspaceId.toString() }),
     type: project.archived ? ACTIVITY_TYPES.PROJECT_ARCHIVED : ACTIVITY_TYPES.PROJECT_RESTORED,
     entityType: "project",
     entityId: project._id.toString(),
@@ -286,45 +288,25 @@ export async function toggleProjectArchive(
 }
 
 // ---------------------------------------------------------------------------
-// Delete (soft)
+// Delete
 // ---------------------------------------------------------------------------
 
-/**
- * Soft-deletes a project by setting `isDeleted: true`.
- *
- * Hard deletion is never performed. The project record is retained so that:
- * 1. Historical activity and task context remains available for the AI Agent.
- * 2. Accidental deletion can be recovered by an admin if needed.
- *
- * A soft-deleted project disappears from all user-facing queries immediately.
- */
-export async function deleteProject(
-  projectId: string,
-  userId: string,
-): Promise<void> {
+export async function deleteProject(projectId: string, userId: string): Promise<void> {
   const project = await assertProjectOwnership(projectId, userId);
 
   project.isDeleted = true;
   await project.save();
 
-  // Phase 12.3: Lifecycle Policy - Unassign Tasks on Project Deletion
-  // This operation is performed sequentially. Transactions are avoided 
-  // to support standalone MongoDB deployments.
-  const TaskModel = mongoose.model("Task");
-  await TaskModel.updateMany(
-    {
-      projectId: project._id,
-      owner: new Types.ObjectId(userId), // Strict security scope
-      isDeleted: false,
-    },
-    {
-      $set: { projectId: null },
-    }
+  // Unlink associated tasks so they become standalone tasks
+  await Task.updateMany(
+    { projectId: project._id, owner: new Types.ObjectId(userId) },
+    { $set: { projectId: null } },
   );
 
   await recordActivity({
     owner: userId,
     actorId: userId,
+    ...(project.workspaceId && { workspaceId: project.workspaceId.toString() }),
     type: ACTIVITY_TYPES.PROJECT_DELETED,
     entityType: "project",
     entityId: project._id.toString(),
@@ -340,122 +322,55 @@ export async function deleteProject(
 // Options
 // ---------------------------------------------------------------------------
 
-/**
- * Retrieves a lightweight, unpaginated list of active projects for dropdown selectors.
- * Excludes soft-deleted and archived projects.
- * Returns only id, name, emoji, and color.
- * Sorts alphabetically by name.
- */
-export async function getProjectOptions(userId: string) {
-  const ProjectModel = mongoose.model("Project");
+export async function getProjectOptions(
+  userId: string,
+  explicitWorkspaceId?: string,
+): Promise<{ id: string; name: string; emoji: string; color: string }[]> {
+  let targetWorkspaceId: Types.ObjectId;
+  if (explicitWorkspaceId) {
+    targetWorkspaceId = new Types.ObjectId(explicitWorkspaceId);
+  } else {
+    const userDoc = await User.findById(userId);
+    const personal = await provisionPersonalWorkspace({
+      _id: userId,
+      name: userDoc?.name || "User",
+      username: userDoc?.username || "user",
+    });
+    targetWorkspaceId = personal.workspace._id as Types.ObjectId;
+  }
 
-  const projects = await ProjectModel.find(
-    {
-      owner: new Types.ObjectId(userId),
-      isDeleted: false,
-      archived: false,
-    },
-    // Projection: _id is included by default and mapped to id in the transform,
-    // but we explicitly select the fields we need. owner and other fields are excluded.
-    "name emoji color"
-  )
+  const projects = await Project.find({
+    owner: new Types.ObjectId(userId),
+    workspaceId: targetWorkspaceId,
+    isDeleted: false,
+    archived: false,
+  })
+    .select("_id name emoji color")
     .sort({ name: 1 })
     .exec();
 
-  // Mongoose documents need to be mapped to match the DTO expectations
-  // We use the same toJSON transform to ensure consistent `id` mapping
-  return projects.map((p) => {
-    const doc = p.toJSON();
-    return {
-      id: doc.id,
-      name: doc.name,
-      emoji: doc.emoji,
-      color: doc.color,
-    };
-  });
+  return projects.map((p) => ({
+    id: p._id.toString(),
+    name: p.name,
+    emoji: p.emoji,
+    color: p.color,
+  }));
 }
 
 // ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 
-/**
- * Calculates real-time progress metrics for a project using MongoDB Aggregation.
- * Excludes soft-deleted and archived tasks from the LIVE workspace metrics.
- */
 export async function getProjectSummary(
   projectId: string,
   userId: string,
-) {
-  // 1. Establish strict authorization boundary (404 on cross-tenant/non-existent)
-  await assertProjectOwnership(projectId, userId);
-
-  const TaskModel = mongoose.model("Task");
-  
-  // 2. Perform aggregation
-  const summary = await TaskModel.aggregate([
-    {
-      // Efficiently uses existing index: { owner: 1, isDeleted: 1, archived: 1, projectId: 1, updatedAt: -1 }
-      $match: {
-        projectId: new Types.ObjectId(projectId),
-        owner: new Types.ObjectId(userId),
-        isDeleted: false,
-        archived: false, // Live metrics exclude archived tasks
-      },
-    },
-    {
-      $group: {
-        _id: null,
-        total: { $sum: 1 },
-        completed: { $sum: { $cond: [{ $eq: ["$status", "done"] }, 1, 0] } },
-        inProgress: { $sum: { $cond: [{ $eq: ["$status", "in_progress"] }, 1, 0] } },
-        cancelled: { $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0] } },
-        overdue: {
-          $sum: {
-            $cond: [
-              {
-                $and: [
-                  { $ne: ["$dueDate", null] },
-                  { $lt: ["$dueDate", new Date()] },
-                  { $ne: ["$status", "done"] },
-                  { $ne: ["$status", "cancelled"] },
-                ],
-              },
-              1,
-              0,
-            ],
-          },
-        },
-      },
-    },
-  ]);
-
-  // 3. Fallback for zero-task projects
-  if (summary.length === 0) {
-    return {
-      total: 0,
-      completed: 0,
-      inProgress: 0,
-      remaining: 0,
-      overdue: 0,
-      completionPercentage: 0,
-    };
+): Promise<string> {
+  const project = await assertProjectOwnership(projectId, userId);
+  if (!project.aiSummary) {
+    return "No AI summary generated for this project yet.";
   }
-
-  // 4. Derived metrics (remaining and percentage)
-  const s = summary[0];
-  const remaining = s.total - s.completed - s.cancelled;
-  const actionableTotal = s.total - s.cancelled;
-  
-  // Guard against divide-by-zero if all tasks are cancelled
-  const completionPercentage = actionableTotal > 0 ? (s.completed / actionableTotal) * 100 : 0;
-
-  return {
-    total: s.total,
-    completed: s.completed,
-    inProgress: s.inProgress,
-    remaining,
-    overdue: s.overdue,
-    completionPercentage: Math.round(completionPercentage),
-  };
+  if (typeof project.aiSummary === "string") {
+    return project.aiSummary;
+  }
+  return (project.aiSummary as any).summary || "No AI summary generated for this project yet.";
 }

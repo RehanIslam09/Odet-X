@@ -5,6 +5,7 @@ import { ActivityType } from "@/constants/activity.js";
 export interface BaseActivityPayload {
   owner: string;
   actorId: string;
+  workspaceId?: string; // Phase 32: tenant boundary - passed from service layer context
   type: ActivityType;
   entityType: "project" | "task";
   entityId: string;
@@ -33,6 +34,7 @@ export async function recordActivity(payload: BaseActivityPayload): Promise<void
     await Activity.create({
       owner: new Types.ObjectId(payload.owner),
       actorId: new Types.ObjectId(payload.actorId),
+      ...(payload.workspaceId && { workspaceId: new Types.ObjectId(payload.workspaceId) }),
       type: payload.type,
       entityType: payload.entityType,
       entityId: new Types.ObjectId(payload.entityId),
@@ -57,6 +59,7 @@ export async function recordActivities(payloads: BaseActivityPayload[]): Promise
     const docs = payloads.map(p => ({
       owner: new Types.ObjectId(p.owner),
       actorId: new Types.ObjectId(p.actorId),
+      ...(p.workspaceId && { workspaceId: new Types.ObjectId(p.workspaceId) }),
       type: p.type,
       entityType: p.entityType,
       entityId: new Types.ObjectId(p.entityId),
@@ -72,17 +75,28 @@ export async function recordActivities(payloads: BaseActivityPayload[]): Promise
 }
 
 /**
- * Retrieves a paginated list of activities, securely scoped to the tenant (owner).
+ * Retrieves a paginated list of activities, securely scoped to the active workspace.
+ *
+ * Tenant isolation:
+ * - When workspaceId is provided (Phase 32 path): filter strictly by workspaceId.
+ * - Fallback (legacy path without workspaceId): filter by owner userId for backward compat.
  */
 export async function listActivities(
   userId: string,
-  query: { cursor?: string | undefined; limit: number; projectId?: string | undefined; taskId?: string | undefined }
+  query: { cursor?: string | undefined; limit: number; projectId?: string | undefined; taskId?: string | undefined },
+  explicitWorkspaceId?: string,
 ): Promise<CursorPaginatedResult<IActivityDocument>> {
   const { cursor, limit, projectId, taskId } = query;
 
-  const filter: Record<string, any> = {
-    owner: new Types.ObjectId(userId),
-  };
+  const filter: Record<string, any> = {};
+
+  if (explicitWorkspaceId) {
+    // Phase 32: Tenant-scoped filter - primary security boundary
+    filter.workspaceId = new Types.ObjectId(explicitWorkspaceId);
+  } else {
+    // Legacy fallback: owner-scoped (used when no workspace context available)
+    filter.owner = new Types.ObjectId(userId);
+  }
 
   if (projectId) {
     // Backward compatibility: match either the new context array or the legacy projectId field.

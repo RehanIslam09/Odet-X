@@ -1,12 +1,13 @@
 import { Types } from "mongoose";
 
 import ProjectMemory, { IProjectMemoryDocument } from "@/models/project-memory.model.js";
-import { getProjectById, PaginatedResult } from "@/services/project.service.js";
-import { ConflictError, NotFoundError } from "@/utils/app-error.js";
+import { getProjectById } from "@/services/project.service.js";
+
 import {
   DEFAULT_MEMORY_PAGE_SIZE,
   MAX_MEMORY_PAGE_SIZE,
 } from "@/constants/project-memory.js";
+
 import type {
   CreateProjectMemoryDto,
   ProjectMemoryDto,
@@ -14,8 +15,11 @@ import type {
   UpdateProjectMemoryDto,
 } from "@/validators/project-memory.validator.js";
 
+import type { PaginatedResult } from "@/services/project.service.js";
+import { ConflictError, NotFoundError } from "@/utils/app-error.js";
+
 // ---------------------------------------------------------------------------
-// Constants for Copilot AI Retrieval
+// Constants & Budget Limits
 // ---------------------------------------------------------------------------
 
 export const COPILOT_MAX_RETRIEVED_MEMORIES = 20;
@@ -39,10 +43,6 @@ export interface CopilotMemoryRetrievalResult {
 // Safe DTO Transformation
 // ---------------------------------------------------------------------------
 
-/**
- * Maps an internal Mongoose ProjectMemory document to the canonical safe ProjectMemoryDto.
- * Excludes `owner`, `projectId`, and raw `__v` from client visibility.
- */
 export function toProjectMemoryDto(doc: IProjectMemoryDocument): ProjectMemoryDto {
   return {
     id: doc._id.toString(),
@@ -58,58 +58,47 @@ export function toProjectMemoryDto(doc: IProjectMemoryDocument): ProjectMemoryDt
 // Service Operations
 // ---------------------------------------------------------------------------
 
-/**
- * Creates a new project memory document.
- *
- * Scoped to an authenticated user and an owned, non-deleted project.
- * Archived projects are valid memory targets.
- */
 export async function createProjectMemory(
   ownerId: string,
   projectId: string,
   data: CreateProjectMemoryDto,
 ): Promise<ProjectMemoryDto> {
-  // 1. Validate project ownership & existence (throws NotFoundError if inaccessible or soft-deleted)
-  await getProjectById(projectId, ownerId);
+  const project = await getProjectById(projectId, ownerId);
 
-  // 2. Normalize content (trim outer whitespace)
   const normalizedContent = data.content.trim();
 
-  // 3. Create document with server-controlled fields
-  const memory = await ProjectMemory.create({
+  const memoryPayload: Record<string, unknown> = {
     owner: new Types.ObjectId(ownerId),
     projectId: new Types.ObjectId(projectId),
     content: normalizedContent,
     sourceType: "USER",
-  });
+  };
+
+  if (project.workspaceId) {
+    memoryPayload.workspaceId = project.workspaceId;
+  }
+
+  const memory = await ProjectMemory.create(memoryPayload);
 
   return toProjectMemoryDto(memory);
 }
 
-/**
- * Lists project memories for an owned project with page-based pagination.
- *
- * Scoped strictly to { owner, projectId } and ordered by updatedAt DESC, _id DESC.
- */
 export async function listProjectMemories(
   ownerId: string,
   projectId: string,
   query?: Partial<ProjectMemoryQueryDto>,
 ): Promise<PaginatedResult<ProjectMemoryDto>> {
-  // 1. Validate project ownership
   await getProjectById(projectId, ownerId);
 
   const page = Math.max(1, query?.page ?? 1);
   const limit = Math.min(MAX_MEMORY_PAGE_SIZE, Math.max(1, query?.limit ?? DEFAULT_MEMORY_PAGE_SIZE));
   const skip = (page - 1) * limit;
 
-  // 2. Compound filter: owner + projectId
   const filter = {
     owner: new Types.ObjectId(ownerId),
     projectId: new Types.ObjectId(projectId),
   };
 
-  // 3. Execute count and find in parallel with frozen ordering (updatedAt DESC, _id DESC)
   const [total, items] = await Promise.all([
     ProjectMemory.countDocuments(filter),
     ProjectMemory.find(filter)
@@ -134,17 +123,6 @@ export async function listProjectMemories(
   };
 }
 
-/**
- * Deterministically retrieves explicit project memories for Copilot AI context integration.
- *
- * Rules & Guarantees:
- * 1. Owner + Project Scoped strictly: { owner: ownerId, projectId: projectId }
- * 2. Deterministic ordering: updatedAt DESC, _id DESC
- * 3. Database limit: capped at 20 documents directly at MongoDB level
- * 4. Per-memory content limit: max 500 chars (truncated in-memory, persisted DB record untouched)
- * 5. Aggregate content limit: max 10,000 chars total across all included memories
- * 6. ZERO database mutations.
- */
 export async function getProjectMemoriesForCopilot(
   ownerId: string,
   projectId: string,
@@ -168,7 +146,6 @@ export async function getProjectMemoriesForCopilot(
   for (const doc of rawMemories) {
     const rawContent = doc.content || "";
 
-    // Apply per-memory max 500 character limit
     let truncatedContent =
       rawContent.length > COPILOT_MAX_MEMORY_CONTENT_LENGTH
         ? rawContent.slice(0, COPILOT_MAX_MEMORY_CONTENT_LENGTH).trimEnd()
@@ -201,22 +178,14 @@ export async function getProjectMemoriesForCopilot(
   };
 }
 
-/**
- * Applies a content update to an existing memory document using Optimistic Concurrency Control (OCC).
- *
- * Inaccessible or nonexistent memories return NotFoundError (anti-enumeration).
- * Stale expectedVersion returns ConflictError.
- */
 export async function updateProjectMemory(
   ownerId: string,
   projectId: string,
   memoryId: string,
   data: UpdateProjectMemoryDto,
 ): Promise<ProjectMemoryDto> {
-  // 1. Validate project ownership
-  await getProjectById(projectId, ownerId);
+  const project = await getProjectById(projectId, ownerId);
 
-  // 2. Anti-enumeration ObjectId format validation
   if (!Types.ObjectId.isValid(memoryId)) {
     throw new NotFoundError("Project memory not found.");
   }
@@ -226,7 +195,6 @@ export async function updateProjectMemory(
   const projectObjectId = new Types.ObjectId(projectId);
   const memoryObjectId = new Types.ObjectId(memoryId);
 
-  // 3. Compound atomic update enforcing OCC via __v matching and increment
   const updatedMemory = await ProjectMemory.findOneAndUpdate(
     {
       _id: memoryObjectId,
@@ -235,14 +203,16 @@ export async function updateProjectMemory(
       __v: data.expectedVersion,
     },
     {
-      $set: { content: normalizedContent },
+      $set: {
+        content: normalizedContent,
+        ...(project.workspaceId ? { workspaceId: project.workspaceId } : {}),
+      },
       $inc: { __v: 1 },
     },
     { returnDocument: "after", runValidators: true },
   );
 
   if (!updatedMemory) {
-    // 4. Disambiguate between nonexistent/inaccessible memory (404) and OCC stale version (409)
     const existsInScope = await ProjectMemory.exists({
       _id: memoryObjectId,
       owner: ownerObjectId,
@@ -259,26 +229,17 @@ export async function updateProjectMemory(
   return toProjectMemoryDto(updatedMemory);
 }
 
-/**
- * Permanently hard-deletes a project memory document.
- *
- * Soft deletion is not used for ProjectMemory.
- * Repeated deletion or deletion of an inaccessible/nonexistent memory returns NotFoundError.
- */
 export async function deleteProjectMemory(
   ownerId: string,
   projectId: string,
   memoryId: string,
 ): Promise<void> {
-  // 1. Validate project ownership
   await getProjectById(projectId, ownerId);
 
-  // 2. Anti-enumeration ObjectId format validation
   if (!Types.ObjectId.isValid(memoryId)) {
     throw new NotFoundError("Project memory not found.");
   }
 
-  // 3. Hard delete using compound scope filter
   const result = await ProjectMemory.deleteOne({
     _id: new Types.ObjectId(memoryId),
     owner: new Types.ObjectId(ownerId),

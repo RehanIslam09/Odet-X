@@ -1,38 +1,40 @@
-/**
- * Deterministic Backend Search Engine Service
- * Phase 31 — Global Search & Command Palette
- */
-
 import { Types } from "mongoose";
-import Project from "../models/project.model.js";
-import Task from "../models/task.model.js";
-import Milestone from "../models/milestone.model.js";
-import ProjectMemory from "../models/project-memory.model.js";
+
+import Milestone from "@/models/milestone.model.js";
+import ProjectMemory from "@/models/project-memory.model.js";
+import Project from "@/models/project.model.js";
+import Task from "@/models/task.model.js";
+
 import {
-  SearchTypeFilter,
-  SearchResultDto,
   SEARCH_ALL_MAX_RESULTS,
-  SEARCH_PER_TYPE_LIMIT,
   SEARCH_DEFAULT_LIMIT,
   SEARCH_MAX_LIMIT,
-} from "../types/search.types.js";
+  SEARCH_MIN_QUERY_LENGTH,
+  SEARCH_PER_TYPE_LIMIT,
+  SearchResultDto,
+  SearchTypeFilter,
+} from "@/types/search.types.js";
+
 import {
-  normalizeSearchQuery,
+  SearchCandidateInput,
   calculateRelevanceScore,
   compareSearchResults,
   generateMemorySnippet,
   generateNavigationUrl,
-  SearchCandidateInput,
-} from "../utils/search-domain.utils.js";
+  normalizeSearchQuery,
+} from "@/utils/search-domain.utils.js";
+
+export const SEARCH_CANDIDATE_LIMIT_PER_ENTITY = 50;
 
 export interface GlobalSearchOptions {
-  ownerId: Types.ObjectId | string;
+  ownerId: string | Types.ObjectId;
   query: string;
   type?: SearchTypeFilter;
   limit?: number;
+  workspaceId?: string | Types.ObjectId;
 }
 
-export interface GlobalSearchResponse {
+export interface SearchResultsEnvelopeDto {
   query: string;
   totalResults: number;
   items: SearchResultDto[];
@@ -42,51 +44,83 @@ interface RankedResultItem extends SearchResultDto {
   score: number;
 }
 
-const SEARCH_CANDIDATE_LIMIT_PER_ENTITY = 50;
-
 /**
- * Searches global entities deterministically for an authenticated tenant.
+ * Executes a scoped global search query across Project, Task, Milestone, and ProjectMemory collections.
+ * Supports optional `workspaceId` tenant scoping while retaining existing user owner isolation.
  */
 export async function searchGlobalEntities(
-  options: GlobalSearchOptions
-): Promise<GlobalSearchResponse> {
-  const { ownerId, query, type = "all", limit = SEARCH_DEFAULT_LIMIT } = options;
-
-  const ownerObjectId =
-    typeof ownerId === "string" ? new Types.ObjectId(ownerId) : ownerId;
+  options: GlobalSearchOptions,
+): Promise<SearchResultsEnvelopeDto> {
+  const { ownerId, query, type = "all", limit = SEARCH_DEFAULT_LIMIT, workspaceId } = options;
 
   const norm = normalizeSearchQuery(query);
-  if (!norm.isSearchable) {
+
+  if (!norm.isSearchable || norm.trimmed.length < SEARCH_MIN_QUERY_LENGTH) {
     return {
-      query: query || "",
+      query: norm.trimmed,
       totalResults: 0,
       items: [],
     };
   }
 
-  const effectiveLimit = Math.min(Math.max(1, limit), SEARCH_MAX_LIMIT);
-  const searchAll = type === "all";
+  const effectiveLimit = Math.min(SEARCH_MAX_LIMIT, Math.max(1, limit));
+  const ownerObjectId = new Types.ObjectId(ownerId.toString());
+  const workspaceObjectId = workspaceId ? new Types.ObjectId(workspaceId.toString()) : undefined;
+  const regexFilter = { $regex: norm.escaped, $options: "i" };
 
-  // -------------------------------------------------------------------------
-  // 1. Concurrent Candidate Fetching
-  // -------------------------------------------------------------------------
+  const searchAll = type === "all";
 
   const fetchProjects = searchAll || type === "project";
   const fetchTasks = searchAll || type === "task";
   const fetchMilestones = searchAll || type === "milestone";
   const fetchMemories = searchAll || type === "memory";
 
-  const regexFilter = { $regex: norm.escaped, $options: "i" };
+  const projectFilter: Record<string, unknown> = {
+    owner: ownerObjectId,
+    isDeleted: false,
+    archived: false,
+    $or: [{ name: regexFilter }, { description: regexFilter }],
+  };
+  if (workspaceObjectId) {
+    projectFilter.workspaceId = workspaceObjectId;
+  }
 
+  const taskFilter: Record<string, unknown> = {
+    owner: ownerObjectId,
+    isDeleted: false,
+    archived: false,
+    $or: [
+      { title: regexFilter },
+      { description: regexFilter },
+      { labels: regexFilter },
+    ],
+  };
+  if (workspaceObjectId) {
+    taskFilter.workspaceId = workspaceObjectId;
+  }
+
+  const milestoneFilter: Record<string, unknown> = {
+    owner: ownerObjectId,
+    isDeleted: false,
+    $or: [{ title: regexFilter }, { description: regexFilter }],
+  };
+  if (workspaceObjectId) {
+    milestoneFilter.workspaceId = workspaceObjectId;
+  }
+
+  const memoryFilter: Record<string, unknown> = {
+    owner: ownerObjectId,
+    content: regexFilter,
+  };
+  if (workspaceObjectId) {
+    memoryFilter.workspaceId = workspaceObjectId;
+  }
+
+  // 1. Parallel Candidate Retrieval across relevant collections
   const [rawProjects, rawTasks, rawMilestones, rawMemories] = await Promise.all([
     fetchProjects
       ? Project.find(
-          {
-            owner: ownerObjectId,
-            isDeleted: false,
-            archived: false,
-            $or: [{ name: regexFilter }, { description: regexFilter }],
-          },
+          projectFilter,
           { name: 1, description: 1, updatedAt: 1 }
         )
           .sort({ updatedAt: -1 })
@@ -96,16 +130,7 @@ export async function searchGlobalEntities(
 
     fetchTasks
       ? Task.find(
-          {
-            owner: ownerObjectId,
-            isDeleted: false,
-            archived: false,
-            $or: [
-              { title: regexFilter },
-              { description: regexFilter },
-              { labels: regexFilter },
-            ],
-          },
+          taskFilter,
           {
             title: 1,
             description: 1,
@@ -122,11 +147,7 @@ export async function searchGlobalEntities(
 
     fetchMilestones
       ? Milestone.find(
-          {
-            owner: ownerObjectId,
-            isDeleted: false,
-            $or: [{ title: regexFilter }, { description: regexFilter }],
-          },
+          milestoneFilter,
           { title: 1, description: 1, projectId: 1, updatedAt: 1 }
         )
           .sort({ updatedAt: -1 })
@@ -136,10 +157,7 @@ export async function searchGlobalEntities(
 
     fetchMemories
       ? ProjectMemory.find(
-          {
-            owner: ownerObjectId,
-            content: regexFilter,
-          },
+          memoryFilter,
           { content: 1, projectId: 1, updatedAt: 1 }
         )
           .sort({ updatedAt: -1 })
@@ -148,10 +166,7 @@ export async function searchGlobalEntities(
       : Promise.resolve([]),
   ]);
 
-  // -------------------------------------------------------------------------
   // 2. Batch Parent Project Name & Visibility Resolution (N+1 Prevention)
-  // -------------------------------------------------------------------------
-
   const parentProjectIds = new Set<string>();
   for (const t of rawTasks) {
     if (t.projectId) parentProjectIds.add(t.projectId.toString());
@@ -169,13 +184,18 @@ export async function searchGlobalEntities(
       (id) => new Types.ObjectId(id)
     );
 
+    const parentLookupFilter: Record<string, unknown> = {
+      _id: { $in: parentObjectIds },
+      owner: ownerObjectId,
+      isDeleted: false,
+      archived: false,
+    };
+    if (workspaceObjectId) {
+      parentLookupFilter.workspaceId = workspaceObjectId;
+    }
+
     const activeParents = await Project.find(
-      {
-        _id: { $in: parentObjectIds },
-        owner: ownerObjectId,
-        isDeleted: false,
-        archived: false,
-      },
+      parentLookupFilter,
       { name: 1 }
     ).lean();
 
@@ -184,10 +204,7 @@ export async function searchGlobalEntities(
     }
   }
 
-  // -------------------------------------------------------------------------
   // 3. Scoring & DTO Transformation
-  // -------------------------------------------------------------------------
-
   const rankedProjects: RankedResultItem[] = [];
   for (const p of rawProjects) {
     const candidate: SearchCandidateInput = {
@@ -211,12 +228,11 @@ export async function searchGlobalEntities(
 
   const rankedTasks: RankedResultItem[] = [];
   for (const t of rawTasks) {
-    // If task has a parent project, verify parent is active & visible
     let projectName: string | undefined;
     if (t.projectId) {
       const pIdStr = t.projectId.toString();
       if (!validParentProjectsMap.has(pIdStr)) {
-        continue; // Parent is deleted, archived, or unowned
+        continue;
       }
       projectName = validParentProjectsMap.get(pIdStr);
     }
@@ -248,7 +264,7 @@ export async function searchGlobalEntities(
   for (const m of rawMilestones) {
     const pIdStr = m.projectId.toString();
     if (!validParentProjectsMap.has(pIdStr)) {
-      continue; // Parent is deleted, archived, or unowned
+      continue;
     }
     const projectName = validParentProjectsMap.get(pIdStr);
 
@@ -277,7 +293,7 @@ export async function searchGlobalEntities(
   for (const mem of rawMemories) {
     const pIdStr = mem.projectId.toString();
     if (!validParentProjectsMap.has(pIdStr)) {
-      continue; // Parent is deleted, archived, or unowned
+      continue;
     }
     const projectName = validParentProjectsMap.get(pIdStr);
 
@@ -301,14 +317,10 @@ export async function searchGlobalEntities(
     }
   }
 
-  // -------------------------------------------------------------------------
   // 4. Result Composition & Bounded Sorting
-  // -------------------------------------------------------------------------
-
   let finalItems: SearchResultDto[];
 
   if (searchAll) {
-    // Sort per entity group and apply per-type cap (5 items max)
     rankedProjects.sort(compareSearchResults);
     rankedTasks.sort(compareSearchResults);
     rankedMilestones.sort(compareSearchResults);
@@ -319,7 +331,6 @@ export async function searchGlobalEntities(
     const cappedMilestones = rankedMilestones.slice(0, SEARCH_PER_TYPE_LIMIT);
     const cappedMemories = rankedMemories.slice(0, SEARCH_PER_TYPE_LIMIT);
 
-    // Combine capped results and globally rank them
     const combined = [
       ...cappedProjects,
       ...cappedTasks,
@@ -328,11 +339,9 @@ export async function searchGlobalEntities(
     ];
     combined.sort(compareSearchResults);
 
-    // Apply global cap (min of effectiveLimit or SEARCH_ALL_MAX_RESULTS)
     const globalCap = Math.min(effectiveLimit, SEARCH_ALL_MAX_RESULTS);
     const topCap = combined.slice(0, globalCap);
 
-    // Strip internal score property before returning public DTOs
     finalItems = topCap.map(({ score: _, ...dto }) => dto);
   } else {
     let singleGroup: RankedResultItem[] = [];

@@ -19,3 +19,13 @@ export {
   searchQuerySchema,
   type SearchQueryInput,
 } from "@/validators/search.validator.js";
+
+export {
+  createWorkspaceSchema,
+  updateWorkspaceSchema,
+  workspaceNameSchema,
+  workspaceSlugSchema,
+  slugify,
+  type CreateWorkspaceDto,
+  type UpdateWorkspaceDto,
+} from "@/validators/workspace.validator.js";

@@ -16,6 +16,7 @@ import {
 
 export interface ITask {
   owner: Types.ObjectId;
+  workspaceId?: Types.ObjectId;
   projectId: Types.ObjectId | null;
   title: string;
   description: string;
@@ -47,6 +48,12 @@ const taskSchema = new Schema<ITaskDocument>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+
+    workspaceId: {
+      type: Schema.Types.ObjectId,
+      ref: "Workspace",
+      required: false,
     },
 
     projectId: {
@@ -147,7 +154,6 @@ const taskSchema = new Schema<ITaskDocument>(
   },
   {
     timestamps: true,
-    // Enable optimistic concurrency control to prevent concurrent lost updates
     optimisticConcurrency: true,
 
     toJSON: {
@@ -164,13 +170,7 @@ const taskSchema = new Schema<ITaskDocument>(
 // Middleware Hooks
 // ---------------------------------------------------------------------------
 
-/**
- * Pre-save hooks:
- * 1. Automatically manages `completedAt` state based on `status`.
- * 2. Normalizes labels by trimming whitespace, removing duplicates, and ignoring empty strings.
- */
 taskSchema.pre("save", async function () {
-  // 1. completedAt State Sync
   if (this.isModified("status")) {
     if (this.status === "done") {
       this.completedAt = new Date();
@@ -179,7 +179,6 @@ taskSchema.pre("save", async function () {
     }
   }
 
-  // 2. Labels Normalization
   if (this.isModified("labels") && this.labels) {
     this.labels = Array.from(
       new Set(
@@ -195,35 +194,21 @@ taskSchema.pre("save", async function () {
 // Indexes
 // ---------------------------------------------------------------------------
 
-/**
- * Database index strategy:
- * Scoped compound keys prevent collection scans when searching, filtering, and sorting.
- *
- * `owner` and `isDeleted` are the primary filters applied to every query.
- */
-
-// 1. Dashboard queries: filtered by owner + isDeleted + archived, sorted by updatedAt
+// Legacy owner compound indexes
 taskSchema.index({ owner: 1, isDeleted: 1, archived: 1, updatedAt: -1 });
-
-// Prerequisite Lookup Index: Efficiently resolves tasks that depend on a given task ID
 taskSchema.index({ owner: 1, dependencies: 1 });
-
-// 2. Project views: filtered by owner + isDeleted + archived + projectId, sorted by updatedAt
 taskSchema.index({ owner: 1, isDeleted: 1, archived: 1, projectId: 1, updatedAt: -1 });
-
-// 3. Status filter views: filtered by owner + isDeleted + archived + status, sorted by updatedAt
 taskSchema.index({ owner: 1, isDeleted: 1, archived: 1, status: 1, updatedAt: -1 });
-
-// 4. Priority filter views: filtered by owner + isDeleted + archived + priority, sorted by updatedAt
 taskSchema.index({ owner: 1, isDeleted: 1, archived: 1, priority: 1, updatedAt: -1 });
-
-// 5. Due date filters/sorts: filtered by owner + isDeleted + archived, sorted/filtered by dueDate
 taskSchema.index({ owner: 1, isDeleted: 1, archived: 1, dueDate: 1, updatedAt: -1 });
-
-// 6. Support text-like queries on label lists inside task filtering
 taskSchema.index({ owner: 1, isDeleted: 1, labels: 1 });
 
-// 7. Global Scheduler Index: Efficiently scans active tasks globally by dueDate
+// Phase 32 Workspace multi-tenant compound indexes
+taskSchema.index({ workspaceId: 1, isDeleted: 1, archived: 1, updatedAt: -1 });
+taskSchema.index({ workspaceId: 1, isDeleted: 1, archived: 1, projectId: 1, updatedAt: -1 });
+taskSchema.index({ workspaceId: 1, dependencies: 1 });
+
+// Global scheduler index
 taskSchema.index({ isDeleted: 1, archived: 1, status: 1, dueDate: 1 });
 
 // ---------------------------------------------------------------------------

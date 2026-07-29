@@ -9,7 +9,9 @@ import activityRoutes from "@/routes/activity.routes.js";
 import notificationRoutes from "@/routes/notification.routes.js";
 import copilotActionRoutes from "@/routes/copilot-action.routes.js";
 import searchRoutes from "@/routes/search.routes.js";
+import workspaceRoutes from "@/routes/workspace.routes.js";
 import { workspaceRecommendationRoutes } from "@/routes/project-recommendation.routes.js";
+import { resolveOptionalWorkspace } from "@/middleware/workspace-auth.middleware.js";
 
 const router = Router();
 
@@ -21,15 +23,15 @@ router.get("/health", (_req, res) => {
 });
 
 router.use("/auth", authRoutes);
-router.use("/dashboard", dashboardRoutes);
-router.use("/projects", projectRoutes);
-router.use("/tasks", taskRoutes);
+router.use("/workspaces", workspaceRoutes);
+router.use("/dashboard", resolveOptionalWorkspace, dashboardRoutes);
+router.use("/projects", resolveOptionalWorkspace, projectRoutes);
+router.use("/tasks", resolveOptionalWorkspace, taskRoutes);
 router.use("/users", userRoutes);
-router.use("/activities", activityRoutes);
+router.use("/activities", resolveOptionalWorkspace, activityRoutes);
 router.use("/notifications", notificationRoutes);
-router.use("/copilot/actions", copilotActionRoutes);
-router.use("/recommendations", workspaceRecommendationRoutes);
-router.use("/search", searchRoutes);
-
+router.use("/copilot/actions", resolveOptionalWorkspace, copilotActionRoutes);
+router.use("/recommendations", resolveOptionalWorkspace, workspaceRecommendationRoutes);
+router.use("/search", resolveOptionalWorkspace, searchRoutes);
 
 export default router;

@@ -1,6 +1,7 @@
 import User from "@/models/user.model.js";
 
 import type { LoginUserDto, RegisterUserDto } from "@/types/auth.js";
+import { provisionPersonalWorkspace } from "@/services/workspace.service.js";
 import { ConflictError, UnauthorizedError } from "@/utils/app-error.js";
 import { hashToken } from "@/utils/hash.js";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "@/utils/jwt.js";
@@ -10,7 +11,7 @@ import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "@
 // ---------------------------------------------------------------------------
 
 /**
- * Creates a new user account.
+ * Creates a new user account and automatically provisions their personal workspace.
  *
  * Returns the serialized user object (via toJSON) so the controller receives a
  * plain object with no Mongoose internals or sensitive fields.
@@ -44,6 +45,16 @@ export async function registerUser(data: RegisterUserDto) {
     ...data,
     username,
   });
+
+  // Provision personal workspace & owner membership
+  try {
+    await provisionPersonalWorkspace(user);
+  } catch (error) {
+    // Compensating cleanup: if workspace provisioning fails, delete user document
+    // to prevent half-provisioned user accounts without a personal workspace.
+    await User.deleteOne({ _id: user._id });
+    throw error;
+  }
 
   return user.toJSON();
 }

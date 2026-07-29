@@ -217,6 +217,7 @@ export async function generateProjectPlan(
   await recordActivity({
     owner: userId,
     actorId: userId,
+    ...(project.workspaceId && { workspaceId: project.workspaceId.toString() }),
     type: ACTIVITY_TYPES.AI_PLAN_GENERATED,
     entityType: "project",
     entityId: projectId,

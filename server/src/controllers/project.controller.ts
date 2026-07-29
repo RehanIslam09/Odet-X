@@ -35,11 +35,6 @@ function getRequiredProjectId(req: Request): string {
   return id;
 }
 
-/**
- * The validateQuery middleware has already parsed, coerced and validated
- * the query string. Controllers should trust that output instead of
- * validating a second time.
- */
 function getValidatedProjectQuery(req: Request): ProjectQueryDto {
   return req.validatedQuery as ProjectQueryDto;
 }
@@ -48,14 +43,12 @@ function getValidatedProjectQuery(req: Request): ProjectQueryDto {
 // GET /projects
 // ---------------------------------------------------------------------------
 
-/**
- * Returns a paginated list of projects for the authenticated user.
- */
 export const list = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const query = getValidatedProjectQuery(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const result = await listProjects(userId, query);
+  const result = await listProjects(userId, query, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Projects retrieved successfully.",
@@ -108,8 +101,9 @@ export const getSummary = asyncHandler(async (req: Request, res: Response) => {
 
 export const getOptions = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
+  const workspaceId = req.workspace?._id?.toString();
 
-  const options = await getProjectOptions(userId);
+  const options = await getProjectOptions(userId, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Project options retrieved successfully.",
@@ -125,8 +119,9 @@ export const getOptions = asyncHandler(async (req: Request, res: Response) => {
 
 export const create = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
+  const workspaceId = req.workspace?._id?.toString();
 
-  const project = await createProject(userId, req.body);
+  const project = await createProject(userId, req.body, workspaceId);
 
   sendSuccessResponse(res, {
     statusCode: 201,

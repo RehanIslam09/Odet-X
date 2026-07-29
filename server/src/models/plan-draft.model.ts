@@ -29,6 +29,7 @@ export interface IPlanDraftMilestone {
 
 export interface IPlanDraft {
   owner: Types.ObjectId;
+  workspaceId?: Types.ObjectId;
   projectId: Types.ObjectId;
   status: PlanDraftStatus;
   promptDescription: string;
@@ -139,6 +140,11 @@ const planDraftSchema = new Schema<IPlanDraftDocument>(
       ref: "User",
       required: true,
     },
+    workspaceId: {
+      type: Schema.Types.ObjectId,
+      ref: "Workspace",
+      required: false,
+    },
     projectId: {
       type: Schema.Types.ObjectId,
       ref: "Project",
@@ -200,12 +206,17 @@ const planDraftSchema = new Schema<IPlanDraftDocument>(
 // TTL Index: Automatically expire drafts based on expiresAt date
 planDraftSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-// Compound Lookup Index
+// Legacy owner indexes
 planDraftSchema.index({ owner: 1, projectId: 1, status: 1 });
-
-// Active draft partial unique index: ensures at most ONE active draft per project
 planDraftSchema.index(
   { owner: 1, projectId: 1 },
+  { unique: true, partialFilterExpression: { status: "draft" } }
+);
+
+// Phase 32 Workspace multi-tenant indexes
+planDraftSchema.index({ workspaceId: 1, projectId: 1, status: 1 });
+planDraftSchema.index(
+  { workspaceId: 1, projectId: 1 },
   { unique: true, partialFilterExpression: { status: "draft" } }
 );
 

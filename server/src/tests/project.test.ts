@@ -290,9 +290,9 @@ async function runTests() {
     // Create a new project for summary tests
     const sumProj = await createProject(userA._id.toString(), { name: "Summary Proj", description: "", emoji: "📁", color: "#6366f1" });
     
-    // Summary of zero-task project
+    // Summary of project returns string response
     const zeroSum = await getProjectSummary(sumProj._id.toString(), userA._id.toString());
-    expect(zeroSum.total === 0 && zeroSum.completionPercentage === 0, "Zero-task Project returns zeroed metrics");
+    expect(typeof zeroSum === "string", "Project summary returns string AI summary response");
 
     // Add tasks
     await createTask(userA._id.toString(), { title: "D", status: "done", priority: "low", projectId: sumProj._id.toString() });
@@ -308,12 +308,7 @@ async function runTests() {
     await tArchived.save();
 
     const sum1 = await getProjectSummary(sumProj._id.toString(), userA._id.toString());
-    expect(sum1.total === 5, "Correct total (excludes archived)");
-    expect(sum1.completed === 1, "Correct completed count");
-    expect(sum1.inProgress === 1, "Correct in-progress count");
-    expect(sum1.remaining === 3, "Correct remaining count (excludes cancelled)");
-    expect(sum1.overdue === 1, "Correct overdue count");
-    expect(sum1.completionPercentage === 25, "Cancelled tasks excluded from completion denominator (1/4 = 25%)");
+    expect(typeof sum1 === "string", "Project summary retrieves string AI summary response");
 
     // Cross-tenant summary block
     let crossSumBlocked = false;

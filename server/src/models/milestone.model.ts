@@ -2,6 +2,7 @@ import { Document, Model, Schema, Types, model } from "mongoose";
 
 export interface IMilestone {
   owner: Types.ObjectId;
+  workspaceId?: Types.ObjectId;
   projectId: Types.ObjectId;
   title: string;
   description: string;
@@ -20,6 +21,11 @@ const milestoneSchema = new Schema<IMilestoneDocument>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+    workspaceId: {
+      type: Schema.Types.ObjectId,
+      ref: "Workspace",
+      required: false,
     },
     projectId: {
       type: Schema.Types.ObjectId,
@@ -69,7 +75,11 @@ const milestoneSchema = new Schema<IMilestoneDocument>(
   }
 );
 
+// Legacy owner index
 milestoneSchema.index({ owner: 1, projectId: 1, isDeleted: 1, position: 1 });
+
+// Phase 32 Workspace multi-tenant index
+milestoneSchema.index({ workspaceId: 1, projectId: 1, isDeleted: 1, position: 1 });
 
 const Milestone: Model<IMilestoneDocument> = model<IMilestoneDocument>("Milestone", milestoneSchema);
 

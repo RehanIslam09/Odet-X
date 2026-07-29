@@ -16,23 +16,16 @@ import {
  * Field rationale:
  *
  * - `owner`       — The authenticated user who created/owns this memory.
- *                   Required, immutable, server-controlled.
- *
+ * - `workspaceId` — The tenant workspace boundary key. Inherited from parent Project.
  * - `projectId`   — The project this memory belongs to.
- *                   Required, immutable, server-controlled.
- *
- * - `content`     — The stored memory text. 1–1000 characters after trimming.
- *                   Internal whitespace preserved.
- *
- * - `sourceType`  — Provenance enum. In V1, contains strictly "USER".
- *                   Required, immutable, server-controlled.
- *
+ * - `content`     — The stored memory text.
+ * - `sourceType`  — Provenance enum ("USER").
  * - `createdAt`   — Injected automatically by Mongoose timestamps.
  * - `updatedAt`   — Injected automatically by Mongoose timestamps.
- * - `__v`         — Mongoose version key for Optimistic Concurrency Control (OCC).
  */
 export interface IProjectMemory {
   owner: Types.ObjectId;
+  workspaceId?: Types.ObjectId;
   projectId: Types.ObjectId;
   content: string;
   sourceType: MemorySourceType;
@@ -55,6 +48,12 @@ const projectMemorySchema = new Schema<IProjectMemoryDocument>(
       required: true,
     },
 
+    workspaceId: {
+      type: Schema.Types.ObjectId,
+      ref: "Workspace",
+      required: false,
+    },
+
     projectId: {
       type: Schema.Types.ObjectId,
       ref: "Project",
@@ -65,6 +64,7 @@ const projectMemorySchema = new Schema<IProjectMemoryDocument>(
       type: String,
       required: true,
       trim: true,
+      minlength: 1,
       maxlength: MAX_MEMORY_CONTENT_LENGTH,
     },
 
@@ -82,12 +82,8 @@ const projectMemorySchema = new Schema<IProjectMemoryDocument>(
     toJSON: {
       virtuals: true,
       transform(_doc, ret) {
-        const { _id, __v, owner: _owner, projectId: _projectId, ...safe } = ret as Record<string, unknown>;
-        return {
-          id: typeof _id === "object" && _id !== null ? _id.toString() : String(_id),
-          ...safe,
-          version: typeof __v === "number" ? __v : 0,
-        };
+        const { _id: _, __v, ...safe } = ret as Record<string, unknown>;
+        return { ...safe, version: typeof __v === "number" ? __v : 0 };
       },
     },
   },
@@ -98,17 +94,14 @@ const projectMemorySchema = new Schema<IProjectMemoryDocument>(
 // ---------------------------------------------------------------------------
 
 /**
- * Frozen compound index for ProjectMemory.
- *
- * Order: owner (1), projectId (1), updatedAt (-1), _id (-1)
- *
- * Supports:
- * - Strict owner isolation
- * - Strict project isolation
- * - Deterministic newest-first listing
- * - Stable _id tie-breaking for pagination and retrieval
+ * Legacy owner compound index.
  */
 projectMemorySchema.index({ owner: 1, projectId: 1, updatedAt: -1, _id: -1 });
+
+/**
+ * Phase 32 Workspace multi-tenant compound index.
+ */
+projectMemorySchema.index({ workspaceId: 1, projectId: 1, updatedAt: -1, _id: -1 });
 
 // ---------------------------------------------------------------------------
 // Model

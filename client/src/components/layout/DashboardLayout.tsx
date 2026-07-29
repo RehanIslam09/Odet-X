@@ -4,6 +4,7 @@ import {
   DashboardNavbar,
   DashboardSidebar,
 } from "@/components/layout";
+import { CommandPalette } from "@/features/commands/components/CommandPalette";
 
 export default function DashboardLayout() {
   return (
@@ -19,6 +20,8 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+
+      <CommandPalette />
     </div>
   );
 }

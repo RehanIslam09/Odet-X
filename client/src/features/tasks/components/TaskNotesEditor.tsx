@@ -207,6 +207,7 @@ export function TaskNotesEditor({
         {mode === "write" ? (
           <TextareaAutosize
             ref={textareaRef}
+            data-suppress-global-command-palette="true"
             value={localDraft}
             onChange={(e) => onDraftChange(e.target.value)}
             className="w-full flex-1 resize-none bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-ring/50 focus:ring-inset p-4 md:p-6 lg:p-8 text-base text-foreground/90 font-sans leading-relaxed"

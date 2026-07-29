@@ -14,3 +14,8 @@ export {
   type UpdateProjectDto,
   type ProjectQueryDto,
 } from "@/validators/project.validator.js";
+
+export {
+  searchQuerySchema,
+  type SearchQueryInput,
+} from "@/validators/search.validator.js";

@@ -5,7 +5,7 @@ import Workspace, { IWorkspaceDocument } from "@/models/workspace.model.js";
 import WorkspaceMember, { IWorkspaceMemberDocument } from "@/models/workspace-member.model.js";
 import Project from "@/models/project.model.js";
 import Task from "@/models/task.model.js";
-import { MAX_WORKSPACE_NAME_LENGTH } from "@/constants/workspace.js";
+import { MAX_WORKSPACE_NAME_LENGTH, WorkspaceRole } from "@/constants/workspace.js";
 import { CreateWorkspaceDto, UpdateWorkspaceDto, slugify } from "@/validators/workspace.validator.js";
 import { ConflictError, ForbiddenError, NotFoundError } from "@/utils/app-error.js";
 
@@ -30,7 +30,7 @@ export interface WorkspaceMemberDto {
   workspaceId: string;
   userId: string;
   user?: WorkspaceMemberUserDto;
-  role: "OWNER" | "MEMBER";
+  role: WorkspaceRole;
   joinedAt: Date;
 }
 
@@ -40,7 +40,7 @@ export interface WorkspaceDto {
   slug: string;
   ownerId: string;
   isPersonal: boolean;
-  role?: "OWNER" | "MEMBER";
+  role?: WorkspaceRole;
   memberCount?: number;
   createdAt: Date;
   updatedAt: Date;
@@ -52,7 +52,7 @@ export interface WorkspaceDto {
 
 export function toWorkspaceDto(
   workspace: IWorkspaceDocument,
-  role?: "OWNER" | "MEMBER",
+  role?: WorkspaceRole,
   memberCount?: number,
 ): WorkspaceDto {
   return {
@@ -268,7 +268,7 @@ export async function listWorkspacesForUser(userId: string): Promise<WorkspaceDt
     return [];
   }
 
-  const membershipMap = new Map<string, "OWNER" | "MEMBER">();
+  const membershipMap = new Map<string, WorkspaceRole>();
   const workspaceIds = memberships.map((m) => {
     membershipMap.set(m.workspaceId.toString(), m.role);
     return m.workspaceId;

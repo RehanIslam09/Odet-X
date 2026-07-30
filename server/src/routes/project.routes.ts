@@ -21,6 +21,8 @@ import { projectRecommendationSubRoutes } from "@/routes/project-recommendation.
 import { authenticate } from "@/middleware/auth.middleware.js";
 import { validate } from "@/middleware/validate.js";
 import { validateQuery } from "@/middleware/validate-query.js";
+import { requirePermission } from "@/middleware/workspace-auth.middleware.js";
+import { Permission } from "@/constants/permissions.js";
 
 import {
   createProjectSchema,
@@ -48,44 +50,44 @@ router.use("/:projectId/recommendations", projectRecommendationSubRoutes);
 // ---------------------------------------------------------------------------
 
 // GET /projects?page=1&limit=12&search=...&sort=-updatedAt&archived=false
-router.get("/", validateQuery(projectQuerySchema), list);
+router.get("/", requirePermission(Permission.PROJECT_READ), validateQuery(projectQuerySchema), list);
 
 // POST /projects
-router.post("/", validate(createProjectSchema), create);
+router.post("/", requirePermission(Permission.PROJECT_CREATE), validate(createProjectSchema), create);
 
 // ---------------------------------------------------------------------------
 // Member
 // ---------------------------------------------------------------------------
 
 // GET /projects/options
-router.get("/options", getOptions);
+router.get("/options", requirePermission(Permission.PROJECT_READ), getOptions);
 
 // GET /projects/:id
-router.get("/:id", getOne);
+router.get("/:id", requirePermission(Permission.PROJECT_READ), getOne);
 
 // GET /projects/:id/summary
-router.get("/:id/summary", getSummary);
+router.get("/:id/summary", requirePermission(Permission.PROJECT_READ), getSummary);
 
 // PATCH /projects/:id
-router.patch("/:id", validate(updateProjectSchema), update);
+router.patch("/:id", requirePermission(Permission.PROJECT_UPDATE), validate(updateProjectSchema), update);
 
 // DELETE /projects/:id
-router.delete("/:id", remove);
+router.delete("/:id", requirePermission(Permission.PROJECT_DELETE), remove);
 
 // ---------------------------------------------------------------------------
 // Sub-resource actions
 // ---------------------------------------------------------------------------
 
 // POST /projects/:id/archive  (toggles archived state)
-router.post("/:id/archive", archive);
+router.post("/:id/archive", requirePermission(Permission.PROJECT_ARCHIVE), archive);
 
 // POST /projects/:id/generate-tasks (AI Task Generation)
-router.post("/:id/generate-tasks", validate(generateProjectTasksSchema), generateTasks);
+router.post("/:id/generate-tasks", requirePermission(Permission.AI_ACTION_EXECUTE), validate(generateProjectTasksSchema), generateTasks);
 
 // POST /projects/:id/generate-summary (AI Project Summary)
-router.post("/:id/generate-summary", validate(generateProjectSummarySchema), generateSummary);
+router.post("/:id/generate-summary", requirePermission(Permission.AI_ACTION_EXECUTE), validate(generateProjectSummarySchema), generateSummary);
 
 // POST /projects/:projectId/copilot (Read-Only AI Project Copilot)
-router.post("/:projectId/copilot", validate(copilotQuerySchema), queryCopilot);
+router.post("/:projectId/copilot", requirePermission(Permission.AI_COPILOT_QUERY), validate(copilotQuerySchema), queryCopilot);
 
 export default router;

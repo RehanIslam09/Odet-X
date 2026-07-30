@@ -15,7 +15,9 @@ import {
   resolveWorkspace,
   requireWorkspaceMember,
   requireWorkspaceOwner,
+  requirePermission,
 } from "@/middleware/workspace-auth.middleware.js";
+import { Permission } from "@/constants/permissions.js";
 import {
   createWorkspaceSchema,
   updateWorkspaceSchema,
@@ -41,7 +43,6 @@ router.get(
 router.patch(
   "/:workspaceId",
   resolveWorkspace,
-  requireWorkspaceMember,
   requireWorkspaceOwner,
   validate(updateWorkspaceSchema),
   updateWorkspace,
@@ -50,7 +51,6 @@ router.patch(
 router.delete(
   "/:workspaceId",
   resolveWorkspace,
-  requireWorkspaceMember,
   requireWorkspaceOwner,
   deleteWorkspace,
 );
@@ -60,6 +60,7 @@ router.get(
   "/:workspaceId/members",
   resolveWorkspace,
   requireWorkspaceMember,
+  requirePermission(Permission.MEMBER_LIST),
   listMembers,
 );
 
@@ -67,6 +68,7 @@ router.delete(
   "/:workspaceId/members/:userId",
   resolveWorkspace,
   requireWorkspaceMember,
+  requirePermission(Permission.MEMBER_REMOVE),
   removeMember,
 );
 

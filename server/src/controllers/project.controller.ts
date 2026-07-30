@@ -66,8 +66,9 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
 export const getOne = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const id = getRequiredProjectId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const project = await getProjectById(id, userId);
+  const project = await getProjectById(id, userId, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Project retrieved successfully.",
@@ -84,8 +85,9 @@ export const getOne = asyncHandler(async (req: Request, res: Response) => {
 export const getSummary = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const id = getRequiredProjectId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const summary = await getProjectSummary(id, userId);
+  const summary = await getProjectSummary(id, userId, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Project summary retrieved successfully.",
@@ -139,8 +141,9 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
 export const update = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const id = getRequiredProjectId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const project = await updateProject(id, userId, req.body);
+  const project = await updateProject(id, userId, req.body, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Project updated successfully.",
@@ -157,8 +160,9 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
 export const archive = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const id = getRequiredProjectId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const project = await toggleProjectArchive(id, userId);
+  const project = await toggleProjectArchive(id, userId, workspaceId);
 
   sendSuccessResponse(res, {
     message: `Project ${project.archived ? "archived" : "unarchived"} successfully.`,
@@ -175,8 +179,9 @@ export const archive = asyncHandler(async (req: Request, res: Response) => {
 export const remove = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const id = getRequiredProjectId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  await deleteProject(id, userId);
+  await deleteProject(id, userId, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Project deleted successfully.",

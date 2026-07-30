@@ -1,0 +1,596 @@
+# PHASE 33 ? ARCHITECTURE CONTRACT
+## RBAC (Role-Based Access Control) & Collaboration Architecture Specification
+
+**Status:** APPROVED ARCHITECTURE CONTRACT  
+**Phase:** Phase 33 ? RBAC & Collaboration  
+**Authoritative Location:** docs/phases/phase-33-rbac-collaboration/contracts/phase-33-architecture-contract.md  
+**Target Repository:** /home/rehan/Developer/ai-project-manager  
+**Runtime Environment:** Node.js 24.18.0, npm 11.16.0, MongoDB, Express, React, TypeScript  
+
+---
+
+### 1. Executive Summary & Context
+
+Following the completion of **Phase 32 (Workspaces & Memberships)**, the i-project-manager application established multi-tenant isolation through the Workspace and WorkspaceMember models. However, an empirical audit of the domain services (project.service.ts, 	ask.service.ts, global-search.service.ts, dashboard.service.ts, and AI context builders) revealed that all resource queries continue to filter by owner: new Types.ObjectId(userId) alongside workspaceId.
+
+This creates a fundamental structural bottleneck: **resource ownership is overloaded as creator identity and access control boundary**, preventing multi-user collaboration within shared workspaces.
+
+This **Architecture Contract** establishes the authoritative, binding technical design for **Phase 33**. It resolves resource ownership semantics, defines a multi-tenant security boundary model, specifies a hybrid Permission Engine architecture, establishes role and capability taxonomies, outlines the collaboration data model, and guarantees permission enforcement across AI, Search, Dashboard, and REST endpoints.
+
+> **Contract Authority:** This document is the binding architectural specification for Phase 33. All future implementation pull requests, schema migrations, and service refactorings must adhere strictly to the invariants and designs set forth herein.
+
+---
+
+### 2. Re-Evaluation of Investigation Findings
+
+The investigation phase identified that domain queries enforce single-user isolation (WHERE owner = userId AND workspaceId = targetWorkspace). Re-evaluating this finding leads to five foundational architectural decisions:
+
+1. **Owner Field Semantics:** owner must be decoupled from authorization boundaries. A resource belongs to a **Workspace** (the tenant), while owner represents **Creator Identity** (createdBy).
+2. **Security Boundary:** The primary security boundary is the **Workspace**. User access within a workspace is dictated by **Workspace Role** and augmented by **Resource Context** (creator/assignee relationships).
+3. **Authorization Engine Placement:** A **centralized pure domain Permission Engine** (server/src/domain/permission-evaluator.ts) will power both Express route middleware and domain service authorization checks.
+4. **Context-Aware Evaluation:** Base authorization relies on a **Capability Matrix** (Role -> Permissions[]), which is dynamically evaluated against **Resource Context** (e.g., creator vs non-creator task deletion).
+5. **Universal Enforcement:** AI Copilot context assembly, Global Search, and Dashboard aggregations will consume the exact same permission rules to eliminate data leakage risks.
+
+---
+
+### 3. Architectural Decision 1: owner vs createdBy Field Semantics
+
+#### Decision:
+The Mongoose model field owner will be **re-semanticized as Creator Identity (createdBy)** while retaining its physical database field name owner for backward compatibility with existing MongoDB indexes and historical documents.
+
+`
+??????????????????????????????????????????????????????????????????????????
+?                          PROJECT MODEL SHAPE                           ?
+??????????????????????????????????????????????????????????????????????????
+? Field                    ? Domain Semantic Role                        ?
+??????????????????????????????????????????????????????????????????????????
+? workspaceId: ObjectId    ? TENANT BOUNDARY (Primary Security Anchor)   ?
+? owner: ObjectId          ? CREATOR ATTRIBUTION (Audit & Self-Context)  ?
+? name / description / etc ? Domain Attributes                           ?
+??????????????????????????????????????????????????????????????????????????
+`
+
+#### Rationale:
+- In enterprise collaboration software, resources created by an employee belong to the workspace organization, not the individual user. If a user leaves a workspace, their created projects and tasks remain accessible to the team.
+- Retaining owner as the database key avoids complex, destructive database migrations on production collections while allowing domain code to alias it as createdBy.
+- All database queries across project.service.ts, 	ask.service.ts, milestone.service.ts, project-memory.service.ts, etc., will **remove owner: userId as a filter** and filter strictly by workspaceId: targetWorkspaceId, passing retrieved documents through the Permission Engine.
+
+#### Tradeoffs & Rejected Alternatives:
+- *Rejected Alternative A (Rename owner to createdBy in MongoDB via Migration):* Requires destructive database field updates, index drops, and breaking changes across existing test suites. High risk with zero functional gain over domain aliasing.
+- *Rejected Alternative B (Introduce a separate workspaceOwnerId on every resource):* Redundant because Workspace.ownerId already defines the primary owner of the workspace itself.
+
+---
+
+### 4. Architectural Decision 2: Security Boundary & Evaluation Flow
+
+#### Decision:
+Authorization is structured in a **4-Tier Security Cascade**:
+
+`
+ ????????????????????????????????????????????????????????????????????
+ ? Tier 1: System Authentication (JWT Bearer Token -> req.user)     ?
+ ????????????????????????????????????????????????????????????????????
+                                  ? Pass
+                                  ?
+ ????????????????????????????????????????????????????????????????????
+ ? Tier 2: Workspace Membership Check (req.workspaceMember)        ?
+ ?         - Verified against workspaceId / workspaceSlug           ?
+ ?         - Non-members receive 404 Not Found (Anti-Enumeration)  ?
+ ????????????????????????????????????????????????????????????????????
+                                  ? Pass
+                                  ?
+ ????????????????????????????????????????????????????????????????????
+ ? Tier 3: Role Capability Matrix Evaluation                       ?
+ ?         - Checks if req.workspaceMember.role possesses           ?
+ ?           required Permission (e.g. TASK_DELETE)                 ?
+ ????????????????????????????????????????????????????????????????????
+                                  ? Pass
+                                  ?
+ ????????????????????????????????????????????????????????????????????
+ ? Tier 4: Resource Context Policy Rules                            ?
+ ?         - Evaluates resource properties:                         ?
+ ?           * Is caller resource creator (owner / createdBy)?      ?
+ ?           * Is caller assigned to task (assigneeId)?             ?
+ ?           * Is workspace personal (isPersonal)?                  ?
+ ????????????????????????????????????????????????????????????????????
+                                  ? Pass
+                                  ?
+ ????????????????????????????????????????????????????????????????????
+ ? SUCCESS: Execute Requested Operation                             ?
+ ????????????????????????????????????????????????????????????????????
+`
+
+#### Anti-Enumeration Protection Invariant:
+If a user is NOT an active member of eq.workspace, the system **MUST** return HTTP status 404 Not Found with message "Workspace not found." prior to evaluating any resource permissions. This prevents malicious users from probing workspace IDs or resource existence.
+
+---
+
+### 5. Architectural Decision 3: Authorization Placement Architecture
+
+#### Decision:
+Adopt a **Hybrid Architecture**: A pure, stateless **Domain Permission Engine** (server/src/domain/permission-evaluator.ts) consumed by BOTH **Express Route Middleware** and **Domain Services**.
+
+`
+                           ?????????????????????????????
+                           ?   Incoming Express Req    ?
+                           ?????????????????????????????
+                                         ?
+                             [authenticate middleware]
+                                         ?
+                         [resolveWorkspace middleware]
+                                         ?
+                       [requireWorkspaceMember middleware]
+                                         ?
+                 ?????????????????????????????????????????????????
+                 ?                                               ?
+                 ?                                               ?
+   ?????????????????????????????                   ?????????????????????????????
+   ? Route Level Middleware    ?                   ? Domain Service Method     ?
+   ? (requirePermission)       ?                   ? (e.g. updateTask)         ?
+   ?????????????????????????????                   ?????????????????????????????
+                 ?                                               ?
+                 ?     ?????????????????????????????             ?
+                 ???????  PermissionEngine         ???????????????
+                       ?  (Stateless Domain Evaluator)           ?
+                       ?????????????????????????????
+`
+
+#### Rationale:
+- **Route Middleware (equirePermission(permission)):** Provides fast-path rejection for coarse operations before invoking controllers or services (e.g. POST /projects requires PROJECT_CREATE; DELETE /workspaces/:id requires WORKSPACE_DELETE).
+- **Domain Service Authorization (PermissionEngine.authorize(...)):** Required when permission decisions depend on document contents fetched during service execution (e.g. verifying task creator vs assignee when a MEMBER attempts task deletion, or filtering search candidates).
+
+---
+
+### 6. Architectural Decision 4: Role-Based vs Resource-Context Evaluation
+
+#### Decision:
+Authorization utilizes a **Hybrid Evaluation Strategy**:
+1. **Base Access:** Evaluated against the caller's WorkspaceRole capability matrix.
+2. **Context Refinements:**
+   - **Creator Self-Service Rule:** A MEMBER is permitted to update or delete tasks they created (owner == user._id) or are assigned to (ssigneeId == user._id), but cannot delete tasks created by others unless they hold ADMIN or OWNER roles.
+   - **Personal Workspace Protection Rule:** Personal workspaces (isPersonal === true) explicitly reject member invitations, role changes, and member removals to enforce single-user invariants.
+   - **Viewer Read-Only Invariant:** A VIEWER is strictly forbidden from executing any state-mutating actions (create, update, delete, archive, assign), regardless of resource creator status.
+
+---
+
+### 7. Architectural Decision 5: Permission Engine Contract & API
+
+#### Location: server/src/domain/permission-evaluator.ts
+
+`	s
+import { Types } from "mongoose";
+import { IUserDocument } from "@/models/user.model.js";
+import { IWorkspaceDocument } from "@/models/workspace.model.js";
+import { IWorkspaceMemberDocument } from "@/models/workspace-member.model.js";
+import { WorkspaceRole } from "@/constants/workspace.js";
+import { Permission } from "@/constants/permissions.js";
+
+export interface AuthContext {
+  user: IUserDocument;
+  workspace: IWorkspaceDocument;
+  member: IWorkspaceMemberDocument;
+}
+
+export interface ResourceContext {
+  createdBy?: string | Types.ObjectId;
+  assigneeId?: string | Types.ObjectId;
+  workspaceId?: string | Types.ObjectId;
+  isPersonalWorkspace?: boolean;
+}
+
+export interface PermissionResult {
+  allowed: boolean;
+  reason?: string;
+}
+
+/**
+ * Pure domain service for evaluating Role-Based Access Control and Resource Context rules.
+ */
+export class PermissionEngine {
+  /**
+   * Fast-path check: returns true if the workspace role possesses the permission capability.
+   */
+  public static hasCapability(role: WorkspaceRole, permission: Permission): boolean;
+
+  /**
+   * Evaluates authorization considering role capabilities AND optional resource context.
+   */
+  public static evaluate(
+    context: AuthContext,
+    permission: Permission,
+    resourceContext?: ResourceContext,
+  ): PermissionResult;
+
+  /**
+   * Asserts authorization. Throws AppError (ForbiddenError / NotFoundError) if denied.
+   */
+  public static authorize(
+    context: AuthContext,
+    permission: Permission,
+    resourceContext?: ResourceContext,
+  ): void;
+}
+`
+
+---
+
+### 8. Official Role Model & Capability Matrix
+
+The workspace role hierarchy consists of 4 explicit roles: OWNER, ADMIN, MEMBER, and VIEWER.
+
+`
+                  ?????????????????????????????????
+                  ?            OWNER              ? (Primary Administrator & Tenant Owner)
+                  ?????????????????????????????????
+                                  ? Inherits capabilities
+                                  ?
+                  ?????????????????????????????????
+                  ?            ADMIN              ? (Workspace Manager)
+                  ?????????????????????????????????
+                                  ? Inherits capabilities
+                                  ?
+                  ?????????????????????????????????
+                  ?            MEMBER             ? (Standard Collaborator)
+                  ?????????????????????????????????
+                                  ? Inherits capabilities
+                                  ?
+                  ?????????????????????????????????
+                  ?            VIEWER             ? (Read-Only Observer)
+                  ?????????????????????????????????
+`
+
+#### Detailed Role Definitions:
+
+1. **OWNER (Primary Tenant Owner)**
+   - **Purpose:** Full administrative authority over workspace identity, billing, ownership transfer, and danger zone actions.
+   - **Capabilities:** All permissions across all domains (*).
+   - **Restrictions:** Workspace must have at least one OWNER. Personal workspace owners cannot be removed or demoted.
+
+2. **ADMIN (Workspace Administrator)**
+   - **Purpose:** Team and project management without destructive workspace-level powers.
+   - **Capabilities:** Manage members, send invitations, manage all projects, tasks, milestones, and project memories.
+   - **Restrictions:** Cannot update workspace slug/name, delete workspace, transfer ownership, or modify OWNER memberships.
+
+3. **MEMBER (Standard Collaborator)**
+   - **Purpose:** Daily team member creating and executing work.
+   - **Capabilities:** Create projects, create tasks, update tasks, assign tasks, comment, execute AI copilot, search workspace.
+   - **Restrictions:** Cannot manage workspace members, send workspace invites, update workspace settings, or delete projects/tasks created by other users (unless assigned).
+
+4. **VIEWER (Read-Only Observer)**
+   - **Purpose:** External stakeholders, clients, or read-only team members.
+   - **Capabilities:** Read-only access to workspace dashboard, projects, tasks, milestones, search, and activity feed.
+   - **Restrictions:** Cannot mutate any entity, execute AI write actions, create tasks, or access administrative settings.
+
+---
+
+### 9. Official Permission Model & Taxonomy
+
+Location: server/src/constants/permissions.ts
+
+`	s
+export enum Permission {
+  // --- Workspace Administration ---
+  WORKSPACE_UPDATE = "workspace:update",
+  WORKSPACE_DELETE = "workspace:delete",
+  WORKSPACE_SETTINGS_VIEW = "workspace:settings:view",
+
+  // --- Member & Invitation Management ---
+  MEMBER_LIST = "member:list",
+  MEMBER_INVITE = "member:invite",
+  MEMBER_ROLE_UPDATE = "member:role:update",
+  MEMBER_REMOVE = "member:remove",
+
+  // --- Project Domain ---
+  PROJECT_CREATE = "project:create",
+  PROJECT_READ = "project:read",
+  PROJECT_UPDATE = "project:update",
+  PROJECT_DELETE = "project:delete",
+  PROJECT_ARCHIVE = "project:archive",
+
+  // --- Task Domain ---
+  TASK_CREATE = "task:create",
+  TASK_READ = "task:read",
+  TASK_UPDATE = "task:update",
+  TASK_DELETE = "task:delete",
+  TASK_ASSIGN = "task:assign",
+
+  // --- Milestone Domain ---
+  MILESTONE_CREATE = "milestone:create",
+  MILESTONE_READ = "milestone:read",
+  MILESTONE_UPDATE = "milestone:update",
+  MILESTONE_DELETE = "milestone:delete",
+
+  // --- AI & Intelligence Domain ---
+  AI_COPILOT_QUERY = "ai:copilot:query",
+  AI_ACTION_EXECUTE = "ai:action:execute",
+
+  // --- Search & Dashboard Domain ---
+  DASHBOARD_VIEW = "dashboard:view",
+  SEARCH_EXECUTE = "search:execute",
+  ACTIVITY_READ = "activity:read",
+  NOTIFICATION_READ = "notification:read",
+}
+`
+
+#### Official Capability Matrix (ROLE_PERMISSIONS):
+
+`	s
+export const ROLE_PERMISSIONS: Record<WorkspaceRole, Permission[]> = {
+  OWNER: Object.values(Permission),
+
+  ADMIN: [
+    Permission.WORKSPACE_SETTINGS_VIEW,
+    Permission.MEMBER_LIST,
+    Permission.MEMBER_INVITE,
+    Permission.MEMBER_ROLE_UPDATE,
+    Permission.MEMBER_REMOVE,
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_READ,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
+    Permission.PROJECT_ARCHIVE,
+    Permission.TASK_CREATE,
+    Permission.TASK_READ,
+    Permission.TASK_UPDATE,
+    Permission.TASK_DELETE,
+    Permission.TASK_ASSIGN,
+    Permission.MILESTONE_CREATE,
+    Permission.MILESTONE_READ,
+    Permission.MILESTONE_UPDATE,
+    Permission.MILESTONE_DELETE,
+    Permission.AI_COPILOT_QUERY,
+    Permission.AI_ACTION_EXECUTE,
+    Permission.DASHBOARD_VIEW,
+    Permission.SEARCH_EXECUTE,
+    Permission.ACTIVITY_READ,
+    Permission.NOTIFICATION_READ,
+  ],
+
+  MEMBER: [
+    Permission.WORKSPACE_SETTINGS_VIEW,
+    Permission.MEMBER_LIST,
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_READ,
+    Permission.PROJECT_UPDATE,
+    Permission.TASK_CREATE,
+    Permission.TASK_READ,
+    Permission.TASK_UPDATE,
+    Permission.TASK_DELETE, // Refined by ResourceContext (creator/assignee)
+    Permission.TASK_ASSIGN,
+    Permission.MILESTONE_CREATE,
+    Permission.MILESTONE_READ,
+    Permission.MILESTONE_UPDATE,
+    Permission.AI_COPILOT_QUERY,
+    Permission.AI_ACTION_EXECUTE,
+    Permission.DASHBOARD_VIEW,
+    Permission.SEARCH_EXECUTE,
+    Permission.ACTIVITY_READ,
+    Permission.NOTIFICATION_READ,
+  ],
+
+  VIEWER: [
+    Permission.PROJECT_READ,
+    Permission.TASK_READ,
+    Permission.MILESTONE_READ,
+    Permission.DASHBOARD_VIEW,
+    Permission.SEARCH_EXECUTE,
+    Permission.ACTIVITY_READ,
+    Permission.NOTIFICATION_READ,
+  ],
+};
+`
+
+---
+
+### 10. Collaboration Model
+
+Phase 33 lays the database and domain foundation for rich team collaboration:
+
+#### 10.1 Schema Enhancements for Collaboration
+- **Task Schema (server/src/models/task.model.ts):**
+  - Add ssigneeId: { type: Schema.Types.ObjectId, ref: "User", default: null } (Single user assignee).
+  - Add watcherIds: [{ type: Schema.Types.ObjectId, ref: "User" }] (Array of user subscribers).
+- **WorkspaceMember Schema (server/src/models/workspace-member.model.ts):**
+  - Update ole enum to ["OWNER", "ADMIN", "MEMBER", "VIEWER"].
+- **WorkspaceInvitation Schema (server/src/models/workspace-invitation.model.ts):**
+  - New collection for email invitations: workspaceId, email, ole, 	oken, status ("pending" | "accepted" | "expired"), invitedBy, expiresAt.
+
+#### 10.2 Collaboration Workflows & RBAC Rules
+1. **Task Assignment:**
+   - Any user with TASK_ASSIGN (OWNER, ADMIN, MEMBER) can assign a task to any active workspace member.
+   - Assigning a task automatically adds the user to watcherIds and creates an ACTIVITY_TYPES.TASK_ASSIGNED entry.
+2. **Task Watchers & Activity Feed:**
+   - Activities recorded in ctivity.service.ts are tagged with workspaceId.
+   - The Activity Feed lists workspace-wide team actions filtered by workspaceId and caller's ACTIVITY_READ permission.
+3. **Workspace Invitations:**
+   - ADMIN or OWNER calls POST /api/v1/workspaces/:workspaceId/invitations with { email, role }.
+   - Inviting user must hold MEMBER_INVITE permission. Personal workspaces reject invitations.
+   - Invited users accept via token, generating a new WorkspaceMember record.
+4. **Shared Project Editing:**
+   - Projects are accessible to all workspace members with PROJECT_READ.
+   - Mutations (PATCH /projects/:id) require PROJECT_UPDATE. VIEWER attempts are blocked at the route level.
+
+---
+
+### 11. AI Authorization Architecture
+
+The AI Copilot service (server/src/ai/ and project-copilot-ai.service.ts) **MUST NEVER BYPASS PERMISSIONS**.
+
+`
+ ????????????????????????????????????????????????????????????????????
+ ? User Prompts AI Copilot (e.g. "What tasks are overdue?")         ?
+ ????????????????????????????????????????????????????????????????????
+                                  ?
+                                  ?
+ ????????????????????????????????????????????????????????????????????
+ ? Route Guard: requirePermission(Permission.AI_COPILOT_QUERY)      ?
+ ????????????????????????????????????????????????????????????????????
+                                  ?
+                                  ?
+ ????????????????????????????????????????????????????????????????????
+ ? Copilot Context Builder (copilot-context-builder.ts)             ?
+ ? - Queries projects, tasks, memories strictly by workspaceId    ?
+ ? - Applies PermissionEngine.authorize(...) to candidate docs     ?
+ ????????????????????????????????????????????????????????????????????
+                                  ?
+                                  ?
+ ????????????????????????????????????????????????????????????????????
+ ? LLM Provider (Gemini / Anthropic)                                ?
+ ? - Prompt populated ONLY with authorized context payload          ?
+ ????????????????????????????????????????????????????????????????????
+                                  ?
+                                  ?
+ ????????????????????????????????????????????????????????????????????
+ ? Action Executor (action.executor.ts)                             ?
+ ? - If AI proposes action (e.g. createTask), handler checks        ?
+ ?   PermissionEngine.authorize(context, TASK_CREATE) before DB    ?
+ ????????????????????????????????????????????????????????????????????
+`
+
+#### AI Safety Rules:
+1. **Context Boundary:** CopilotContextBuilder queries entities using { workspaceId: req.workspace._id } and filters candidate documents through PermissionEngine.evaluate(...).
+2. **Action Execution Guard:** Every proposed AI tool execution in ction.executor.ts (e.g. create-task, update-task-status) must re-evaluate caller permissions prior to execution.
+3. **Error Handling:** If an unprivileged user (e.g. VIEWER) attempts to trigger an AI action, the system throws ForbiddenError without making LLM API requests.
+
+---
+
+### 12. Global Search Authorization & Ranking
+
+Phase 33 updates global-search.service.ts to enforce workspace tenant boundaries and capability filtering:
+
+1. **Workspace Filter:** All search queries filter candidates using workspaceId: targetWorkspaceId.
+2. **Permission Gate:**
+   - Before executing search, PermissionEngine.authorize(context, Permission.SEARCH_EXECUTE) is checked.
+   - If user lacks PROJECT_READ, project search candidates are excluded from results.
+   - If user lacks TASK_READ, task search candidates are excluded from results.
+3. **Relevance Ranking & Privacy:**
+   - Results are scored via calculateRelevanceScore() in search-domain.utils.ts.
+   - Results from other workspaces are physically impossible to retrieve due to strict workspaceId indexing.
+
+---
+
+### 13. NON-NEGOTIABLE INVARIANTS
+
+The following invariants are **STRICTLY BINDING**. Future phases and pull requests must never violate them:
+
+1. **INVARIANT 1 (Tenant Boundary):** Every database query for tenant resources MUST include workspaceId: targetWorkspaceId. No single-tenant query may omit workspace scoping.
+2. **INVARIANT 2 (Anti-Enumeration):** Any access attempt to a workspace or workspace resource by a non-member MUST return HTTP 404 Not Found with message "Workspace not found.".
+3. **INVARIANT 3 (Authoritative Backend):** Frontend permission checks are cosmetic UX aids. All security boundaries MUST be enforced by the backend PermissionEngine.
+4. **INVARIANT 4 (AI Permission Equity):** The AI Copilot is subject to the exact same permission evaluation engine as REST endpoints. AI context must never include unauthorized entity data.
+5. **INVARIANT 5 (Viewer Immutability):** A user holding the VIEWER role MUST NEVER be permitted to mutate system state (create, update, delete, archive, assign).
+6. **INVARIANT 6 (Workspace Owner Preservation):** A workspace MUST have at least one active OWNER. Decrementing the owner count to zero or deleting a personal workspace owner membership is strictly prohibited.
+
+---
+
+### 14. Comprehensive Architectural Decisions Log
+
+| Decision ID | Summary | Rationale | Tradeoffs | Rejected Alternatives | Future Impact |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **AD-33-01** | Retain Mongoose owner field as createdBy semantic. | Avoids destructive DB migrations while establishing clear tenant vs creator semantics. | DB field name (owner) differs slightly from domain concept (createdBy). | Renaming DB field via script (high risk of data corruption). | Smooth migration; zero downtime. |
+| **AD-33-02** | Hybrid Permission Engine (Middleware + Service). | Fast route rejection + deep resource context evaluation. | Two invocation sites for authorization logic. | Middleware-only (cannot inspect DB docs) or Service-only (boilerplate in controllers). | Scales cleanly for enterprise policies. |
+| **AD-33-03** | 4-Role Hierarchy (OWNER, ADMIN, MEMBER, VIEWER). | Covers 99% of team collaboration use cases with clear capability boundaries. | Cannot define arbitrary custom roles in Phase 33. | Custom RBAC policy engine (over-engineered for current scope). | Easily extensible to custom roles in Phase 35. |
+| **AD-33-04** | Explicit Task ssigneeId and watcherIds. | Enables task delegation, ownership attribution, and notifications. | Requires schema update on Task model. | Storing assignees as tag strings (unstructured, untyped). | Foundation for real-time notifications. |
+| **AD-33-05** | AI Context Permission Filtering. | Prevents confidential context leakage through prompt injection or Copilot context retrieval. | Slight overhead during AI context assembly. | Unrestricted AI context querying (severe security vulnerability). | Safe enterprise AI deployment. |
+
+---
+
+### 15. Out of Scope Boundaries
+
+Phase 33 explicitly excludes the following features to prevent scope creep:
+
+- **Custom Role Builders:** Creating user-defined custom roles with arbitrary permission checkboxes is deferred to Phase 35+.
+- **Project-Level Role Overrides:** Defining granular per-project roles (e.g. User A is ADMIN in Project 1 but VIEWER in Project 2) is out of scope; RBAC remains anchored at the **Workspace** level.
+- **Real-Time WebSockets:** Real-time presence indicators and live cursor tracking are deferred to Phase 34+.
+- **Third-Party SAML / SSO / SCIM Integration:** Enterprise identity federation is out of scope for Phase 33.
+
+---
+
+### 16. Implementation Strategy & Dependency Graph
+
+#### Implementation Sequence (Execution Order):
+
+`
+ ????????????????????????????????????????????????????????????????????
+ ? Step 1: Permission Constants & PermissionEngine                  ?
+ ?         - Create server/src/constants/permissions.ts            ?
+ ?         - Implement server/src/domain/permission-evaluator.ts   ?
+ ????????????????????????????????????????????????????????????????????
+                                  ?
+                                  ?
+ ????????????????????????????????????????????????????????????????????
+ ? Step 2: Model & Schema Enhancements                              ?
+ ?         - Update WorkspaceMember role enum                       ?
+ ?         - Add assigneeId / watcherIds to Task model              ?
+ ?         - Create WorkspaceInvitation model                       ?
+ ????????????????????????????????????????????????????????????????????
+                                  ?
+                                  ?
+ ????????????????????????????????????????????????????????????????????
+ ? Step 3: Domain Service Refactoring                               ?
+ ?         - Decouple project.service.ts from owner: userId         ?
+ ?         - Decouple task.service.ts from owner: userId            ?
+ ?         - Decouple milestone & memory services                   ?
+ ????????????????????????????????????????????????????????????????????
+                                  ?
+                                  ?
+ ????????????????????????????????????????????????????????????????????
+ ? Step 4: AI, Search & Dashboard Security Integration             ?
+ ?         - Enforce permission engine in Copilot context builder   ?
+ ?         - Enforce permission engine in global search service     ?
+ ?         - Scope dashboard aggregation queries by workspaceId     ?
+ ????????????????????????????????????????????????????????????????????
+                                  ?
+                                  ?
+ ????????????????????????????????????????????????????????????????????
+ ? Step 5: Express Middleware & Router Wiring                       ?
+ ?         - Implement requirePermission middleware                 ?
+ ?         - Update workspace, project, task, and admin routes      ?
+ ????????????????????????????????????????????????????????????????????
+                                  ?
+                                  ?
+ ????????????????????????????????????????????????????????????????????
+ ? Step 6: Frontend Role Awareness & Permission UI Hooks            ?
+ ?         - Implement usePermission / useRole hooks                ?
+ ?         - Update action buttons, forms, and route guards         ?
+ ????????????????????????????????????????????????????????????????????
+`
+
+#### High-Risk Components & Mitigation:
+1. **Task & Project Query Decoupling:** Removing owner: userId from queries could accidentally expose data if workspaceId filtering is missing. *Mitigation: Require workspaceId validation in unit tests before service execution.*
+2. **AI Prompt Construction:** Leakage of unauthorized memories into LLM prompt context. *Mitigation: Add automated security evaluator tests for AI context builder.*
+
+---
+
+### 17. Testing & Verification Strategy
+
+Phase 33 implementation must pass a rigorous test suite spanning unit, integration, and security layers:
+
+1. **Unit Tests (server/src/tests/permission-engine.test.ts):**
+   - Verify PermissionEngine.hasCapability for all role-permission combinations.
+   - Test PermissionEngine.evaluate with resource context (creator vs non-creator, personal workspace rules).
+2. **Cross-Role Integration Tests (server/src/tests/cross-role-authorization.test.ts):**
+   - Verify VIEWER receives 403 Forbidden on all mutation endpoints (POST /projects, POST /tasks, PATCH /tasks/:id).
+   - Verify MEMBER can create projects and tasks, but receives 403 Forbidden when attempting to update workspace settings or change member roles.
+   - Verify ADMIN can manage tasks and members, but receives 403 Forbidden on workspace deletion.
+   - Verify OWNER can execute all workspace actions.
+3. **Cross-Tenant Security Tests (server/src/tests/cross-tenant-rbac.test.ts):**
+   - Verify User A (OWNER of Workspace 1) receives 404 Not Found when trying to access Workspace 2 resources.
+4. **AI & Search Authorization Tests (server/src/tests/ai-search-rbac.test.ts):**
+   - Verify Global Search returns zero results for entities in non-member workspaces.
+   - Verify AI Copilot context builder excludes restricted entities.
+
+---
+
+### 18. Contract Finalization & Sign-Off Criteria
+
+This contract is finalized and ready for architectural review. Implementation of Phase 33 work packages will begin ONLY AFTER Gate 1 review and formal sign-off.
+
+- [x] Investigation Findings Integrated
+- [x] Owner Field Semantics Decoupled
+- [x] Security Cascade Defined
+- [x] Hybrid Permission Engine Contract Specified
+- [x] 4-Role Hierarchy & Capability Matrix Frozen
+- [x] Non-Negotiable Invariants Established
+- [x] AI & Search Permission Integration Detailed
+
+---

@@ -20,7 +20,7 @@ export const MAX_WORKSPACE_SLUG_LENGTH = 50;
 /** Regex pattern for valid URL-safe workspace slugs: lowercase alphanumeric and single hyphens. */
 export const WORKSPACE_SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-/** Whitelisted Phase 32 workspace roles. */
-export const WORKSPACE_ROLES = ["OWNER", "MEMBER"] as const;
+/** Whitelisted Phase 33 workspace roles. */
+export const WORKSPACE_ROLES = ["OWNER", "ADMIN", "MEMBER", "VIEWER"] as const;
 
 export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];

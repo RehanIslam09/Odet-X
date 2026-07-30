@@ -9,6 +9,8 @@ import {
 import { authenticate } from "@/middleware/auth.middleware.js";
 import { validate } from "@/middleware/validate.js";
 import { validateQuery } from "@/middleware/validate-query.js";
+import { requirePermission } from "@/middleware/workspace-auth.middleware.js";
+import { Permission } from "@/constants/permissions.js";
 import {
   createProjectMemorySchema,
   projectMemoryQuerySchema,
@@ -22,15 +24,15 @@ const router = Router({ mergeParams: true });
 router.use(authenticate);
 
 // POST /api/v1/projects/:projectId/memories
-router.post("/", validate(createProjectMemorySchema), create);
+router.post("/", requirePermission(Permission.PROJECT_UPDATE), validate(createProjectMemorySchema), create);
 
 // GET /api/v1/projects/:projectId/memories
-router.get("/", validateQuery(projectMemoryQuerySchema), list);
+router.get("/", requirePermission(Permission.PROJECT_READ), validateQuery(projectMemoryQuerySchema), list);
 
 // PATCH /api/v1/projects/:projectId/memories/:memoryId
-router.patch("/:memoryId", validate(updateProjectMemorySchema), update);
+router.patch("/:memoryId", requirePermission(Permission.PROJECT_UPDATE), validate(updateProjectMemorySchema), update);
 
 // DELETE /api/v1/projects/:projectId/memories/:memoryId
-router.delete("/:memoryId", remove);
+router.delete("/:memoryId", requirePermission(Permission.PROJECT_UPDATE), remove);
 
 export default router;

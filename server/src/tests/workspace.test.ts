@@ -222,12 +222,12 @@ async function runTests() {
       await WorkspaceMember.create({
         workspaceId: customWs2._id,
         userId: secondUser._id,
-        role: "ADMIN" as any,
+        role: "INVALID_ROLE" as any,
       });
     } catch {
       invalidRoleErr = true;
     }
-    expect(invalidRoleErr, "20. Unsupported role ('ADMIN') rejected");
+    expect(invalidRoleErr, "20. Unsupported role ('INVALID_ROLE') rejected");
 
     // Duplicate membership rejection
     let dupMemberErr = false;

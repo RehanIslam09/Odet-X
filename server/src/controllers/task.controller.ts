@@ -36,6 +36,17 @@ function getValidatedTaskQuery(req: Request): TaskQueryDto {
   return req.validatedQuery as TaskQueryDto;
 }
 
+function getAuthContext(req: Request) {
+  if (req.user && req.workspace && req.workspaceMember) {
+    return {
+      user: req.user,
+      workspace: req.workspace,
+      member: req.workspaceMember,
+    };
+  }
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // GET /tasks
 // ---------------------------------------------------------------------------
@@ -61,8 +72,9 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
 export const getOne = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const id = getRequiredTaskId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const task = await getTaskById(id, userId);
+  const task = await getTaskById(id, userId, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Task retrieved successfully.",
@@ -96,8 +108,9 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
 export const update = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const id = getRequiredTaskId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const task = await updateTask(id, userId, req.body);
+  const task = await updateTask(id, userId, req.body, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Task updated successfully.",
@@ -114,8 +127,9 @@ export const updateNotes = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const id = getRequiredTaskId(req);
   const { notes } = req.body;
+  const workspaceId = req.workspace?._id?.toString();
 
-  const task = await updateTaskNotes(id, userId, notes);
+  const task = await updateTaskNotes(id, userId, notes, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Task notes updated successfully.",
@@ -131,8 +145,9 @@ export const updateNotes = asyncHandler(async (req: Request, res: Response) => {
 export const archive = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const id = getRequiredTaskId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const task = await toggleTaskArchive(id, userId);
+  const task = await toggleTaskArchive(id, userId, workspaceId);
 
   sendSuccessResponse(res, {
     message: `Task ${task.archived ? "archived" : "unarchived"} successfully.`,
@@ -148,8 +163,10 @@ export const archive = asyncHandler(async (req: Request, res: Response) => {
 export const remove = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const id = getRequiredTaskId(req);
+  const workspaceId = req.workspace?._id?.toString();
+  const authContext = getAuthContext(req);
 
-  await deleteTask(id, userId);
+  await deleteTask(id, userId, workspaceId, authContext);
 
   sendSuccessResponse(res, {
     message: "Task deleted successfully.",

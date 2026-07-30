@@ -40,17 +40,25 @@ function escapeRegex(value: string): string {
 }
 
 /**
- * Asserts that a project exists and belongs to the requesting user.
+ * Asserts that a project exists and belongs to the requesting user or target workspace.
  */
 async function assertProjectOwnership(
   projectId: string,
   userId: string,
+  workspaceId?: string,
 ): Promise<IProjectDocument> {
-  const project = await Project.findOne({
+  const filter: Record<string, unknown> = {
     _id: projectId,
-    owner: new Types.ObjectId(userId),
     isDeleted: false,
-  });
+  };
+
+  if (workspaceId && Types.ObjectId.isValid(workspaceId)) {
+    filter.workspaceId = new Types.ObjectId(workspaceId);
+  } else {
+    filter.owner = new Types.ObjectId(userId);
+  }
+
+  const project = await Project.findOne(filter);
 
   if (!project) {
     throw new NotFoundError("Project not found.");
@@ -68,7 +76,7 @@ async function assertProjectOwnership(
  */
 export async function createProject(
   userId: string,
-  data: Partial<CreateProjectDto> & { name: string },
+  data: Partial<CreateProjectDto> & { name: string; aiSummary?: any },
   explicitWorkspaceId?: string,
 ): Promise<IProjectDocument> {
   let targetWorkspaceId: Types.ObjectId;
@@ -78,26 +86,27 @@ export async function createProject(
   } else {
     const userDoc = await User.findById(userId);
     const personal = await provisionPersonalWorkspace({
-      _id: userId,
+      _id: new Types.ObjectId(userId),
       name: userDoc?.name || "User",
       username: userDoc?.username || "user",
     });
-    targetWorkspaceId = personal.workspace._id as Types.ObjectId;
+    targetWorkspaceId = personal.workspace._id;
   }
 
   const project = await Project.create({
     owner: new Types.ObjectId(userId),
     workspaceId: targetWorkspaceId,
-    name: data.name,
-    description: data.description ?? "",
-    emoji: data.emoji ?? "📁",
-    color: data.color ?? "#6366f1",
+    name: data.name.trim(),
+    description: data.description?.trim() ?? "",
+    emoji: data.emoji?.trim() ?? "??",
+    color: data.color?.trim() ?? "#4F46E5",
+    aiSummary: data.aiSummary ?? null,
   });
 
   await recordActivity({
     owner: userId,
     actorId: userId,
-    ...(project.workspaceId && { workspaceId: project.workspaceId.toString() }),
+    workspaceId: targetWorkspaceId.toString(),
     type: ACTIVITY_TYPES.PROJECT_CREATED,
     entityType: "project",
     entityId: project._id.toString(),
@@ -112,72 +121,62 @@ export async function createProject(
 }
 
 // ---------------------------------------------------------------------------
-// Read (List)
+// Read (List with Filtering, Pagination, Sorting)
 // ---------------------------------------------------------------------------
 
 export async function listProjects(
   userId: string,
-  query: ProjectQueryDto,
+  query: ProjectQueryDto & Record<string, any>,
   explicitWorkspaceId?: string,
 ): Promise<PaginatedResult<IProjectDocument>> {
-  const { page, limit, search, archived, sort, sortBy, sortOrder } = query as any;
-
   let targetWorkspaceId: Types.ObjectId;
+
   if (explicitWorkspaceId) {
     targetWorkspaceId = new Types.ObjectId(explicitWorkspaceId);
   } else {
     const userDoc = await User.findById(userId);
     const personal = await provisionPersonalWorkspace({
-      _id: userId,
+      _id: new Types.ObjectId(userId),
       name: userDoc?.name || "User",
       username: userDoc?.username || "user",
     });
-    targetWorkspaceId = personal.workspace._id as Types.ObjectId;
+    targetWorkspaceId = personal.workspace._id;
   }
 
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 12;
+
   const filter: Record<string, unknown> = {
-    owner: new Types.ObjectId(userId),
     workspaceId: targetWorkspaceId,
     isDeleted: false,
   };
 
-  if (archived !== undefined) {
-    filter.archived = archived;
-  } else {
-    filter.archived = false;
+  if (query.archived !== undefined) {
+    filter.archived = query.archived;
   }
 
-  if (search && search.trim().length > 0) {
-    filter.name = {
-      $regex: escapeRegex(search.trim()),
-      $options: "i",
-    };
+  if (query.search && query.search.trim().length > 0) {
+    const searchRegex = new RegExp(escapeRegex(query.search.trim()), "i");
+    filter.$or = [{ name: searchRegex }, { description: searchRegex }];
   }
 
-  let sortField = sortBy;
-  let sortDirection: SortOrder = sortOrder === "asc" ? 1 : -1;
-
-  if (sort && typeof sort === "string") {
-    if (sort.startsWith("-")) {
-      sortField = sort.slice(1);
-      sortDirection = -1;
-    } else {
-      sortField = sort;
-      sortDirection = 1;
-    }
+  let sortOption: Record<string, SortOrder> = { updatedAt: -1 };
+  if (query.sort) {
+    const rawSort = query.sort;
+    const isDescending = rawSort.startsWith("-");
+    const fieldName = isDescending ? rawSort.slice(1) : rawSort;
+    sortOption = { [fieldName]: isDescending ? -1 : 1 };
   }
 
-  sortField = sortField || "updatedAt";
-  const sortExpression: Record<string, SortOrder> = { [sortField]: sortDirection };
-
+  const total = await Project.countDocuments(filter);
+  const totalPages = Math.ceil(total / limit) || 1;
   const skip = (page - 1) * limit;
 
-  const [total, items] = await Promise.all([
-    Project.countDocuments(filter),
-    Project.find(filter).sort(sortExpression).skip(skip).limit(limit).exec(),
-  ]);
-
-  const totalPages = Math.ceil(total / limit);
+  const items = await Project.find(filter)
+    .sort(sortOption)
+    .skip(skip)
+    .limit(limit)
+    .exec();
 
   return {
     items,
@@ -199,8 +198,9 @@ export async function listProjects(
 export async function getProjectById(
   projectId: string,
   userId: string,
+  workspaceId?: string,
 ): Promise<IProjectDocument> {
-  return assertProjectOwnership(projectId, userId);
+  return assertProjectOwnership(projectId, userId, workspaceId);
 }
 
 // ---------------------------------------------------------------------------
@@ -211,8 +211,9 @@ export async function updateProject(
   projectId: string,
   userId: string,
   data: UpdateProjectDto,
+  workspaceId?: string,
 ): Promise<IProjectDocument> {
-  const project = await assertProjectOwnership(projectId, userId);
+  const project = await assertProjectOwnership(projectId, userId, workspaceId);
 
   let hasChanges = false;
   if (data.name !== undefined && data.name !== project.name) {
@@ -264,8 +265,9 @@ export async function updateProject(
 export async function toggleProjectArchive(
   projectId: string,
   userId: string,
+  workspaceId?: string,
 ): Promise<IProjectDocument> {
-  const project = await assertProjectOwnership(projectId, userId);
+  const project = await assertProjectOwnership(projectId, userId, workspaceId);
 
   project.archived = !project.archived;
   await project.save();
@@ -291,15 +293,19 @@ export async function toggleProjectArchive(
 // Delete
 // ---------------------------------------------------------------------------
 
-export async function deleteProject(projectId: string, userId: string): Promise<void> {
-  const project = await assertProjectOwnership(projectId, userId);
+export async function deleteProject(
+  projectId: string,
+  userId: string,
+  workspaceId?: string,
+): Promise<void> {
+  const project = await assertProjectOwnership(projectId, userId, workspaceId);
 
   project.isDeleted = true;
   await project.save();
 
   // Unlink associated tasks so they become standalone tasks
   await Task.updateMany(
-    { projectId: project._id, owner: new Types.ObjectId(userId) },
+    { projectId: project._id, isDeleted: false },
     { $set: { projectId: null } },
   );
 
@@ -319,33 +325,31 @@ export async function deleteProject(projectId: string, userId: string): Promise<
 }
 
 // ---------------------------------------------------------------------------
-// Options
+// Options (Active Projects Minimal Select)
 // ---------------------------------------------------------------------------
 
 export async function getProjectOptions(
   userId: string,
   explicitWorkspaceId?: string,
-): Promise<{ id: string; name: string; emoji: string; color: string }[]> {
+): Promise<Array<{ id: string; name: string; emoji: string; color: string }>> {
   let targetWorkspaceId: Types.ObjectId;
+
   if (explicitWorkspaceId) {
     targetWorkspaceId = new Types.ObjectId(explicitWorkspaceId);
   } else {
     const userDoc = await User.findById(userId);
     const personal = await provisionPersonalWorkspace({
-      _id: userId,
+      _id: new Types.ObjectId(userId),
       name: userDoc?.name || "User",
       username: userDoc?.username || "user",
     });
-    targetWorkspaceId = personal.workspace._id as Types.ObjectId;
+    targetWorkspaceId = personal.workspace._id;
   }
 
-  const projects = await Project.find({
-    owner: new Types.ObjectId(userId),
-    workspaceId: targetWorkspaceId,
-    isDeleted: false,
-    archived: false,
-  })
-    .select("_id name emoji color")
+  const projects = await Project.find(
+    { workspaceId: targetWorkspaceId, isDeleted: false, archived: false },
+    { _id: 1, name: 1, emoji: 1, color: 1 },
+  )
     .sort({ name: 1 })
     .exec();
 
@@ -358,19 +362,20 @@ export async function getProjectOptions(
 }
 
 // ---------------------------------------------------------------------------
-// Summary
+// AI Summary Read
 // ---------------------------------------------------------------------------
 
 export async function getProjectSummary(
   projectId: string,
   userId: string,
+  workspaceId?: string,
 ): Promise<string> {
-  const project = await assertProjectOwnership(projectId, userId);
+  const project = await assertProjectOwnership(projectId, userId, workspaceId);
   if (!project.aiSummary) {
     return "No AI summary generated for this project yet.";
   }
   if (typeof project.aiSummary === "string") {
     return project.aiSummary;
   }
-  return (project.aiSummary as any).summary || "No AI summary generated for this project yet.";
+  return (project.aiSummary as any).summary ?? "No AI summary generated for this project yet.";
 }

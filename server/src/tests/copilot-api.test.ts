@@ -11,6 +11,7 @@ import Milestone from "../models/milestone.model.js";
 import PlanDraft from "../models/plan-draft.model.js";
 import Activity from "../models/activity.model.js";
 import { generateAccessToken } from "../utils/jwt.js";
+import { provisionPersonalWorkspace } from "../services/workspace.service.js";
 import { aiService } from "../ai/ai.service.js";
 import { AIProvider } from "../ai/providers/base.provider.js";
 import { AIModelTier, AIRequestOptions, AIProviderResponse } from "../ai/types/index.js";
@@ -58,9 +59,9 @@ describe("Copilot HTTP API Endpoint Integration Tests (WP-04)", () => {
   let server: http.Server;
   let baseUrl: string;
 
-  let userA: { _id: Types.ObjectId };
+  let userA: { _id: Types.ObjectId; name: string; username: string };
   let tokenA: string;
-  let userB: { _id: Types.ObjectId };
+  let userB: { _id: Types.ObjectId; name: string; username: string };
   let tokenB: string;
   let projectA: { _id: Types.ObjectId; isDeleted?: boolean; save: () => Promise<unknown> };
   let task1A: { _id: Types.ObjectId };
@@ -108,6 +109,7 @@ describe("Copilot HTTP API Endpoint Integration Tests (WP-04)", () => {
       password: "Password123!",
     });
     tokenA = generateAccessToken(userA._id.toString());
+    const wsA = await provisionPersonalWorkspace(userA);
 
     userB = await User.create({
       name: "Other User B",
@@ -116,10 +118,12 @@ describe("Copilot HTTP API Endpoint Integration Tests (WP-04)", () => {
       password: "Password123!",
     });
     tokenB = generateAccessToken(userB._id.toString());
+    await provisionPersonalWorkspace(userB);
 
     // Seed project for User A
     projectA = await Project.create({
       owner: userA._id,
+      workspaceId: wsA.workspace._id,
       name: "Alpha Web App",
       description: "Building responsive web application.",
     });

@@ -15,11 +15,14 @@ export const search = asyncHandler(
     // Validated query params are attached to req.validatedQuery by validateQuery middleware
     const queryInput = req.validatedQuery as SearchQueryInput;
 
+    const workspaceId = req.workspace?._id?.toString();
+
     const results = await searchGlobalEntities({
       ownerId,
       query: queryInput.q,
       type: queryInput.type,
       limit: queryInput.limit,
+      ...(workspaceId ? { workspaceId } : {}),
     });
 
     sendSuccessResponse(res, {

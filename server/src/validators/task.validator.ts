@@ -38,6 +38,12 @@ const projectIdSchema = z
     message: "Invalid project ID format.",
   });
 
+const assigneeIdSchema = z
+  .preprocess((val) => (val === "" ? null : val), z.string().nullable().optional())
+  .refine((val) => val === null || val === undefined || Types.ObjectId.isValid(val), {
+    message: "Invalid assignee ID format.",
+  });
+
 const dueDateSchema = z.preprocess(
   (val) => {
     if (val === "" || val === null || val === undefined) return null;
@@ -74,6 +80,7 @@ export const createTaskSchema = z.object({
   title: titleSchema,
   description: descriptionSchema,
   projectId: projectIdSchema,
+  assigneeId: assigneeIdSchema,
   status: z.enum(TASK_STATUSES).optional(),
   priority: z.enum(TASK_PRIORITIES).optional(),
   dueDate: dueDateSchema,
@@ -89,6 +96,7 @@ export const updateTaskSchema = z.object({
   title: titleSchema.optional(),
   description: descriptionSchema.optional(),
   projectId: projectIdSchema,
+  assigneeId: assigneeIdSchema,
   status: z.enum(TASK_STATUSES).optional(),
   priority: z.enum(TASK_PRIORITIES).optional(),
   dueDate: dueDateSchema,
@@ -183,6 +191,6 @@ export type TaskParamDto = { id: string };
 // AI Validation
 // ---------------------------------------------------------------------------
 
-export const generateTaskLabelsSchema = z.object({}); // Empty body, relies on URL params and user context
+export const generateTaskLabelsSchema = z.object({});
 
 export type GenerateTaskLabelsDto = z.infer<typeof generateTaskLabelsSchema>;

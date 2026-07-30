@@ -18,6 +18,8 @@ export interface ITask {
   owner: Types.ObjectId;
   workspaceId?: Types.ObjectId;
   projectId: Types.ObjectId | null;
+  assigneeId?: Types.ObjectId | null;
+  watcherIds?: Types.ObjectId[];
   title: string;
   description: string;
   notes: string;
@@ -60,6 +62,18 @@ const taskSchema = new Schema<ITaskDocument>(
       type: Schema.Types.ObjectId,
       ref: "Project",
       default: null,
+    },
+
+    assigneeId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    watcherIds: {
+      type: [Schema.Types.ObjectId],
+      ref: "User",
+      default: [],
     },
 
     title: {
@@ -207,6 +221,10 @@ taskSchema.index({ owner: 1, isDeleted: 1, labels: 1 });
 taskSchema.index({ workspaceId: 1, isDeleted: 1, archived: 1, updatedAt: -1 });
 taskSchema.index({ workspaceId: 1, isDeleted: 1, archived: 1, projectId: 1, updatedAt: -1 });
 taskSchema.index({ workspaceId: 1, dependencies: 1 });
+
+// Phase 33 Collaboration indexes
+taskSchema.index({ assigneeId: 1 });
+taskSchema.index({ workspaceId: 1, assigneeId: 1 });
 
 // Global scheduler index
 taskSchema.index({ isDeleted: 1, archived: 1, status: 1, dueDate: 1 });

@@ -4,12 +4,13 @@ import Project, { IProjectDocument } from "@/models/project.model.js";
 import Task, { ITaskDocument } from "@/models/task.model.js";
 import User from "@/models/user.model.js";
 import { provisionPersonalWorkspace } from "@/services/workspace.service.js";
+import { Permission } from "@/constants/permissions.js";
+import { PermissionEngine, AuthContext } from "@/domain/permission-evaluator.js";
 
 import type {
   CreateTaskDto,
   TaskQueryDto,
   UpdateTaskDto,
-  UpdateTaskNotesDto,
 } from "@/validators/task.validator.js";
 
 import { ConflictError, NotFoundError } from "@/utils/app-error.js";
@@ -25,12 +26,20 @@ import type { PaginatedResult } from "./project.service.js";
 async function validateProjectOwnership(
   projectId: Types.ObjectId,
   userId: string,
+  workspaceId?: string,
 ): Promise<IProjectDocument> {
-  const project = await Project.findOne({
+  const filter: Record<string, unknown> = {
     _id: projectId,
-    owner: new Types.ObjectId(userId),
     isDeleted: false,
-  });
+  };
+
+  if (workspaceId && Types.ObjectId.isValid(workspaceId)) {
+    filter.workspaceId = new Types.ObjectId(workspaceId);
+  } else {
+    filter.owner = new Types.ObjectId(userId);
+  }
+
+  const project = await Project.findOne(filter);
 
   if (!project) {
     throw new NotFoundError("Project not found.");
@@ -42,12 +51,20 @@ async function validateProjectOwnership(
 async function assertTaskOwnership(
   taskId: string,
   userId: string,
+  workspaceId?: string,
 ): Promise<ITaskDocument> {
-  const task = await Task.findOne({
+  const filter: Record<string, unknown> = {
     _id: taskId,
-    owner: new Types.ObjectId(userId),
     isDeleted: false,
-  });
+  };
+
+  if (workspaceId && Types.ObjectId.isValid(workspaceId)) {
+    filter.workspaceId = new Types.ObjectId(workspaceId);
+  } else {
+    filter.owner = new Types.ObjectId(userId);
+  }
+
+  const task = await Task.findOne(filter);
 
   if (!task) {
     throw new NotFoundError("Task not found.");
@@ -66,78 +83,81 @@ function escapeRegex(value: string): string {
 
 export async function createTask(
   userId: string,
-  data: CreateTaskDto & { dependencies?: string[]; position?: number; milestoneId?: string | null; notes?: string },
+  data: CreateTaskDto & { dependencies?: string[]; position?: number; milestoneId?: string | null; notes?: string; assigneeId?: string | null },
   explicitWorkspaceId?: string,
 ): Promise<ITaskDocument> {
-    let targetWorkspaceId: Types.ObjectId;
+  let targetWorkspaceId: Types.ObjectId;
 
-  if (data.projectId) {
-    const projectObjId = new Types.ObjectId(data.projectId);
-    const project = await validateProjectOwnership(projectObjId, userId);
-
-    if (project.workspaceId) {
-      targetWorkspaceId = project.workspaceId;
-    } else {
-      const userDoc = await User.findById(userId);
-      const personal = await provisionPersonalWorkspace({
-        _id: userId,
-        name: userDoc?.name || "User",
-        username: userDoc?.username || "user",
-      });
-      targetWorkspaceId = personal.workspace._id as Types.ObjectId;
-    }
-  } else if (explicitWorkspaceId) {
+  if (explicitWorkspaceId) {
     targetWorkspaceId = new Types.ObjectId(explicitWorkspaceId);
   } else {
     const userDoc = await User.findById(userId);
     const personal = await provisionPersonalWorkspace({
-      _id: userId,
+      _id: new Types.ObjectId(userId),
       name: userDoc?.name || "User",
       username: userDoc?.username || "user",
     });
-    targetWorkspaceId = personal.workspace._id as Types.ObjectId;
+    targetWorkspaceId = personal.workspace._id;
   }
 
-  const position = typeof data.position === "number" ? data.position : 1;
+  let validatedProjectId: Types.ObjectId | null = null;
+  if (data.projectId) {
+    const project = await validateProjectOwnership(
+      new Types.ObjectId(data.projectId),
+      userId,
+      targetWorkspaceId.toString(),
+    );
+    validatedProjectId = project._id;
+  }
 
+  const dependencyIds: Types.ObjectId[] = [];
   if (data.dependencies && data.dependencies.length > 0) {
-    const depObjectIds = data.dependencies.map((id) => new Types.ObjectId(id));
-    const validCount = await Task.countDocuments({
-      _id: { $in: depObjectIds },
-      owner: new Types.ObjectId(userId),
-      isDeleted: false,
-    });
+    const uniqueDepStrings = Array.from(new Set(data.dependencies));
+    for (const depIdStr of uniqueDepStrings) {
+      if (!Types.ObjectId.isValid(depIdStr)) {
+        throw new NotFoundError("One or more dependency tasks were not found.");
+      }
+      const depTask = await Task.findOne({
+        _id: depIdStr,
+        workspaceId: targetWorkspaceId,
+        isDeleted: false,
+      });
 
-    if (validCount !== data.dependencies.length) {
-      throw new NotFoundError("One or more prerequisite tasks do not exist or belong to another user.");
+      if (!depTask) {
+        throw new NotFoundError("One or more dependency tasks were not found.");
+      }
+      dependencyIds.push(depTask._id);
     }
   }
 
   const task = await Task.create({
     owner: new Types.ObjectId(userId),
     workspaceId: targetWorkspaceId,
-    projectId: data.projectId ? new Types.ObjectId(data.projectId) : null,
-    milestoneId: data.milestoneId ? new Types.ObjectId(data.milestoneId) : null,
-    title: data.title,
-    description: data.description ?? "",
+    projectId: validatedProjectId,
+    assigneeId: data.assigneeId ? new Types.ObjectId(data.assigneeId) : null,
+    watcherIds: [new Types.ObjectId(userId)],
+    title: data.title.trim(),
+    description: data.description?.trim() ?? "",
     notes: data.notes ?? "",
     status: data.status ?? "todo",
     priority: data.priority ?? "none",
-    dueDate: data.dueDate ? new Date(data.dueDate) : null,
+    dueDate: data.dueDate ?? null,
+    estimatedTime: data.estimatedTime?.trim() ?? null,
     labels: data.labels ?? [],
-    position,
-    dependencies: data.dependencies ? data.dependencies.map((id) => new Types.ObjectId(id)) : [],
+    dependencies: dependencyIds,
+    position: data.position ?? 1,
+    milestoneId: data.milestoneId ? new Types.ObjectId(data.milestoneId) : null,
   });
 
   await recordActivity({
     owner: userId,
     actorId: userId,
-    ...(task.workspaceId && { workspaceId: task.workspaceId.toString() }),
+    workspaceId: targetWorkspaceId.toString(),
     type: ACTIVITY_TYPES.TASK_CREATED,
     entityType: "task",
     entityId: task._id.toString(),
-    projectId: task.projectId ? task.projectId.toString() : null,
-    contextProjectIds: task.projectId ? [task.projectId.toString()] : [],
+    taskId: task._id.toString(),
+    ...(task.projectId && { projectId: task.projectId.toString(), contextProjectIds: [task.projectId.toString()] }),
     metadata: {
       taskTitle: task.title,
     },
@@ -153,8 +173,9 @@ export async function createTask(
 export async function getTaskById(
   taskId: string,
   userId: string,
+  workspaceId?: string,
 ): Promise<ITaskDocument> {
-  return assertTaskOwnership(taskId, userId);
+  return assertTaskOwnership(taskId, userId, workspaceId);
 }
 
 // ---------------------------------------------------------------------------
@@ -166,129 +187,93 @@ export async function listTasks(
   query: TaskQueryDto & Record<string, any>,
   explicitWorkspaceId?: string,
 ): Promise<PaginatedResult<ITaskDocument>> {
-  const {
-    page = 1,
-    limit = 10,
-    search,
-    status,
-    priority,
-    projectId,
-    milestoneId,
-    label,
-    archived,
-    dueDate,
-    sort,
-    sortBy,
-    sortOrder,
-  } = query;
-
   let targetWorkspaceId: Types.ObjectId;
+
   if (explicitWorkspaceId) {
     targetWorkspaceId = new Types.ObjectId(explicitWorkspaceId);
   } else {
     const userDoc = await User.findById(userId);
     const personal = await provisionPersonalWorkspace({
-      _id: userId,
+      _id: new Types.ObjectId(userId),
       name: userDoc?.name || "User",
       username: userDoc?.username || "user",
     });
-    targetWorkspaceId = personal.workspace._id as Types.ObjectId;
+    targetWorkspaceId = personal.workspace._id;
   }
+
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 10;
 
   const filter: Record<string, unknown> = {
-    owner: new Types.ObjectId(userId),
     workspaceId: targetWorkspaceId,
     isDeleted: false,
+    archived: query.archived ?? false,
   };
 
-  if (archived !== undefined) {
-    filter.archived = archived;
-  } else {
-    filter.archived = false;
+  if (query.status && query.status !== "all") {
+    filter.status = query.status;
   }
 
-  if (projectId !== undefined && projectId !== "all") {
-    if (projectId === null) {
-      filter.projectId = null;
-    } else {
-      filter.projectId = new Types.ObjectId(projectId);
-    }
+  if (query.priority && query.priority !== "all") {
+    filter.priority = query.priority;
   }
 
-  if (milestoneId !== undefined && milestoneId !== "all") {
-    if (milestoneId === null) {
-      filter.milestoneId = null;
-    } else {
-      filter.milestoneId = new Types.ObjectId(milestoneId);
-    }
+  if (query.projectId && query.projectId !== "all") {
+    filter.projectId = new Types.ObjectId(query.projectId);
   }
 
-  if (status !== undefined && status !== "all") {
-    filter.status = status;
+  if (query.search && query.search.trim().length > 0) {
+    const searchRegex = new RegExp(escapeRegex(query.search.trim()), "i");
+    filter.$or = [{ title: searchRegex }, { description: searchRegex }, { labels: searchRegex }];
   }
 
-  if (priority !== undefined && priority !== "all") {
-    filter.priority = priority;
-  }
-
-  if (label !== undefined && typeof label === "string" && label.trim().length > 0) {
-    filter.labels = label.trim();
-  }
-
-  if (search && typeof search === "string" && search.trim().length > 0) {
-    const safeRegex = escapeRegex(search.trim());
-    filter.$or = [
-      { title: { $regex: safeRegex, $options: "i" } },
-      { description: { $regex: safeRegex, $options: "i" } },
-      { labels: { $regex: safeRegex, $options: "i" } },
-    ];
-  }
-
-  if (dueDate !== undefined) {
+  if (query.quickFilter) {
     const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
-    if (dueDate === "overdue") {
-      filter.dueDate = { $lt: startOfDay };
-      filter.status = { $ne: "done" };
-    } else if (dueDate === "today") {
-      filter.dueDate = { $gte: startOfDay, $lte: endOfDay };
-    } else if (dueDate === "upcoming") {
-      filter.dueDate = { $gt: endOfDay };
-    } else if (dueDate === "no_date") {
-      filter.dueDate = null;
+    switch (query.quickFilter) {
+      case "my-tasks":
+        filter.$or = [
+          { owner: new Types.ObjectId(userId) },
+          { assigneeId: new Types.ObjectId(userId) },
+        ];
+        break;
+
+      case "due-today":
+        filter.dueDate = { $gte: startOfToday, $lte: endOfToday };
+        filter.status = { $ne: "done" };
+        break;
+
+      case "overdue":
+        filter.dueDate = { $lt: startOfToday };
+        filter.status = { $ne: "done" };
+        break;
+
+      case "completed":
+        filter.status = "done";
+        break;
     }
   }
 
-  let sortField = sortBy;
-  let sortDirection: SortOrder = sortOrder === "asc" ? 1 : -1;
-
-  if (sort && typeof sort === "string") {
-    if (sort.startsWith("-")) {
-      sortField = sort.slice(1);
-      sortDirection = -1;
-    } else {
-      sortField = sort;
-      sortDirection = 1;
-    }
+  let sortOption: Record<string, SortOrder> = { updatedAt: -1 };
+  if (query.sort) {
+    const rawSort = query.sort;
+    const isDescending = rawSort.startsWith("-");
+    const fieldName = isDescending ? rawSort.slice(1) : rawSort;
+    sortOption = { [fieldName]: isDescending ? -1 : 1 };
   }
 
-  sortField = sortField || "updatedAt";
-  const sortExpression: Record<string, SortOrder> = { [sortField]: sortDirection };
-
-  if (sortField !== "updatedAt") {
-    sortExpression.updatedAt = -1;
-  }
-
+  const total = await Task.countDocuments(filter);
+  const totalPages = Math.ceil(total / limit) || 1;
   const skip = (page - 1) * limit;
 
-  const [total, items] = await Promise.all([
-    Task.countDocuments(filter),
-    Task.find(filter).select("-notes").sort(sortExpression).skip(skip).limit(limit).exec(),
-  ]);
-
-  const totalPages = Math.ceil(total / limit);
+  const items = await Task.find(filter)
+    .select("-notes")
+    .sort(sortOption)
+    .skip(skip)
+    .limit(limit)
+    .exec();
 
   return {
     items,
@@ -310,9 +295,10 @@ export async function listTasks(
 export async function updateTask(
   taskId: string,
   userId: string,
-  data: UpdateTaskDto & { dependencies?: string[]; position?: number; milestoneId?: string | null; notes?: string },
+  data: UpdateTaskDto & { dependencies?: string[]; position?: number; milestoneId?: string | null; notes?: string; assigneeId?: string | null },
+  workspaceId?: string,
 ): Promise<ITaskDocument> {
-  const task = await assertTaskOwnership(taskId, userId);
+  const task = await assertTaskOwnership(taskId, userId, workspaceId);
   const events: BaseActivityPayload[] = [];
   let genericUpdate = false;
 
@@ -323,63 +309,8 @@ export async function updateTask(
     entityType: "task" as const,
     entityId: task._id.toString(),
     taskId: task._id.toString(),
-    metadata: { taskTitle: data.title !== undefined ? data.title : task.title },
-    contextProjectIds: task.projectId ? [task.projectId.toString()] : [],
+    ...(task.projectId && { projectId: task.projectId.toString(), contextProjectIds: [task.projectId.toString()] }),
   };
-
-  if (data.projectId !== undefined) {
-    if (data.projectId === null && task.projectId !== null) {
-      const fromProject = await Project.findById(task.projectId);
-      events.push({
-        ...baseEvent,
-        type: ACTIVITY_TYPES.TASK_PROJECT_CHANGED,
-        projectId: null,
-        contextProjectIds: [task.projectId.toString()],
-        metadata: {
-          ...baseEvent.metadata,
-          fromProjectId: task.projectId.toString(),
-          toProjectId: null,
-          fromProjectName: fromProject?.name || "Unknown Project",
-          toProjectName: null
-        },
-      });
-      task.projectId = null;
-    } else if (data.projectId !== null && (!task.projectId || task.projectId.toString() !== data.projectId)) {
-      const projectObjId = new Types.ObjectId(data.projectId);
-      const toProject = await validateProjectOwnership(projectObjId, userId);
-      const fromProject = task.projectId ? await Project.findById(task.projectId) : null;
-      events.push({
-        ...baseEvent,
-        type: ACTIVITY_TYPES.TASK_PROJECT_CHANGED,
-        projectId: data.projectId,
-        contextProjectIds: task.projectId ? [task.projectId.toString(), data.projectId] : [data.projectId],
-        metadata: {
-          ...baseEvent.metadata,
-          fromProjectId: task.projectId?.toString() || null,
-          toProjectId: data.projectId,
-          fromProjectName: fromProject?.name || null,
-          toProjectName: toProject.name
-        },
-      });
-      task.projectId = projectObjId;
-      if (toProject.workspaceId) {
-        task.workspaceId = toProject.workspaceId;
-      }
-    }
-  }
-
-  if (data.dependencies !== undefined) {
-    task.dependencies = data.dependencies.map((id) => new Types.ObjectId(id));
-    genericUpdate = true;
-  }
-  if (data.position !== undefined) {
-    task.position = data.position;
-    genericUpdate = true;
-  }
-  if (data.milestoneId !== undefined) {
-    task.milestoneId = data.milestoneId ? new Types.ObjectId(data.milestoneId) : null;
-    genericUpdate = true;
-  }
 
   if (data.title !== undefined && data.title !== task.title) {
     task.title = data.title;
@@ -389,54 +320,161 @@ export async function updateTask(
     task.description = data.description;
     genericUpdate = true;
   }
+  if (data.notes !== undefined && data.notes !== task.notes) {
+    task.notes = data.notes;
+    genericUpdate = true;
+  }
+
+  if (data.assigneeId !== undefined) {
+    const newAssignee = data.assigneeId ? new Types.ObjectId(data.assigneeId) : null;
+    if (String(newAssignee) !== String(task.assigneeId)) {
+      task.assigneeId = newAssignee;
+      if (newAssignee) {
+        if (!task.watcherIds) task.watcherIds = [];
+        if (!task.watcherIds.some((w) => w.toString() === newAssignee.toString())) {
+          task.watcherIds.push(newAssignee);
+        }
+      }
+      events.push({
+        ...baseEvent,
+        type: ACTIVITY_TYPES.TASK_UPDATED,
+        metadata: { assigneeId: data.assigneeId },
+      });
+    }
+  }
+
   if (data.status !== undefined && data.status !== task.status) {
+    const oldStatus = task.status;
+    task.status = data.status;
+
     events.push({
       ...baseEvent,
       type: ACTIVITY_TYPES.TASK_STATUS_CHANGED,
-      projectId: task.projectId?.toString() || null,
-      metadata: { ...baseEvent.metadata, fromStatus: task.status, toStatus: data.status },
+      metadata: { fromStatus: oldStatus, toStatus: data.status },
     });
-    task.status = data.status;
   }
+
   if (data.priority !== undefined && data.priority !== task.priority) {
+    const oldPriority = task.priority;
+    task.priority = data.priority;
     events.push({
       ...baseEvent,
       type: ACTIVITY_TYPES.TASK_PRIORITY_CHANGED,
-      projectId: task.projectId?.toString() || null,
-      metadata: { ...baseEvent.metadata, fromPriority: task.priority, toPriority: data.priority },
+      metadata: { fromPriority: oldPriority, toPriority: data.priority },
     });
-    task.priority = data.priority;
   }
+
   if (data.dueDate !== undefined) {
-    const oldDate = task.dueDate?.getTime();
-    const newDate = data.dueDate?.getTime();
-    if (oldDate !== newDate) {
+    const newTime = data.dueDate ? data.dueDate.getTime() : null;
+    const oldTime = task.dueDate ? task.dueDate.getTime() : null;
+    if (newTime !== oldTime) {
       task.dueDate = data.dueDate;
-      genericUpdate = true;
+      events.push({
+        ...baseEvent,
+        type: ACTIVITY_TYPES.TASK_UPDATED,
+        metadata: { dueDate: data.dueDate ? data.dueDate.toISOString() : null },
+      });
     }
   }
+
+  if (data.projectId !== undefined) {
+    const newProjId = data.projectId ? new Types.ObjectId(data.projectId) : null;
+    const oldProjId = task.projectId ? task.projectId.toString() : null;
+    const targetProjStr = newProjId ? newProjId.toString() : null;
+
+    if (targetProjStr !== oldProjId) {
+      let fromProjectName: string | null = null;
+      let toProjectName: string | null = null;
+
+      if (task.projectId) {
+        const oldProj = await Project.findById(task.projectId).select("name").lean();
+        fromProjectName = oldProj ? oldProj.name : null;
+      }
+
+      if (newProjId) {
+        const proj = await validateProjectOwnership(newProjId, userId, workspaceId);
+        task.projectId = proj._id;
+        toProjectName = proj.name;
+      } else {
+        task.projectId = null;
+      }
+
+      const contextProjectIds = Array.from(
+        new Set([oldProjId, targetProjStr].filter((id): id is string => Boolean(id)))
+      );
+
+      events.push({
+        ...baseEvent,
+        type: ACTIVITY_TYPES.TASK_PROJECT_CHANGED,
+        contextProjectIds,
+        metadata: {
+          fromProjectId: oldProjId,
+          toProjectId: targetProjStr,
+          fromProjectName,
+          toProjectName,
+        },
+      });
+    }
+  }
+
+  if (data.dependencies !== undefined) {
+    const uniqueDepStrings = Array.from(new Set(data.dependencies));
+    const targetWorkspace = task.workspaceId || (await Project.findById(task.projectId))?.workspaceId;
+
+    const dependencyIds: Types.ObjectId[] = [];
+    for (const depIdStr of uniqueDepStrings) {
+      if (depIdStr === task._id.toString()) {
+        throw new ConflictError("A task cannot depend on itself.");
+      }
+      if (!Types.ObjectId.isValid(depIdStr)) {
+        throw new NotFoundError("One or more dependency tasks were not found.");
+      }
+
+      const depTask = await Task.findOne({
+        _id: depIdStr,
+        ...(targetWorkspace ? { workspaceId: targetWorkspace } : { owner: new Types.ObjectId(userId) }),
+        isDeleted: false,
+      });
+
+      if (!depTask) {
+        throw new NotFoundError("One or more dependency tasks were not found.");
+      }
+      dependencyIds.push(depTask._id);
+    }
+
+    task.dependencies = dependencyIds;
+    genericUpdate = true;
+  }
+
   if (data.estimatedTime !== undefined && data.estimatedTime !== task.estimatedTime) {
     task.estimatedTime = data.estimatedTime;
     genericUpdate = true;
   }
+
   if (data.labels !== undefined) {
-    const oldLabels = task.labels.join(",");
-    const newLabels = [...new Set(data.labels.map(l => l.trim()).filter(l => l.length > 0))].join(",");
-    if (oldLabels !== newLabels) {
-      task.labels = data.labels;
-      genericUpdate = true;
-    }
+    task.labels = data.labels;
+    genericUpdate = true;
   }
 
-  if (genericUpdate) {
-    events.push({
-      ...baseEvent,
-      type: ACTIVITY_TYPES.TASK_UPDATED,
-      projectId: task.projectId?.toString() || null,
-    });
+  if (data.position !== undefined && data.position !== task.position) {
+    task.position = data.position;
+    genericUpdate = true;
+  }
+
+  if (data.milestoneId !== undefined) {
+    task.milestoneId = data.milestoneId ? new Types.ObjectId(data.milestoneId) : null;
+    genericUpdate = true;
   }
 
   await task.save();
+
+  if (genericUpdate && events.length === 0) {
+    events.push({
+      ...baseEvent,
+      type: ACTIVITY_TYPES.TASK_UPDATED,
+      metadata: { taskTitle: task.title },
+    });
+  }
 
   if (events.length > 0) {
     await recordActivities(events);
@@ -448,40 +486,20 @@ export async function updateTask(
 export async function updateTaskNotes(
   taskId: string,
   userId: string,
-  data: UpdateTaskNotesDto,
+  notesOrDto: string | { notes: string; expectedVersion?: number },
+  workspaceId?: string,
 ): Promise<ITaskDocument> {
-  const query: any = {
-    _id: taskId,
-    owner: new Types.ObjectId(userId),
-    isDeleted: false,
-  };
+  const task = await assertTaskOwnership(taskId, userId, workspaceId);
 
-  if (data.expectedVersion !== undefined) {
-    query.__v = data.expectedVersion;
+  const notesText = typeof notesOrDto === "string" ? notesOrDto : notesOrDto.notes;
+  const expectedVersion = typeof notesOrDto === "string" ? undefined : notesOrDto.expectedVersion;
+
+  if (expectedVersion !== undefined && (task as any).__v !== expectedVersion) {
+    throw new ConflictError("Task has been modified by another request.");
   }
 
-  const task = await Task.findOneAndUpdate(
-    query,
-    {
-      $set: { notes: data.notes },
-      $inc: { __v: 1 },
-    },
-    { new: true, runValidators: true }
-  );
-
-  if (!task) {
-    const exists = await Task.exists({
-      _id: taskId,
-      owner: new Types.ObjectId(userId),
-      isDeleted: false,
-    });
-
-    if (!exists) {
-      throw new NotFoundError("Task not found.");
-    } else {
-      throw new ConflictError("Notes were updated in another session.");
-    }
-  }
+  task.notes = notesText;
+  await task.save();
 
   return task;
 }
@@ -489,8 +507,9 @@ export async function updateTaskNotes(
 export async function toggleTaskArchive(
   taskId: string,
   userId: string,
+  workspaceId?: string,
 ): Promise<ITaskDocument> {
-  const task = await assertTaskOwnership(taskId, userId);
+  const task = await assertTaskOwnership(taskId, userId, workspaceId);
   task.archived = !task.archived;
   await task.save();
 
@@ -501,9 +520,8 @@ export async function toggleTaskArchive(
     type: task.archived ? ACTIVITY_TYPES.TASK_ARCHIVED : ACTIVITY_TYPES.TASK_RESTORED,
     entityType: "task",
     entityId: task._id.toString(),
-    projectId: task.projectId?.toString() || null,
-    contextProjectIds: task.projectId ? [task.projectId.toString()] : [],
     taskId: task._id.toString(),
+    ...(task.projectId && { projectId: task.projectId.toString(), contextProjectIds: [task.projectId.toString()] }),
     metadata: {
       taskTitle: task.title,
     },
@@ -515,18 +533,28 @@ export async function toggleTaskArchive(
 export async function deleteTask(
   taskId: string,
   userId: string,
+  workspaceId?: string,
+  authContext?: AuthContext,
 ): Promise<void> {
-  const task = await assertTaskOwnership(taskId, userId);
+  const task = await assertTaskOwnership(taskId, userId, workspaceId);
+
+  if (authContext) {
+    PermissionEngine.authorize(authContext, Permission.TASK_DELETE, {
+      createdBy: task.owner,
+      ...(task.assigneeId ? { assigneeId: task.assigneeId } : {}),
+      ...(task.workspaceId ? { workspaceId: task.workspaceId } : {}),
+    });
+  }
 
   const dependentTaskCount = await Task.countDocuments({
-    owner: new Types.ObjectId(userId),
+    ...(task.workspaceId ? { workspaceId: task.workspaceId } : { owner: new Types.ObjectId(userId) }),
     isDeleted: false,
     dependencies: task._id,
   });
 
   if (dependentTaskCount > 0) {
     throw new ConflictError(
-      `Cannot delete task because it is a prerequisite for ${dependentTaskCount} active task(s).`
+      `Cannot delete task because it is a prerequisite for ${dependentTaskCount} active task(s).`,
     );
   }
 
@@ -540,9 +568,8 @@ export async function deleteTask(
     type: ACTIVITY_TYPES.TASK_DELETED,
     entityType: "task",
     entityId: task._id.toString(),
-    projectId: task.projectId?.toString() || null,
-    contextProjectIds: task.projectId ? [task.projectId.toString()] : [],
     taskId: task._id.toString(),
+    ...(task.projectId && { projectId: task.projectId.toString(), contextProjectIds: [task.projectId.toString()] }),
     metadata: {
       taskTitle: task.title,
     },

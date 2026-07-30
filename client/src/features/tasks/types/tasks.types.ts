@@ -14,6 +14,8 @@ export interface Task {
   projectId: string | null;
   projectName?: string;
   projectColor?: string; // Hex or HSL color code to match modern aesthetics
+  assigneeId?: string | null;
+  watcherIds?: string[];
   dueDate: string | null; // ISO format: YYYY-MM-DD
   estimatedTime: string | null; // e.g., "2h", "1d", "30m"
   labels: string[];

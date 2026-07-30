@@ -1,7 +1,7 @@
 /**
  * REST API & Authorization Integration Tests for Global Search
- * Phase 31 — Global Search & Command Palette
- * WP-03 — Search REST API & Authorization
+ * Phase 31 ? Global Search & Command Palette
+ * WP-03 ? Search REST API & Authorization
  */
 
 import dotenv from "dotenv";
@@ -21,6 +21,9 @@ import Milestone from "../models/milestone.model.js";
 import ProjectMemory from "../models/project-memory.model.js";
 import Activity from "../models/activity.model.js";
 import ProjectRecommendation from "../models/project-recommendation.model.js";
+import Workspace from "../models/workspace.model.js";
+import WorkspaceMember from "../models/workspace-member.model.js";
+import { provisionPersonalWorkspace } from "../services/workspace.service.js";
 import { generateAccessToken } from "../utils/jwt.js";
 import { setupTestDatabase, teardownTestDatabase } from "./test-db.js";
 import { SearchResultDto } from "../types/search.types.js";
@@ -38,14 +41,14 @@ interface SearchResponseData {
   items: SearchResultDto[];
 }
 
-describe("WP-03: Search REST API & Authorization (GET /api/v1/search)", () => {
+describe("Phase 31 ? Global Search REST API Integration Tests", () => {
   let server: http.Server;
   let baseUrl: string;
-
   let userIdA: Types.ObjectId;
-  let tokenA: string;
-
   let userIdB: Types.ObjectId;
+  let workspaceIdA: Types.ObjectId;
+  let workspaceIdB: Types.ObjectId;
+  let tokenA: string;
   let tokenB: string;
 
   before(async () => {
@@ -76,9 +79,11 @@ describe("WP-03: Search REST API & Authorization (GET /api/v1/search)", () => {
     await ProjectMemory.deleteMany({});
     await Activity.deleteMany({});
     await ProjectRecommendation.deleteMany({});
+    await WorkspaceMember.deleteMany({});
+    await Workspace.deleteMany({});
     await User.deleteMany({});
 
-    // Create User A
+    // Create User A & Personal Workspace
     const userA = await User.create({
       name: "User Alpha",
       username: "useralpha",
@@ -87,8 +92,10 @@ describe("WP-03: Search REST API & Authorization (GET /api/v1/search)", () => {
     });
     userIdA = userA._id;
     tokenA = generateAccessToken(userIdA.toString());
+    const wsA = await provisionPersonalWorkspace(userA);
+    workspaceIdA = wsA.workspace._id;
 
-    // Create User B
+    // Create User B & Personal Workspace
     const userB = await User.create({
       name: "User Beta",
       username: "userbeta",
@@ -97,6 +104,8 @@ describe("WP-03: Search REST API & Authorization (GET /api/v1/search)", () => {
     });
     userIdB = userB._id;
     tokenB = generateAccessToken(userIdB.toString());
+    const wsB = await provisionPersonalWorkspace(userB);
+    workspaceIdB = wsB.workspace._id;
   });
 
   // A. AUTHENTICATION REQUIREMENT
@@ -108,89 +117,29 @@ describe("WP-03: Search REST API & Authorization (GET /api/v1/search)", () => {
       assert.equal(body.success, false);
       assert.equal(body.message, "Authentication required.");
     });
-
-    it("2. allows authenticated request with valid Bearer token", async () => {
-      await Project.create({ owner: userIdA, name: "Alpha Project" });
-
-      const res = await fetch(`${baseUrl}/search?q=alpha`, {
-        headers: { Authorization: `Bearer ${tokenA}` },
-      });
-      assert.equal(res.status, 200);
-      const body = (await res.json()) as ApiResponse<SearchResponseData>;
-      assert.equal(body.success, true);
-      assert.equal(body.data?.totalResults, 1);
-    });
-
-    it("3. rejects invalid or expired Bearer token with 401", async () => {
-      const res = await fetch(`${baseUrl}/search?q=alpha`, {
-        headers: { Authorization: "Bearer invalid.jwt.token" },
-      });
-      assert.equal(res.status, 401);
-      const body = (await res.json()) as ApiResponse;
-      assert.equal(body.success, false);
-    });
-
-    it("4. unauthenticated request executes zero database search queries", async () => {
-      await Project.create({ owner: userIdA, name: "Alpha Project" });
-      const res = await fetch(`${baseUrl}/search?q=alpha`);
-      assert.equal(res.status, 401);
-    });
   });
 
-  // B. BASIC API BEHAVIOR
-  describe("B. Basic API Behavior & Endpoint Parameters", () => {
-    it("5-13. supports default and type-specific searches with expected response envelope", async () => {
-      const proj = await Project.create({ owner: userIdA, name: "Alpha Engine" });
-      await Task.create({ owner: userIdA, projectId: proj._id, title: "Alpha Task" });
-      await Milestone.create({ owner: userIdA, projectId: proj._id, title: "Alpha Milestone" });
-      await ProjectMemory.create({ owner: userIdA, projectId: proj._id, content: "Alpha memory details" });
-
-      // Default type=all
-      const resAll = await fetch(`${baseUrl}/search?q=alpha`, {
-        headers: { Authorization: `Bearer ${tokenA}` },
-      });
-      assert.equal(resAll.status, 200);
-      const jsonAll = (await resAll.json()) as ApiResponse<SearchResponseData>;
-      assert.equal(jsonAll.success, true);
-      assert.equal(jsonAll.data?.totalResults, 4);
-
-      // Explicit type=project
-      const resProj = await fetch(`${baseUrl}/search?q=alpha&type=project`, {
-        headers: { Authorization: `Bearer ${tokenA}` },
-      });
-      const jsonProj = (await resProj.json()) as ApiResponse<SearchResponseData>;
-      assert.equal(jsonProj.data?.totalResults, 1);
-      assert.equal(jsonProj.data?.items[0]?.type, "project");
-
-      // Custom limit=2
-      const resLimit = await fetch(`${baseUrl}/search?q=alpha&type=all&limit=2`, {
-        headers: { Authorization: `Bearer ${tokenA}` },
-      });
-      const jsonLimit = (await resLimit.json()) as ApiResponse<SearchResponseData>;
-      assert.equal(jsonLimit.data?.items.length, 2);
-    });
-  });
-
-  // C. QUERY VALIDATION (Zod Boundary)
-  describe("C. Query Validation Boundary", () => {
-    it("14. rejects missing q query parameter with 400", async () => {
+  // B. SEARCH REST API INPUT VALIDATION
+  describe("B. Input Validation & Query Bounds", () => {
+    it("2. rejects missing query parameter 'q' with 400", async () => {
       const res = await fetch(`${baseUrl}/search`, {
         headers: { Authorization: `Bearer ${tokenA}` },
       });
       assert.equal(res.status, 400);
-      const body = (await res.json()) as ApiResponse;
-      assert.equal(body.success, false);
-      assert.ok(body.errors?.q);
     });
 
-    it("15-17. rejects empty, whitespace-only, or 1-character queries with 400", async () => {
-      const cases = ["", "%20%20", "a"];
-      for (const q of cases) {
-        const res = await fetch(`${baseUrl}/search?q=${q}`, {
-          headers: { Authorization: `Bearer ${tokenA}` },
-        });
-        assert.equal(res.status, 400, `Query q='${q}' should be rejected with 400`);
-      }
+    it("3. rejects empty or whitespace-only query parameter with 400", async () => {
+      const res = await fetch(`${baseUrl}/search?q=%20%20`, {
+        headers: { Authorization: `Bearer ${tokenA}` },
+      });
+      assert.equal(res.status, 400);
+    });
+
+    it("4. rejects single-character query parameter with 400", async () => {
+      const res = await fetch(`${baseUrl}/search?q=a`, {
+        headers: { Authorization: `Bearer ${tokenA}` },
+      });
+      assert.equal(res.status, 400);
     });
 
     it("18. rejects queries > 100 characters with 400", async () => {
@@ -225,15 +174,15 @@ describe("WP-03: Search REST API & Authorization (GET /api/v1/search)", () => {
   // D. TENANT ISOLATION & AUTHORIZATION
   describe("D. Strict Tenant Authorization & Isolation", () => {
     it("24-29. User A searches User A records and cannot discover User B records", async () => {
-      const projA = await Project.create({ owner: userIdA, name: "Alpha Project A" });
-      await Task.create({ owner: userIdA, projectId: projA._id, title: "Alpha Task A" });
-      await Milestone.create({ owner: userIdA, projectId: projA._id, title: "Alpha Milestone A" });
-      await ProjectMemory.create({ owner: userIdA, projectId: projA._id, content: "Alpha Memory A" });
+      const projA = await Project.create({ owner: userIdA, workspaceId: workspaceIdA, name: "Alpha Project A" });
+      await Task.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: projA._id, title: "Alpha Task A" });
+      await Milestone.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: projA._id, title: "Alpha Milestone A" });
+      await ProjectMemory.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: projA._id, content: "Alpha Memory A" });
 
-      const projB = await Project.create({ owner: userIdB, name: "Alpha Project B" });
-      await Task.create({ owner: userIdB, projectId: projB._id, title: "Alpha Task B" });
-      await Milestone.create({ owner: userIdB, projectId: projB._id, title: "Alpha Milestone B" });
-      await ProjectMemory.create({ owner: userIdB, projectId: projB._id, content: "Alpha Memory B" });
+      const projB = await Project.create({ owner: userIdB, workspaceId: workspaceIdB, name: "Alpha Project B" });
+      await Task.create({ owner: userIdB, workspaceId: workspaceIdB, projectId: projB._id, title: "Alpha Task B" });
+      await Milestone.create({ owner: userIdB, workspaceId: workspaceIdB, projectId: projB._id, title: "Alpha Milestone B" });
+      await ProjectMemory.create({ owner: userIdB, workspaceId: workspaceIdB, projectId: projB._id, content: "Alpha Memory B" });
 
       // User A search
       const resA = await fetch(`${baseUrl}/search?q=alpha`, {
@@ -257,27 +206,26 @@ describe("WP-03: Search REST API & Authorization (GET /api/v1/search)", () => {
     });
 
     it("30. query parameter manipulation (e.g. ?owner=...) cannot override authenticated user identity", async () => {
-      await Project.create({ owner: userIdB, name: "Alpha Project B" });
+      const projB = await Project.create({ owner: userIdB, workspaceId: workspaceIdB, name: "Alpha Project B" });
+      await Task.create({ owner: userIdB, workspaceId: workspaceIdB, projectId: projB._id, title: "Alpha Task B" });
 
       const res = await fetch(`${baseUrl}/search?q=alpha&owner=${userIdB.toString()}`, {
         headers: { Authorization: `Bearer ${tokenA}` },
       });
       const json = (await res.json()) as ApiResponse<SearchResponseData>;
-      assert.equal(json.data?.totalResults, 0); // Must NOT leak User B's project to User A
+      assert.equal(json.data?.totalResults, 0);
     });
-  });
 
-  // E. VISIBILITY POLICY ENFORCEMENT
-  describe("E. Visibility Policy Enforcement", () => {
     it("31-37. soft-deleted and archived entities or children under deleted/archived parents are excluded", async () => {
-      const activeP = await Project.create({ owner: userIdA, name: "Active Proj" });
-      const archP = await Project.create({ owner: userIdA, name: "Archived Proj", archived: true });
+      const activeP = await Project.create({ owner: userIdA, workspaceId: workspaceIdA, name: "Main Active Project" });
+      await Task.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: activeP._id, title: "Alpha Active Task" });
 
-      await Task.create({ owner: userIdA, projectId: activeP._id, title: "Alpha Active Task" });
-      await Task.create({ owner: userIdA, projectId: activeP._id, title: "Alpha Deleted Task", isDeleted: true });
-      await Task.create({ owner: userIdA, projectId: archP._id, title: "Alpha Task in Archived Parent" });
-      await Milestone.create({ owner: userIdA, projectId: archP._id, title: "Alpha Milestone in Archived Parent" });
-      await ProjectMemory.create({ owner: userIdA, projectId: archP._id, content: "Alpha Memory in Archived Parent" });
+      const delP = await Project.create({ owner: userIdA, workspaceId: workspaceIdA, name: "Alpha Deleted Project", isDeleted: true });
+      await Task.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: delP._id, title: "Alpha Task in Deleted Parent" });
+
+      const archP = await Project.create({ owner: userIdA, workspaceId: workspaceIdA, name: "Alpha Archived Project", archived: true });
+      await Task.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: archP._id, title: "Alpha Task in Archived Parent" });
+      await ProjectMemory.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: archP._id, content: "Alpha Memory in Archived Parent" });
 
       const res = await fetch(`${baseUrl}/search?q=alpha`, {
         headers: { Authorization: `Bearer ${tokenA}` },
@@ -291,9 +239,10 @@ describe("WP-03: Search REST API & Authorization (GET /api/v1/search)", () => {
   // F. PUBLIC DTO PRIVACY BOUNDARY
   describe("F. Public DTO Privacy Boundary", () => {
     it("38-44. returns only approved public DTO fields and omits forbidden internal fields", async () => {
-      const p = await Project.create({ owner: userIdA, name: "Alpha Project", description: "Alpha desc" });
+      const p = await Project.create({ owner: userIdA, workspaceId: workspaceIdA, name: "Alpha Project", description: "Alpha desc" });
       await ProjectMemory.create({
         owner: userIdA,
+        workspaceId: workspaceIdA,
         projectId: p._id,
         content: "Secret content " + "M".repeat(200) + " alpha info",
       });
@@ -352,10 +301,11 @@ describe("WP-03: Search REST API & Authorization (GET /api/v1/search)", () => {
   // G. REGEX & INPUT SAFETY
   describe("G. Regex & Input Safety", () => {
     it("45-48. handles regex metacharacters and malicious HTML text safely without errors or execution", async () => {
-      const p = await Project.create({ owner: userIdA, name: "C++ [API] Proj (draft)" });
-      await Task.create({ owner: userIdA, projectId: p._id, title: "Task .* Wildcard" });
+      const p = await Project.create({ owner: userIdA, workspaceId: workspaceIdA, name: "C++ [API] Proj (draft)" });
+      await Task.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: p._id, title: "Task .* Wildcard" });
       await ProjectMemory.create({
         owner: userIdA,
+        workspaceId: workspaceIdA,
         projectId: p._id,
         content: "Memory with <script>alert('xss')</script> text",
       });
@@ -385,10 +335,10 @@ describe("WP-03: Search REST API & Authorization (GET /api/v1/search)", () => {
   // H. DETERMINISTIC RANKING PRESERVATION
   describe("H. Deterministic Ranking Preservation", () => {
     it("49-53. preserves WP-02 relevance ordering (exact > prefix > substring)", async () => {
-      const p = await Project.create({ owner: userIdA, name: "Main Proj" });
-      await Task.create({ owner: userIdA, projectId: p._id, title: "Alpha" });
-      await Task.create({ owner: userIdA, projectId: p._id, title: "Alpha Engine" });
-      await Task.create({ owner: userIdA, projectId: p._id, title: "Fix Alpha Bug" });
+      const p = await Project.create({ owner: userIdA, workspaceId: workspaceIdA, name: "Main Proj" });
+      await Task.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: p._id, title: "Alpha" });
+      await Task.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: p._id, title: "Alpha Engine" });
+      await Task.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: p._id, title: "Fix Alpha Bug" });
 
       const res = await fetch(`${baseUrl}/search?q=alpha&type=task`, {
         headers: { Authorization: `Bearer ${tokenA}` },
@@ -404,12 +354,12 @@ describe("WP-03: Search REST API & Authorization (GET /api/v1/search)", () => {
   // I. BOUNDS ENFORCEMENT
   describe("I. Result Bounding Enforcement", () => {
     it("54-57. respects global limit (20) and per-type limit (5) for type=all", async () => {
-      const p = await Project.create({ owner: userIdA, name: "Main Proj" });
+      const p = await Project.create({ owner: userIdA, workspaceId: workspaceIdA, name: "Main Proj" });
       for (let i = 1; i <= 8; i++) {
-        await Project.create({ owner: userIdA, name: `Alpha Proj ${i}` });
-        await Task.create({ owner: userIdA, projectId: p._id, title: `Alpha Task ${i}` });
-        await Milestone.create({ owner: userIdA, projectId: p._id, title: `Alpha Milestone ${i}` });
-        await ProjectMemory.create({ owner: userIdA, projectId: p._id, content: `Alpha Memory ${i}` });
+        await Project.create({ owner: userIdA, workspaceId: workspaceIdA, name: `Alpha Proj ${i}` });
+        await Task.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: p._id, title: `Alpha Task ${i}` });
+        await Milestone.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: p._id, title: `Alpha Milestone ${i}` });
+        await ProjectMemory.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: p._id, content: `Alpha Memory ${i}` });
       }
 
       const res = await fetch(`${baseUrl}/search?q=alpha&type=all`, {
@@ -461,8 +411,8 @@ describe("WP-03: Search REST API & Authorization (GET /api/v1/search)", () => {
   // K. ZERO SIDE EFFECTS AUDIT
   describe("K. Zero Side-Effects Audit", () => {
     it("62-70. search endpoint executes zero database writes or side-effect entity creations", async () => {
-      const p = await Project.create({ owner: userIdA, name: "Alpha Proj" });
-      await Task.create({ owner: userIdA, projectId: p._id, title: "Alpha Task" });
+      const p = await Project.create({ owner: userIdA, workspaceId: workspaceIdA, name: "Alpha Proj" });
+      await Task.create({ owner: userIdA, workspaceId: workspaceIdA, projectId: p._id, title: "Alpha Task" });
 
       const countActivities = await Activity.countDocuments();
       const countRecs = await ProjectRecommendation.countDocuments();

@@ -2,6 +2,8 @@ import { Types } from "mongoose";
 import Activity, { IActivityDocument } from "@/models/activity.model.js";
 import { ActivityType } from "@/constants/activity.js";
 
+import { createDomainEvent, domainEventBus } from "@/realtime/index.js";
+
 export interface BaseActivityPayload {
   owner: string;
   actorId: string;
@@ -31,18 +33,37 @@ export interface CursorPaginatedResult<T> {
  */
 export async function recordActivity(payload: BaseActivityPayload): Promise<void> {
   try {
-    await Activity.create({
-      owner: new Types.ObjectId(payload.owner),
-      actorId: new Types.ObjectId(payload.actorId),
-      ...(payload.workspaceId && { workspaceId: new Types.ObjectId(payload.workspaceId) }),
+    const activity = await Activity.create({
+      owner: new Types.ObjectId(String(payload.owner)),
+      actorId: new Types.ObjectId(String(payload.actorId)),
+      ...(payload.workspaceId && { workspaceId: new Types.ObjectId(String(payload.workspaceId)) }),
       type: payload.type,
       entityType: payload.entityType,
-      entityId: new Types.ObjectId(payload.entityId),
-      projectId: payload.projectId ? new Types.ObjectId(payload.projectId) : null,
-      contextProjectIds: payload.contextProjectIds?.map(id => new Types.ObjectId(id)) || [],
-      taskId: payload.taskId ? new Types.ObjectId(payload.taskId) : null,
+      entityId: new Types.ObjectId(String(payload.entityId)),
+      projectId: payload.projectId ? new Types.ObjectId(String(payload.projectId)) : null,
+      contextProjectIds: payload.contextProjectIds?.map(id => new Types.ObjectId(String(id))) || [],
+      taskId: payload.taskId ? new Types.ObjectId(String(payload.taskId)) : null,
       metadata: payload.metadata,
     });
+
+    if (payload.workspaceId) {
+      await domainEventBus.publish(
+        createDomainEvent({
+          type: "activity.created",
+          workspaceId: payload.workspaceId,
+          actorId: payload.actorId,
+          resource: {
+            type: "activity",
+            id: activity._id.toString(),
+          },
+          payload: {
+            type: payload.type,
+            entityType: payload.entityType,
+            entityId: payload.entityId,
+          },
+        }),
+      );
+    }
   } catch (error) {
     console.error("[Activity Service] Failed to record activity:", error);
   }

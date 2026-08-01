@@ -24,9 +24,9 @@ export const createNotification = async (payload: CreateNotificationPayload): Pr
   try {
     const docData: any = {
       ...payload,
-      recipientId: new Types.ObjectId(payload.recipientId),
-      actorId: payload.actorId ? new Types.ObjectId(payload.actorId) : null,
-      entityId: payload.entityId ? new Types.ObjectId(payload.entityId) : null,
+      recipientId: new Types.ObjectId(String(payload.recipientId)),
+      actorId: payload.actorId ? new Types.ObjectId(String(payload.actorId)) : null,
+      entityId: payload.entityId ? new Types.ObjectId(String(payload.entityId)) : null,
       metadata: payload.metadata || {},
     };
     if (docData.dedupeKey === null) delete docData.dedupeKey;
@@ -46,9 +46,9 @@ export const createNotificationStrict = async (payload: CreateNotificationPayloa
   try {
     const docData: any = {
       ...payload,
-      recipientId: new Types.ObjectId(payload.recipientId),
-      actorId: payload.actorId ? new Types.ObjectId(payload.actorId) : null,
-      entityId: payload.entityId ? new Types.ObjectId(payload.entityId) : null,
+      recipientId: new Types.ObjectId(String(payload.recipientId)),
+      actorId: payload.actorId ? new Types.ObjectId(String(payload.actorId)) : null,
+      entityId: payload.entityId ? new Types.ObjectId(String(payload.entityId)) : null,
       metadata: payload.metadata || {},
     };
     if (docData.dedupeKey === null) delete docData.dedupeKey;

@@ -3,6 +3,7 @@ import { SortOrder, Types } from "mongoose";
 import Project, { IProjectDocument } from "@/models/project.model.js";
 import Task, { ITaskDocument } from "@/models/task.model.js";
 import User from "@/models/user.model.js";
+import WorkspaceMember from "@/models/workspace-member.model.js";
 import { provisionPersonalWorkspace } from "@/services/workspace.service.js";
 import { Permission } from "@/constants/permissions.js";
 import { PermissionEngine, AuthContext } from "@/domain/permission-evaluator.js";
@@ -16,6 +17,7 @@ import type {
 import { ConflictError, NotFoundError } from "@/utils/app-error.js";
 import { BaseActivityPayload, recordActivities, recordActivity } from "@/services/activity.service.js";
 import { ACTIVITY_TYPES } from "@/constants/activity.js";
+import { createDomainEvent, domainEventBus } from "@/realtime/index.js";
 
 import type { PaginatedResult } from "./project.service.js";
 
@@ -90,6 +92,33 @@ export async function createTask(
 
   if (explicitWorkspaceId) {
     targetWorkspaceId = new Types.ObjectId(explicitWorkspaceId);
+  } else if (data.projectId) {
+    const projDoc = await Project.findById(data.projectId);
+    if (projDoc && projDoc.workspaceId) {
+      const member = await WorkspaceMember.findOne({
+        workspaceId: projDoc.workspaceId,
+        userId: new Types.ObjectId(userId),
+      });
+      if (member || projDoc.owner.toString() === userId) {
+        targetWorkspaceId = projDoc.workspaceId;
+      } else {
+        const userDoc = await User.findById(userId);
+        const personal = await provisionPersonalWorkspace({
+          _id: new Types.ObjectId(userId),
+          name: userDoc?.name || "User",
+          username: userDoc?.username || "user",
+        });
+        targetWorkspaceId = personal.workspace._id;
+      }
+    } else {
+      const userDoc = await User.findById(userId);
+      const personal = await provisionPersonalWorkspace({
+        _id: new Types.ObjectId(userId),
+        name: userDoc?.name || "User",
+        username: userDoc?.username || "user",
+      });
+      targetWorkspaceId = personal.workspace._id;
+    }
   } else {
     const userDoc = await User.findById(userId);
     const personal = await provisionPersonalWorkspace({
@@ -162,6 +191,27 @@ export async function createTask(
       taskTitle: task.title,
     },
   });
+
+  try {
+    await domainEventBus.publish(
+      createDomainEvent({
+        type: "task.created",
+        workspaceId: targetWorkspaceId.toString(),
+        actorId: userId,
+        resource: {
+          type: "task",
+          id: task._id.toString(),
+          version: (task as any).__v ?? 0,
+        },
+        payload: {
+          projectId: task.projectId ? task.projectId.toString() : null,
+          title: task.title,
+        },
+      }),
+    );
+  } catch (err) {
+    console.error("[Task Service] Failed to publish task.created event:", err);
+  }
 
   return task;
 }
@@ -480,6 +530,31 @@ export async function updateTask(
     await recordActivities(events);
   }
 
+  try {
+    const wsId = task.workspaceId ? task.workspaceId.toString() : workspaceId || "";
+    if (wsId) {
+      await domainEventBus.publish(
+        createDomainEvent({
+          type: "task.updated",
+          workspaceId: wsId,
+          actorId: userId,
+          resource: {
+            type: "task",
+            id: task._id.toString(),
+            version: (task as any).__v ?? 0,
+          },
+          payload: {
+            projectId: task.projectId ? task.projectId.toString() : null,
+            status: task.status,
+            priority: task.priority,
+          },
+        }),
+      );
+    }
+  } catch (err) {
+    console.error("[Task Service] Failed to publish task.updated event:", err);
+  }
+
   return task;
 }
 
@@ -500,6 +575,29 @@ export async function updateTaskNotes(
 
   task.notes = notesText;
   await task.save();
+
+  try {
+    const wsId = task.workspaceId ? task.workspaceId.toString() : workspaceId || "";
+    if (wsId) {
+      await domainEventBus.publish(
+        createDomainEvent({
+          type: "task.updated",
+          workspaceId: wsId,
+          actorId: userId,
+          resource: {
+            type: "task",
+            id: task._id.toString(),
+            version: (task as any).__v ?? 0,
+          },
+          payload: {
+            changedFields: ["notes"],
+          },
+        }),
+      );
+    }
+  } catch (err) {
+    console.error("[Task Service] Failed to publish task.updated notes event:", err);
+  }
 
   return task;
 }
@@ -526,6 +624,29 @@ export async function toggleTaskArchive(
       taskTitle: task.title,
     },
   });
+
+  try {
+    const wsId = task.workspaceId ? task.workspaceId.toString() : workspaceId || "";
+    if (wsId) {
+      await domainEventBus.publish(
+        createDomainEvent({
+          type: task.archived ? "task.archived" : "task.updated",
+          workspaceId: wsId,
+          actorId: userId,
+          resource: {
+            type: "task",
+            id: task._id.toString(),
+            version: (task as any).__v ?? 0,
+          },
+          payload: {
+            archived: task.archived,
+          },
+        }),
+      );
+    }
+  } catch (err) {
+    console.error("[Task Service] Failed to publish task archive event:", err);
+  }
 
   return task;
 }
@@ -574,4 +695,27 @@ export async function deleteTask(
       taskTitle: task.title,
     },
   });
+
+  try {
+    const wsId = task.workspaceId ? task.workspaceId.toString() : workspaceId || "";
+    if (wsId) {
+      await domainEventBus.publish(
+        createDomainEvent({
+          type: "task.deleted",
+          workspaceId: wsId,
+          actorId: userId,
+          resource: {
+            type: "task",
+            id: task._id.toString(),
+            version: (task as any).__v ?? 0,
+          },
+          payload: {
+            taskId: task._id.toString(),
+          },
+        }),
+      );
+    }
+  } catch (err) {
+    console.error("[Task Service] Failed to publish task.deleted event:", err);
+  }
 }

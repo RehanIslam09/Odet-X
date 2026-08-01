@@ -113,6 +113,14 @@ apiClient.interceptors.response.use(
         clearAccessToken();
         clearActiveWorkspaceSlug();
         useAuthStore.getState().clearUser();
+        try {
+          // Import dynamically to avoid static circular dependency
+          import("@/realtime/realtime-client").then(({ realtimeClient }) => {
+            realtimeClient.disconnect();
+          });
+        } catch {
+          // Ignore if module unresolvable
+        }
 
         return Promise.reject(error);
       }

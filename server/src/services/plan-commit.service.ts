@@ -7,6 +7,7 @@ import { NotFoundError, BadRequestError, ConflictError } from "@/utils/app-error
 import { validatePlan } from "@/domain/plan-validator.js";
 import { recordActivity } from "./activity.service.js";
 import { ACTIVITY_TYPES } from "@/constants/activity.js";
+import { createDomainEvent, domainEventBus } from "@/realtime/index.js";
 
 export interface CommitPlanResult {
   draftId: string;
@@ -215,6 +216,29 @@ export async function commitPlan(
         committedMilestoneCount: milestonesToInsert.length,
       },
     });
+
+    if (targetWorkspaceId) {
+      try {
+        await domainEventBus.publish(
+          createDomainEvent({
+            type: "plan.committed",
+            workspaceId: targetWorkspaceId.toString(),
+            actorId: userId,
+            resource: {
+              type: "plan",
+              id: draft._id.toString(),
+            },
+            payload: {
+              projectId,
+              committedTaskCount: tasksToInsert.length,
+              committedMilestoneCount: milestonesToInsert.length,
+            },
+          }),
+        );
+      } catch (err) {
+        console.error("[Plan Commit Service] Failed to publish plan.committed event:", err);
+      }
+    }
 
     return {
       draftId: draft._id.toString(),

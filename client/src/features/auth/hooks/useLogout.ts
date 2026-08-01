@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { authApi } from "@/features/auth/services/auth.api";
 import { useAuthStore } from "@/store/auth.store";
 import { clearAccessToken } from "@/services/axios";
+import { realtimeClient } from "@/realtime/realtime-client";
 
 /**
  * Logout mutation hook.
@@ -27,6 +28,7 @@ export function useLogout() {
   const navigate = useNavigate();
 
   const performLocalLogout = () => {
+    realtimeClient.disconnect();
     clearAccessToken();
     clearUser();
     queryClient.clear();

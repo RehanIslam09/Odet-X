@@ -185,6 +185,8 @@ async function runProactiveIntelligenceWorkerTests() {
     console.log("✅ Passed: Hard limit of 50 candidate projects per run strictly enforced.");
 
     await Project.deleteMany({});
+    await Task.deleteMany({});
+    await ProjectRecommendation.deleteMany({});
 
     // -----------------------------------------------------------------------
     // G. HARD MAX 10 AI CALLS PER RUN ENFORCEMENT

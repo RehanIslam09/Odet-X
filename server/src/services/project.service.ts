@@ -14,6 +14,7 @@ import type {
 import { NotFoundError } from "@/utils/app-error.js";
 import { recordActivity } from "@/services/activity.service.js";
 import { ACTIVITY_TYPES } from "@/constants/activity.js";
+import { createDomainEvent, domainEventBus } from "@/realtime/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -116,6 +117,26 @@ export async function createProject(
       projectName: project.name,
     },
   });
+
+  try {
+    await domainEventBus.publish(
+      createDomainEvent({
+        type: "project.created",
+        workspaceId: targetWorkspaceId.toString(),
+        actorId: userId,
+        resource: {
+          type: "project",
+          id: project._id.toString(),
+          version: (project as any).__v ?? 0,
+        },
+        payload: {
+          name: project.name,
+        },
+      }),
+    );
+  } catch (err) {
+    console.error("[Project Service] Failed to publish project.created event:", err);
+  }
 
   return project;
 }
@@ -253,6 +274,29 @@ export async function updateProject(
         projectName: project.name,
       },
     });
+
+    try {
+      const wsId = project.workspaceId ? project.workspaceId.toString() : workspaceId || "";
+      if (wsId) {
+        await domainEventBus.publish(
+          createDomainEvent({
+            type: "project.updated",
+            workspaceId: wsId,
+            actorId: userId,
+            resource: {
+              type: "project",
+              id: project._id.toString(),
+              version: (project as any).__v ?? 0,
+            },
+            payload: {
+              name: project.name,
+            },
+          }),
+        );
+      }
+    } catch (err) {
+      console.error("[Project Service] Failed to publish project.updated event:", err);
+    }
   }
 
   return project;
@@ -285,6 +329,29 @@ export async function toggleProjectArchive(
       projectName: project.name,
     },
   });
+
+  try {
+    const wsId = project.workspaceId ? project.workspaceId.toString() : workspaceId || "";
+    if (wsId) {
+      await domainEventBus.publish(
+        createDomainEvent({
+          type: project.archived ? "project.archived" : "project.updated",
+          workspaceId: wsId,
+          actorId: userId,
+          resource: {
+            type: "project",
+            id: project._id.toString(),
+            version: (project as any).__v ?? 0,
+          },
+          payload: {
+            archived: project.archived,
+          },
+        }),
+      );
+    }
+  } catch (err) {
+    console.error("[Project Service] Failed to publish project archive event:", err);
+  }
 
   return project;
 }
@@ -322,6 +389,29 @@ export async function deleteProject(
       projectName: project.name,
     },
   });
+
+  try {
+    const wsId = project.workspaceId ? project.workspaceId.toString() : workspaceId || "";
+    if (wsId) {
+      await domainEventBus.publish(
+        createDomainEvent({
+          type: "project.deleted",
+          workspaceId: wsId,
+          actorId: userId,
+          resource: {
+            type: "project",
+            id: project._id.toString(),
+            version: (project as any).__v ?? 0,
+          },
+          payload: {
+            projectId: project._id.toString(),
+          },
+        }),
+      );
+    }
+  } catch (err) {
+    console.error("[Project Service] Failed to publish project.deleted event:", err);
+  }
 }
 
 // ---------------------------------------------------------------------------

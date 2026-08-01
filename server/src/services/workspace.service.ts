@@ -8,6 +8,7 @@ import Task from "@/models/task.model.js";
 import { MAX_WORKSPACE_NAME_LENGTH, WorkspaceRole } from "@/constants/workspace.js";
 import { CreateWorkspaceDto, UpdateWorkspaceDto, slugify } from "@/validators/workspace.validator.js";
 import { ConflictError, ForbiddenError, NotFoundError } from "@/utils/app-error.js";
+import { createDomainEvent, domainEventBus, notifyWorkspaceMemberRemoved } from "@/realtime/index.js";
 
 // ---------------------------------------------------------------------------
 // DTOs & Interfaces
@@ -500,4 +501,24 @@ export async function removeWorkspaceMember(
   }
 
   await WorkspaceMember.deleteOne({ _id: targetMember._id });
+  notifyWorkspaceMemberRemoved(workspaceId, targetUserId);
+
+  try {
+    await domainEventBus.publish(
+      createDomainEvent({
+        type: "member.removed",
+        workspaceId,
+        actorId: requestingUserId,
+        resource: {
+          type: "workspaceMember",
+          id: targetMember._id.toString(),
+        },
+        payload: {
+          targetUserId,
+        },
+      }),
+    );
+  } catch (err) {
+    console.error("[Workspace Service] Failed to publish member.removed event:", err);
+  }
 }

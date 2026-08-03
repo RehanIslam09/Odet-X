@@ -1,9 +1,3 @@
-/**
- * Foundational Command Palette Component
- * Phase 31 — Global Search & Command Palette
- * WP-06 — Global Search UX & Result Navigation
- */
-
 import { useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -16,11 +10,14 @@ import {
   FolderPlus,
   PlusSquare,
   Command as CommandIcon,
-  FolderKanban,
   Flag,
   Brain,
   Loader2,
+  Sparkles,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
 import {
   Command,
   CommandDialog,
@@ -30,50 +27,50 @@ import {
   CommandGroup,
   CommandItem,
   CommandShortcut,
-} from "@/components/ui/command";
+} from "@/components/ui/command.js";
+import { ProjectIcon } from "@/components/common/ProjectIcon.js";
 import { useCommandPalette } from "../hooks/useCommandPalette.js";
 import type { CommandDefinition, CommandGroup as GroupName } from "../types/command.types.js";
-import { CreateProjectDialog } from "@/features/projects/components/CreateProjectDialog";
-import { CreateTaskDialog } from "@/features/tasks/components/CreateTaskDialog";
+import { CreateProjectDialog } from "@/features/projects/components/CreateProjectDialog.js";
+import { CreateTaskDialog } from "@/features/tasks/components/CreateTaskDialog.js";
 import { useGlobalSearch } from "@/features/search/hooks/useGlobalSearch.js";
 import { isSafeInternalUrl } from "@/features/search/utils/url.utils.js";
 import type { SearchResultDto, SearchEntityType } from "@/features/search/types/search.types.js";
+import { useGlobalCopilot } from "@/features/ai/context/GlobalCopilotContext.js";
 
 function renderCommandIcon(iconKey?: string) {
-  const props = { "aria-hidden": true as const, className: "mr-2 h-4 w-4 shrink-0 text-muted-foreground" };
-  const primaryProps = { "aria-hidden": true as const, className: "mr-2 h-4 w-4 shrink-0 text-primary" };
   switch (iconKey) {
-    case "LayoutDashboard":
-      return <LayoutDashboard {...props} />;
-    case "Folder":
-      return <Folder {...props} />;
-    case "CheckSquare":
-      return <CheckSquare {...props} />;
-    case "Activity":
-      return <Activity {...props} />;
-    case "Bell":
-      return <Bell {...props} />;
-    case "Settings":
-      return <Settings {...props} />;
-    case "FolderPlus":
-      return <FolderPlus {...primaryProps} />;
-    case "PlusSquare":
-      return <PlusSquare {...primaryProps} />;
+    case "dashboard":
+      return <LayoutDashboard className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />;
+    case "projects":
+      return <Folder className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />;
+    case "tasks":
+      return <CheckSquare className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />;
+    case "activity":
+      return <Activity className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />;
+    case "notifications":
+      return <Bell className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />;
+    case "settings":
+      return <Settings className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />;
+    case "create-project":
+      return <FolderPlus className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />;
+    case "create-task":
+      return <PlusSquare className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />;
     default:
-      return <CommandIcon {...props} />;
+      return <CommandIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />;
   }
 }
 
-function renderEntityIcon(type: SearchEntityType) {
-  switch (type) {
+function renderEntityIcon(item: SearchResultDto) {
+  switch (item.type) {
     case "project":
-      return <FolderKanban aria-hidden className="mr-2 h-4 w-4 shrink-0 text-indigo-500" />;
+      return <ProjectIcon icon={item.subtitle} size="xs" className="mr-2" />;
     case "task":
-      return <CheckSquare aria-hidden className="mr-2 h-4 w-4 shrink-0 text-emerald-500" />;
+      return <CheckSquare className="mr-2 h-4 w-4 shrink-0 text-sky-500" />;
     case "milestone":
-      return <Flag aria-hidden className="mr-2 h-4 w-4 shrink-0 text-amber-500" />;
+      return <Flag className="mr-2 h-4 w-4 shrink-0 text-amber-500" />;
     case "memory":
-      return <Brain aria-hidden className="mr-2 h-4 w-4 shrink-0 text-cyan-500" />;
+      return <Brain className="mr-2 h-4 w-4 shrink-0 text-purple-500" />;
   }
 }
 
@@ -86,9 +83,6 @@ const ENTITY_GROUP_TITLES: Record<SearchEntityType, string> = {
 
 const ENTITY_TYPE_ORDER: SearchEntityType[] = ["project", "task", "milestone", "memory"];
 
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-
 export interface CommandPaletteProps {
   onSelectEntity?: (item: SearchResultDto) => void;
 }
@@ -96,6 +90,7 @@ export interface CommandPaletteProps {
 export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { openCopilot } = useGlobalCopilot();
 
   const {
     open,
@@ -111,7 +106,6 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
     createTaskProjectId,
   } = useCommandPalette();
 
-  // Authenticated debounced global search hook
   const {
     data: searchData,
     isLoading: searchLoading,
@@ -119,7 +113,6 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
     isEligible: searchEligible,
   } = useGlobalSearch(query, open);
 
-  // Group commands by category while preserving canonical insertion order
   const groupedCommands = useMemo(() => {
     const map = new Map<GroupName, CommandDefinition[]>();
     for (const cmd of commands) {
@@ -130,7 +123,6 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
     return Array.from(map.entries());
   }, [commands]);
 
-  // Group search entity results by type while preserving backend relative ranking
   const groupedEntities = useMemo(() => {
     if (!searchData?.items || searchData.items.length === 0) {
       return [];
@@ -143,7 +135,6 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
       map.set(item.type, list);
     }
 
-    // Return groups in canonical entity order
     const result: [string, SearchResultDto[]][] = [];
     for (const type of ENTITY_TYPE_ORDER) {
       const items = map.get(type);
@@ -154,7 +145,18 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
     return result;
   }, [searchData]);
 
-  // Handle entity selection navigation & stale result safety
+  const showAiGroup = query.length === 0 || query.startsWith("/ai");
+
+  const handleLaunchAiMode = useCallback(
+    (customQuestion?: string) => {
+      const initialQuestion = customQuestion || (query.startsWith("/ai") ? query.replace(/^\/ai\s*/, "") : query);
+      setOpen(false);
+      setQuery("");
+      openCopilot(undefined, initialQuestion || undefined);
+    },
+    [query, setOpen, setQuery, openCopilot],
+  );
+
   const handleSelectEntity = useCallback(
     (targetUrl: string, item?: SearchResultDto) => {
       if (!isSafeInternalUrl(targetUrl)) {
@@ -174,7 +176,7 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
       setOpen(false);
       setQuery("");
     },
-    [navigate, queryClient, setOpen, setQuery, onSelectEntity]
+    [navigate, queryClient, setOpen, setQuery, onSelectEntity],
   );
 
   return (
@@ -207,7 +209,30 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
               No results found.
             </CommandEmpty>
 
-            {/* Render Local WP-04 Commands */}
+            {/* Top AI Copilot Mode Option */}
+            {showAiGroup && (
+              <CommandGroup heading="AI Intelligence" data-testid="command-group-ai">
+                <CommandItem
+                  value="launch-ai-copilot"
+                  onSelect={() => handleLaunchAiMode()}
+                  className="text-primary font-medium cursor-pointer"
+                  data-testid="command-item-launch-ai"
+                >
+                  <Sparkles className="mr-2 h-4 w-4 text-primary animate-pulse" />
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <span className="font-medium text-sm text-foreground truncate">
+                      {query.startsWith("/ai") && query.trim().length > 3 ? `Ask AI: "${query.replace(/^\/ai\s*/, "")}"` : "Ask Global AI Copilot"}
+                    </span>
+                    <span className="text-xs text-muted-foreground truncate">
+                      Open AI Copilot with workspace intelligence
+                    </span>
+                  </div>
+                  <CommandShortcut>Ctrl+J</CommandShortcut>
+                </CommandItem>
+              </CommandGroup>
+            )}
+
+            {/* Local WP-04 Commands */}
             {groupedCommands.map(([groupName, groupItems]) => (
               <CommandGroup
                 key={groupName}
@@ -254,7 +279,7 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
               </div>
             )}
 
-            {/* Search Non-Destructive Error Note */}
+            {/* Search Error Indicator */}
             {searchEligible && searchError && (
               <div
                 role="status"
@@ -267,7 +292,7 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
               </div>
             )}
 
-            {/* Render Server Entity Search Results */}
+            {/* Server Entity Search Results */}
             {groupedEntities.map(([groupTitle, entityItems]) => (
               <CommandGroup
                 key={groupTitle}
@@ -289,7 +314,7 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
                       onSelect={() => handleSelectEntity(item.url, item)}
                       data-testid={`entity-item-${item.type}-${item.id}`}
                     >
-                      {renderEntityIcon(item.type)}
+                      {renderEntityIcon(item)}
                       <div className="flex flex-col flex-1 min-w-0">
                         <span className="font-medium text-sm text-foreground truncate">
                           {item.title}
@@ -309,7 +334,6 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
         </Command>
       </CommandDialog>
 
-      {/* Launcher Dialog Integrations */}
       <CreateProjectDialog
         open={createProjectOpen}
         onOpenChange={setCreateProjectOpen}

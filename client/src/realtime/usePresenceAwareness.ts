@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { realtimeClient } from "./realtime-client";
 import type { PresenceUser, ResourceViewing } from "./realtime-types";
@@ -44,19 +44,30 @@ export function usePresenceAwareness(): UsePresenceAwarenessResult {
     } else {
       realtimeClient.setViewingResource(null);
     }
+
+    return () => {
+      // Clear viewing state on unmount or route leave
+      realtimeClient.setViewingResource(null);
+    };
   }, [projectId, taskId]);
 
   // Derived list of collaborators currently viewing the active resource
   const activeResourceId = taskId || projectId || null;
-  const activeViewingUsers = activeResourceId
-    ? presenceUsers.filter(
-        (u) => u.viewing && u.viewing.resourceId === activeResourceId,
-      )
-    : [];
+  const activeViewingUsers = useMemo(() => {
+    if (!activeResourceId) return [];
+    return presenceUsers.filter(
+      (u) => u.viewing && u.viewing.resourceId === activeResourceId,
+    );
+  }, [presenceUsers, activeResourceId]);
+
+  const setViewingResource = useCallback(
+    (viewing: ResourceViewing | null) => realtimeClient.setViewingResource(viewing),
+    [],
+  );
 
   return {
     presenceUsers,
     activeViewingUsers,
-    setViewingResource: (viewing) => realtimeClient.setViewingResource(viewing),
+    setViewingResource,
   };
 }

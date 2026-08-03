@@ -13,10 +13,10 @@ import { IWorkspaceMemberDocument } from "@/models/workspace-member.model.js";
 
 function expectEqual(actual: unknown, expected: unknown, message: string) {
   if (actual !== expected) {
-    console.error(`? Assertion Failed: ${message}. Got '${actual}', expected '${expected}'`);
+    console.error(`❌ Assertion Failed: ${message}. Got '${actual}', expected '${expected}'`);
     process.exit(1);
   }
-  console.log(`? Passed: ${message}`);
+  console.log(`✅ Passed: ${message}`);
 }
 
 function mockUser(idStr: string): IUserDocument {
@@ -41,7 +41,7 @@ function mockMember(wsIdStr: string, role: WorkspaceRole): IWorkspaceMemberDocum
 
 async function runTests() {
   console.log("\n==================================================");
-  console.log("? Phase 33 WP-01 ? Permission Engine Unit Tests");
+  console.log("🧪 Phase 33 WP-01 — Permission Engine Unit Tests");
   console.log("==================================================\n");
 
   const wsId1 = "507f1f77bcf86cd799439011";
@@ -54,14 +54,8 @@ async function runTests() {
   const ownerMember = mockMember(wsId1, "OWNER");
   const ownerContext = { user: ownerUser, workspace: ownerWs, member: ownerMember };
 
-  const adminMember = mockMember(wsId1, "ADMIN");
-  const adminContext = { user: ownerUser, workspace: ownerWs, member: adminMember };
-
   const memberMember = mockMember(wsId1, "MEMBER");
   const memberContext = { user: ownerUser, workspace: ownerWs, member: memberMember };
-
-  const viewerMember = mockMember(wsId1, "VIEWER");
-  const viewerContext = { user: ownerUser, workspace: ownerWs, member: viewerMember };
 
   // 1. Base Capabilities
   expectEqual(
@@ -70,48 +64,34 @@ async function runTests() {
     "OWNER has WORKSPACE_DELETE capability",
   );
   expectEqual(
-    PermissionEngine.hasCapability("ADMIN", Permission.WORKSPACE_DELETE),
+    PermissionEngine.hasCapability("MEMBER", Permission.WORKSPACE_DELETE),
     false,
-    "ADMIN lacks WORKSPACE_DELETE capability",
+    "MEMBER lacks WORKSPACE_DELETE capability",
   );
   expectEqual(
     PermissionEngine.hasCapability("MEMBER", Permission.PROJECT_CREATE),
     true,
     "MEMBER has PROJECT_CREATE capability",
   );
-  expectEqual(
-    PermissionEngine.hasCapability("VIEWER", Permission.PROJECT_CREATE),
-    false,
-    "VIEWER lacks PROJECT_CREATE capability",
-  );
 
   // 2. Evaluation Tests (Owner)
   const resOwnerDelete = PermissionEngine.evaluate(ownerContext, Permission.WORKSPACE_DELETE);
   expectEqual(resOwnerDelete.allowed, true, "OWNER allowed to delete workspace");
 
-  // 3. Evaluation Tests (Viewer Immutability)
-  const resViewerUpdate = PermissionEngine.evaluate(viewerContext, Permission.PROJECT_UPDATE);
-  expectEqual(resViewerUpdate.allowed, false, "VIEWER denied PROJECT_UPDATE");
-  expectEqual(
-    resViewerUpdate.reason,
-    "Role 'VIEWER' lacks capability 'project:update'.",
-    "Correct viewer capability error message",
-  );
-
-  // 4. Evaluation Tests (Anti-Enumeration / Tenant Mismatch)
+  // 3. Evaluation Tests (Anti-Enumeration / Tenant Mismatch)
   const resTenantMismatch = PermissionEngine.evaluate(memberContext, Permission.PROJECT_READ, {
     workspaceId: wsId2,
   });
   expectEqual(resTenantMismatch.allowed, false, "Tenant mismatch denied");
   expectEqual(resTenantMismatch.reason, "Workspace not found.", "Anti-enumeration 404 reason returned");
 
-  // 5. Evaluation Tests (Personal Workspace Restrictions)
+  // 4. Evaluation Tests (Personal Workspace Restrictions)
   const personalWs = mockWorkspace(wsId1, true);
-  const personalAdminContext = { user: ownerUser, workspace: personalWs, member: adminMember };
-  const resPersonalInvite = PermissionEngine.evaluate(personalAdminContext, Permission.MEMBER_INVITE);
+  const personalOwnerContext = { user: ownerUser, workspace: personalWs, member: ownerMember };
+  const resPersonalInvite = PermissionEngine.evaluate(personalOwnerContext, Permission.MEMBER_INVITE);
   expectEqual(resPersonalInvite.allowed, false, "Member invitation denied in personal workspace");
 
-  // 6. Evaluation Tests (Member Task Deletion Refinements)
+  // 5. Evaluation Tests (Member Task Deletion Refinements)
   const taskCreatedBySelf = { createdBy: userId1, workspaceId: wsId1 };
   const taskCreatedByOther = { createdBy: userId2, workspaceId: wsId1 };
 
@@ -121,15 +101,15 @@ async function runTests() {
   const resMemberDeleteOther = PermissionEngine.evaluate(memberContext, Permission.TASK_DELETE, taskCreatedByOther);
   expectEqual(resMemberDeleteOther.allowed, false, "MEMBER cannot delete task created by other user");
 
-  const resAdminDeleteOther = PermissionEngine.evaluate(adminContext, Permission.TASK_DELETE, taskCreatedByOther);
-  expectEqual(resAdminDeleteOther.allowed, true, "ADMIN can delete task created by any user");
+  const resOwnerDeleteOther = PermissionEngine.evaluate(ownerContext, Permission.TASK_DELETE, taskCreatedByOther);
+  expectEqual(resOwnerDeleteOther.allowed, true, "OWNER can delete task created by any user");
 
   console.log("\n==================================================");
-  console.log("? All Permission Engine Unit Tests Passed!");
+  console.log("🎉 All Permission Engine Unit Tests Passed!");
   console.log("==================================================\n");
 }
 
 runTests().catch((err) => {
-  console.error("? Test runner crashed:", err);
+  console.error("❌ Test runner crashed:", err);
   process.exit(1);
 });

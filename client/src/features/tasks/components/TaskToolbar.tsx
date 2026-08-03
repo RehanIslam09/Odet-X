@@ -1,4 +1,5 @@
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -30,6 +31,7 @@ interface TaskToolbarProps {
   view: "list" | "board";
   onViewChange: (view: "list" | "board") => void;
   projects: ProjectOption[];
+  onClearFilters?: () => void;
 }
 
 export function TaskToolbar({
@@ -46,9 +48,16 @@ export function TaskToolbar({
   view,
   onViewChange,
   projects,
+  onClearFilters,
 }: TaskToolbarProps) {
+  const hasActiveFilters =
+    search.trim().length > 0 ||
+    status !== "all" ||
+    priority !== "all" ||
+    projectId !== "all";
+
   return (
-    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border border-border/40 bg-muted/10 p-3 rounded-lg shadow-2xs gap-y-4">
+    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border border-border/40 bg-muted/10 p-3 rounded-lg shadow-2xs">
       {/* Left side: Search & Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-0">
         <TaskSearch value={search} onChange={onSearchChange} />
@@ -61,13 +70,26 @@ export function TaskToolbar({
           onProjectIdChange={onProjectIdChange}
           projects={projects}
         />
+
+        {hasActiveFilters && onClearFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClearFilters}
+            className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5 cursor-pointer shrink-0"
+            title="Clear active filters"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>Reset</span>
+          </Button>
+        )}
       </div>
 
       {/* Right side: Sorting & View Toggle */}
       <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
         {/* Sort Select */}
         <Select value={sort} onValueChange={onSortChange}>
-          <SelectTrigger size="sm" className="h-8 text-xs font-medium bg-background border border-border/80 min-w-[130px]">
+          <SelectTrigger size="sm" className="h-8 text-xs font-medium bg-background border border-border/80 min-w-[140px] cursor-pointer">
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <ArrowUpDown className="h-3.5 w-3.5" />
               <SelectValue placeholder="Sort" />

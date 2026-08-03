@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CommandPalette } from "./components/CommandPalette";
+import { CommandPaletteProvider } from "./context/CommandPaletteProvider";
 import { isGlobalCommandPaletteSuppressed } from "./utils/keyboard.utils";
 import { defaultCommandRegistry } from "./registry/command.registry";
 import { defaultCommands } from "./catalog/default-commands";
@@ -27,9 +28,11 @@ function TestWrapper({ initialEntries = ["/"], children }: { initialEntries?: st
   return (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={initialEntries}>
-        <Routes>
-          <Route path="*" element={children} />
-        </Routes>
+        <CommandPaletteProvider>
+          <Routes>
+            <Route path="*" element={children} />
+          </Routes>
+        </CommandPaletteProvider>
       </MemoryRouter>
     </QueryClientProvider>
   );

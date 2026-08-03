@@ -1,92 +1,95 @@
+import { memo } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, FolderKanban } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import type { DashboardRecentProject } from "@/features/dashboard/types/dashboard.types";
+import { Button } from "@/components/ui/button.js";
+import { Progress } from "@/components/ui/progress.js";
+import { Badge } from "@/components/ui/badge.js";
+import { ProjectIcon } from "@/components/common/ProjectIcon.js";
+import type { DashboardRecentProject } from "@/features/dashboard/types/dashboard.types.js";
 
 interface RecentProjectsProps {
   recentProjects: DashboardRecentProject[];
 }
 
-/**
- * Recent projects.
- *
- * Compact dashboard widget showing the user's most recently updated projects.
- * The data comes directly from the Dashboard overview endpoint.
- */
-export function RecentProjects({ recentProjects }: RecentProjectsProps) {
+export const RecentProjects = memo(function RecentProjects({
+  recentProjects,
+}: RecentProjectsProps) {
   return (
-    <div className="flex h-full flex-col rounded-xl border bg-card p-6 shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-tight">
-          Recent projects
-        </h2>
+    <div className="flex flex-col rounded-xl border border-border/60 bg-card p-4 shadow-2xs">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-500/10 text-indigo-500">
+            <FolderKanban className="h-3.5 w-3.5" />
+          </div>
+          <div>
+            <h2 className="text-xs font-semibold tracking-tight text-foreground uppercase">
+              Recent Projects
+            </h2>
+          </div>
+        </div>
 
         <Button
           id="recent-projects-view-all"
           variant="ghost"
           size="sm"
           asChild
-          className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+          className="h-6 gap-1 px-2 text-[11px] text-muted-foreground cursor-pointer"
         >
           <Link to="/projects">
-            View all
+            <span>View All</span>
             <ArrowRight className="h-3 w-3" />
           </Link>
         </Button>
       </div>
 
-      <div className="flex flex-1 flex-col gap-1">
-        {recentProjects.length === 0 && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
-            <FolderKanban className="h-6 w-6 text-muted-foreground/50" />
+      <div className="flex flex-col gap-1.5">
+        {recentProjects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
+            <FolderKanban className="h-6 w-6 text-muted-foreground/40" />
             <p className="text-xs text-muted-foreground">
-              No projects yet — create one to see it here.
+              No projects active yet — create one to start tracking.
             </p>
           </div>
-        )}
-
-        {recentProjects.map(({ project, progress }) => (
-          <Link
-            key={project.id}
-            to={`/projects/${project.id}`}
-            className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
-          >
-            <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-base"
-              style={{
-                backgroundColor: `${project.color}18`,
-              }}
+        ) : (
+          recentProjects.slice(0, 4).map(({ project, progress }) => (
+            <Link
+              key={project.id}
+              to={`/projects/${project.id}`}
+              className="group flex items-center justify-between gap-3 rounded-lg border border-border/30 bg-muted/10 px-3 py-2 transition-all hover:border-primary/40 hover:bg-card hover:shadow-xs"
             >
-              {project.emoji}
-            </div>
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <ProjectIcon
+                  icon={project.emoji}
+                  color={project.color}
+                  size="sm"
+                />
 
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">
-                {project.name}
-              </p>
-
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">
-                  Updated{" "}
-                  {formatDistanceToNow(new Date(project.updatedAt), {
-                    addSuffix: true,
-                  })}
-                </p>
-                <span className="text-[10px] text-muted-foreground/50">•</span>
-                <div className="flex items-center gap-1.5" aria-label={`${progress.completionPercentage}% complete`}>
-                  <Progress value={progress.completionPercentage} className="h-1.5 w-12" />
-                  <span className="text-[10px] font-medium text-muted-foreground">
-                    {progress.completionPercentage}%
-                  </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                      {project.name}
+                    </p>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground truncate mt-0.5">
+                    Updated {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })} • {progress.completed}/{progress.total} tasks
+                  </p>
                 </div>
               </div>
-            </div>
-          </Link>
-        ))}
+
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-col items-end gap-0.5" aria-label={`${progress.completionPercentage}% complete`}>
+                  <Badge variant="outline" className="h-4 text-[9px] font-semibold border-primary/30 text-primary bg-primary/5 px-1 py-0">
+                    {progress.completionPercentage}%
+                  </Badge>
+                  <Progress value={progress.completionPercentage} className="h-1 w-14" />
+                </div>
+              </div>
+            </Link>
+          ))
+        )}
       </div>
     </div>
   );
-}
+});

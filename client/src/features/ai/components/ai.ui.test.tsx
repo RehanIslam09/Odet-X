@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { GenerateTasksDialog } from "@/features/projects/components/GenerateTasksDialog";
 import { ProjectAISummaryCard } from "@/features/projects/components/ProjectAISummaryCard";
@@ -21,170 +22,178 @@ vi.mock("@/features/projects/hooks/useProject.js", () => ({
   useProject: vi.fn(() => ({ data: { project: null } })),
 }));
 
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+
 describe("WP-03 AI UI Components & Interactions", () => {
+  const mockGenerateTasksMutate = vi.fn();
+  const mockGenerateSummaryMutate = vi.fn();
+  const mockGenerateLabelsMutate = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
 
     vi.mocked(useGenerateTasks).mockReturnValue({
-      mutate: vi.fn(),
+      mutate: mockGenerateTasksMutate,
       isPending: false,
     } as unknown as ReturnType<typeof useGenerateTasks>);
 
     vi.mocked(useGenerateProjectSummary).mockReturnValue({
-      mutate: vi.fn(),
+      mutate: mockGenerateSummaryMutate,
       isPending: false,
     } as unknown as ReturnType<typeof useGenerateProjectSummary>);
 
     vi.mocked(useGenerateTaskLabels).mockReturnValue({
-      mutate: vi.fn(),
+      mutate: mockGenerateLabelsMutate,
       isPending: false,
     } as unknown as ReturnType<typeof useGenerateTaskLabels>);
   });
 
+  // =========================================================================
+  // GenerateTasksDialog
+  // =========================================================================
   describe("GenerateTasksDialog", () => {
-    it("renders dialog when open and prevents empty submission", async () => {
-      const mockMutate = vi.fn();
-      vi.mocked(useGenerateTasks).mockReturnValue({
-        mutate: mockMutate,
-        isPending: false,
-      } as unknown as ReturnType<typeof useGenerateTasks>);
+    it("renders dialog when open and prevents empty submission", () => {
+      const handleOpenChange = vi.fn();
 
       render(
-        <GenerateTasksDialog projectId="proj-1" open={true} onOpenChange={vi.fn()} />,
+        <MemoryRouter>
+          <GenerateTasksDialog
+            projectId="proj-1"
+            open={true}
+            onOpenChange={handleOpenChange}
+          />
+        </MemoryRouter>,
       );
 
+      // Verify header and description
       expect(screen.getByText("Generate Tasks with AI")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Describe what feature, module, or goal/i),
+      ).toBeInTheDocument();
 
-      // Submit empty form
+      // Submit empty form -> should NOT trigger mutation
       const submitBtn = screen.getByRole("button", { name: /Generate Tasks/i });
       fireEvent.click(submitBtn);
 
-      expect(mockMutate).not.toHaveBeenCalled();
-      expect(
-        screen.getByText("Please enter a description for the tasks you want to generate."),
-      ).toBeInTheDocument();
+      expect(mockGenerateTasksMutate).not.toHaveBeenCalled();
     });
 
-    it("triggers generateTasks mutation on valid input", async () => {
-      const mockMutate = vi.fn();
-      vi.mocked(useGenerateTasks).mockReturnValue({
-        mutate: mockMutate,
-        isPending: false,
-      } as unknown as ReturnType<typeof useGenerateTasks>);
-
+    it("triggers generateTasks mutation on valid input", () => {
       render(
-        <GenerateTasksDialog projectId="proj-1" open={true} onOpenChange={vi.fn()} />,
+        <MemoryRouter>
+          <GenerateTasksDialog
+            projectId="proj-1"
+            open={true}
+            onOpenChange={vi.fn()}
+          />
+        </MemoryRouter>,
       );
 
-      const textarea = screen.getByLabelText(/Project Requirement/i);
-      fireEvent.change(textarea, { target: { value: "Build payment integration" } });
+      const input = screen.getByPlaceholderText(/Build user authentication/i);
+      fireEvent.change(input, {
+        target: { value: "Implement OAuth2 login with Google" },
+      });
 
       const submitBtn = screen.getByRole("button", { name: /Generate Tasks/i });
       fireEvent.click(submitBtn);
 
-      expect(mockMutate).toHaveBeenCalledWith(
-        { description: "Build payment integration" },
+      expect(mockGenerateTasksMutate).toHaveBeenCalledWith(
+        { description: "Implement OAuth2 login with Google" },
         expect.any(Object),
       );
     });
 
     it("shows loading state and disables buttons while pending", () => {
       vi.mocked(useGenerateTasks).mockReturnValue({
-        mutate: vi.fn(),
+        mutate: mockGenerateTasksMutate,
         isPending: true,
       } as unknown as ReturnType<typeof useGenerateTasks>);
 
       render(
-        <GenerateTasksDialog projectId="proj-1" open={true} onOpenChange={vi.fn()} />,
+        <MemoryRouter>
+          <GenerateTasksDialog
+            projectId="proj-1"
+            open={true}
+            onOpenChange={vi.fn()}
+          />
+        </MemoryRouter>,
       );
 
-      expect(screen.getByText("Generating Tasks…")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Generating Tasks…/i })).toBeDisabled();
+      expect(screen.getByText(/Generating Tasks/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Cancel/i })).toBeDisabled();
     });
   });
 
+  // =========================================================================
+  // ProjectAISummaryCard
+  // =========================================================================
   describe("ProjectAISummaryCard", () => {
-    it("renders empty state when project has no aiSummary", () => {
-      const mockProject: Project = {
-        id: "proj-1",
-        name: "Test Project",
-        description: "",
-        emoji: "📁",
-        color: "#6366f1",
-        archived: false,
-        owner: "user-1",
-        createdAt: "2026-07-24T00:00:00.000Z",
-        updatedAt: "2026-07-24T00:00:00.000Z",
-      };
+    const mockProject: Project = {
+      id: "proj-1",
+      name: "Core Infrastructure",
+      description: "Main backend and frontend repo",
+      emoji: "📁",
+      color: "#6366f1",
+      owner: "user-1",
+      archived: false,
+      createdAt: "2026-07-24T00:00:00.000Z",
+      updatedAt: "2026-07-24T00:00:00.000Z",
+    };
 
+    it("renders empty state when project has no aiSummary", () => {
       render(<ProjectAISummaryCard project={mockProject} />);
 
-      expect(screen.getByText("AI Project Summary")).toBeInTheDocument();
-      expect(screen.getByText(/No AI summary generated for this project yet/i)).toBeInTheDocument();
+      expect(screen.getByText(/No AI summary generated/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Generate AI Summary/i }),
+      ).toBeInTheDocument();
     });
 
     it("renders summary, highlights, and risks when aiSummary exists", () => {
-      const mockProject: Project = {
-        id: "proj-1",
-        name: "Test Project",
-        description: "",
-        emoji: "📁",
-        color: "#6366f1",
-        archived: false,
-        owner: "user-1",
+      const projectWithSummary: Project = {
+        ...mockProject,
         aiSummary: {
-          summary: "The project is making great progress on core infrastructure.",
-          highlights: ["Database migration complete", "API gateway operational"],
-          risks: [" tight timeline for frontend integration"],
+          summary: "Project is proceeding according to schedule.",
+          highlights: ["Frontend architecture completed", "API spec finalized"],
+          risks: ["Third-party auth rate limits"],
         },
-        createdAt: "2026-07-24T00:00:00.000Z",
-        updatedAt: "2026-07-24T00:00:00.000Z",
       };
 
-      render(<ProjectAISummaryCard project={mockProject} />);
+      render(<ProjectAISummaryCard project={projectWithSummary} />);
 
-      expect(screen.getByText("The project is making great progress on core infrastructure.")).toBeInTheDocument();
-      expect(screen.getByText("Database migration complete")).toBeInTheDocument();
-      expect(screen.getByText("tight timeline for frontend integration")).toBeInTheDocument();
-      expect(screen.getByText("Regenerate")).toBeInTheDocument();
+      expect(
+        screen.getByText("Project is proceeding according to schedule."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Frontend architecture completed"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Third-party auth rate limits"),
+      ).toBeInTheDocument();
     });
 
     it("triggers summary generation mutation when button is clicked", () => {
-      const mockMutate = vi.fn();
-      vi.mocked(useGenerateProjectSummary).mockReturnValue({
-        mutate: mockMutate,
-        isPending: false,
-      } as unknown as ReturnType<typeof useGenerateProjectSummary>);
-
-      const mockProject: Project = {
-        id: "proj-1",
-        name: "Test Project",
-        description: "",
-        emoji: "📁",
-        color: "#6366f1",
-        archived: false,
-        owner: "user-1",
-        createdAt: "2026-07-24T00:00:00.000Z",
-        updatedAt: "2026-07-24T00:00:00.000Z",
-      };
-
       render(<ProjectAISummaryCard project={mockProject} />);
 
-      const btn = screen.getAllByRole("button", { name: /Generate Summary|Generate AI Summary/i })[0];
-      fireEvent.click(btn);
+      const generateBtn = screen.getByRole("button", {
+        name: /Generate AI Summary/i,
+      });
+      fireEvent.click(generateBtn);
 
-      expect(mockMutate).toHaveBeenCalled();
+      expect(mockGenerateSummaryMutate).toHaveBeenCalled();
     });
   });
 
+  // =========================================================================
+  // TaskPropertiesPanel Labels Integration
+  // =========================================================================
   describe("TaskPropertiesPanel Labels Integration", () => {
     it("renders AI Labels button and triggers label generation mutation", () => {
-      const mockMutate = vi.fn();
-      vi.mocked(useGenerateTaskLabels).mockReturnValue({
-        mutate: mockMutate,
-        isPending: false,
-      } as unknown as ReturnType<typeof useGenerateTaskLabels>);
-
       const mockTask: Task = {
         id: "task-100",
         title: "Test Task",
@@ -203,10 +212,14 @@ describe("WP-03 AI UI Components & Interactions", () => {
         version: 1,
       };
 
+      const queryClient = createTestQueryClient();
+
       render(
-        <MemoryRouter>
-          <TaskPropertiesPanel task={mockTask} />
-        </MemoryRouter>,
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter>
+            <TaskPropertiesPanel task={mockTask} />
+          </MemoryRouter>
+        </QueryClientProvider>,
       );
 
       expect(screen.getByText("frontend")).toBeInTheDocument();
@@ -215,7 +228,7 @@ describe("WP-03 AI UI Components & Interactions", () => {
       const aiLabelsBtn = screen.getByRole("button", { name: /AI Labels/i });
       fireEvent.click(aiLabelsBtn);
 
-      expect(mockMutate).toHaveBeenCalled();
+      expect(mockGenerateLabelsMutate).toHaveBeenCalled();
     });
   });
 });

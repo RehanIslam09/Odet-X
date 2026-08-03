@@ -1,14 +1,15 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button.js";
 import { useDebounce } from "@/hooks/useDebounce.js";
 import { useProjectOptions } from "@/features/projects/hooks/useProjectOptions.js";
+import { usePresenceAwareness } from "@/realtime/usePresenceAwareness.js";
 
 import { QuickFilters } from "../components/QuickFilters.js";
 import { TaskToolbar } from "../components/TaskToolbar.js";
-import { TaskList } from "../components/TaskList.js";
+import { TaskViewContainer } from "../components/TaskViewContainer.js";
 import { CreateTaskDialog } from "../components/CreateTaskDialog.js";
 import { EditTaskDialog } from "../components/EditTaskDialog.js";
 import { DeleteTaskDialog } from "../components/DeleteTaskDialog.js";
@@ -18,20 +19,13 @@ import type { Task, TaskStatus, TaskPriority } from "../types/tasks.types.js";
 import {
   useTasks,
   useArchiveTask,
+  useUpdateTask,
 } from "../hooks/index.js";
 
-/**
- * Main Tasks page container.
- *
- * Responsibilities:
- * - Maintain local UI state for filter inputs (search, status, priority, projectId, sort, page).
- * - Debounce search query changes to prevent API throttling.
- * - Call the useTasks query hook to fetch filtered/paginated tasks.
- * - Call useTasks with limit: 1 for completing Quick Filter counts.
- * - Map loaded projectId to dynamic project properties (name, color) using the projects cache.
- * - Manage Open/Close status variables for Create, Edit, and Delete Task dialogs.
- */
 export default function TasksPage() {
+  const { presenceUsers } = usePresenceAwareness();
+  const onlineUserIds = useMemo(() => new Set(presenceUsers.map((u) => u.userId)), [presenceUsers]);
+
   // ---------------------------------------------------------------------------
   // Filters & Pagination State
   // ---------------------------------------------------------------------------
@@ -60,15 +54,13 @@ export default function TasksPage() {
   const projectOptions = useMemo(() => {
     return (projectsData || []).map((proj) => ({
       id: proj.id,
-      name: `${proj.emoji} ${proj.name}`,
+      name: proj.name,
     }));
   }, [projectsData]);
 
   // ---------------------------------------------------------------------------
   // Quick Filter Total Counts Queries
   // ---------------------------------------------------------------------------
-  // We run 4 query calls with limit: 1 to fetch totals for the tab badges.
-  // The database evaluates these fast via indexes.
   const { data: allData } = useTasks({ page: 1, limit: 1, quickFilter: "all", archived: false });
   const { data: completedData } = useTasks({ page: 1, limit: 1, quickFilter: "completed", archived: false });
   const { data: dueTodayData } = useTasks({ page: 1, limit: 1, quickFilter: "due-today", archived: false });
@@ -77,7 +69,7 @@ export default function TasksPage() {
   const quickFilterCounts = useMemo(() => {
     return {
       all: allData?.pagination.total ?? 0,
-      myTasks: allData?.pagination.total ?? 0, // all tasks belong to user
+      myTasks: allData?.pagination.total ?? 0,
       dueToday: dueTodayData?.pagination.total ?? 0,
       overdue: overdueData?.pagination.total ?? 0,
       completed: completedData?.pagination.total ?? 0,
@@ -89,8 +81,8 @@ export default function TasksPage() {
   // ---------------------------------------------------------------------------
   const queryParams = useMemo(() => {
     return {
-      page,
-      limit,
+      page: view === "board" ? 1 : page,
+      limit: view === "board" ? 100 : limit,
       search: debouncedSearch || undefined,
       status: status === "all" ? undefined : status,
       priority: priority === "all" ? undefined : priority,
@@ -99,11 +91,10 @@ export default function TasksPage() {
       quickFilter: quickFilter === "all" ? undefined : quickFilter,
       archived: false,
     };
-  }, [page, limit, debouncedSearch, status, priority, projectId, sort, quickFilter]);
+  }, [page, limit, debouncedSearch, status, priority, projectId, sort, quickFilter, view]);
 
   const { data: tasksData, isLoading, isFetching } = useTasks(queryParams);
 
-  // Map task.projectId to project name and color using cached projects
   const mappedTasks = useMemo(() => {
     const projectsList = projectsData || [];
     const items = tasksData?.items || [];
@@ -122,6 +113,41 @@ export default function TasksPage() {
   // Mutations
   // ---------------------------------------------------------------------------
   const { mutate: archiveTask } = useArchiveTask();
+  const updateTaskMutation = useUpdateTask();
+
+  const handleStatusChange = useCallback(
+    (taskId: string, newStatus: TaskStatus) => {
+      updateTaskMutation.mutate({
+        id: taskId,
+        data: { status: newStatus },
+      });
+    },
+    [updateTaskMutation],
+  );
+
+  const handlePriorityChange = useCallback(
+    (taskId: string, newPriority: TaskPriority) => {
+      updateTaskMutation.mutate({
+        id: taskId,
+        data: { priority: newPriority },
+      });
+    },
+    [updateTaskMutation],
+  );
+
+  const handleClearFilters = useCallback(() => {
+    setSearch("");
+    setStatus("all");
+    setPriority("all");
+    setProjectId("all");
+    setPage(1);
+  }, []);
+
+  const hasActiveFilters =
+    search.trim().length > 0 ||
+    status !== "all" ||
+    priority !== "all" ||
+    projectId !== "all";
 
   return (
     <div className="flex flex-col gap-5 min-h-[500px]">
@@ -132,9 +158,9 @@ export default function TasksPage() {
         transition={{ duration: 0.25, ease: "easeOut" }}
         className="w-full"
       >
-        <PageHeader 
-          title="Tasks" 
-          description="Keep track of everything that needs your attention." 
+        <PageHeader
+          title="Tasks"
+          description="Keep track of everything that needs your attention."
           action={
             <Button
               id="new-task-button"
@@ -144,7 +170,7 @@ export default function TasksPage() {
               <Plus className="h-4 w-4" />
               New Task
             </Button>
-          } 
+          }
         />
       </motion.div>
 
@@ -199,27 +225,34 @@ export default function TasksPage() {
           view={view}
           onViewChange={setView}
           projects={projectOptions}
+          onClearFilters={handleClearFilters}
         />
       </motion.div>
 
-      {/* Task List Content */}
+      {/* Task List / Board Content */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3, delay: 0.12 }}
-        className="flex-1"
+        className="flex-1 flex flex-col min-h-0"
       >
-        <TaskList
+        <TaskViewContainer
+          view={view}
           tasks={mappedTasks}
           isLoading={isLoading}
+          onlineUserIds={onlineUserIds}
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={handleClearFilters}
           onCreateTaskClick={() => setCreateOpen(true)}
           onEditTask={(task) => setEditTarget(task)}
+          onStatusChange={handleStatusChange}
+          onPriorityChange={handlePriorityChange}
           onArchiveTask={(task) => archiveTask(task.id)}
           onDeleteTask={(task) => setDeleteTarget(task)}
         />
 
-        {/* Pagination Actions */}
-        {tasksData && tasksData.pagination.totalPages > 1 && (
+        {/* Pagination Actions (Only in List View) */}
+        {view === "list" && tasksData && tasksData.pagination.totalPages > 1 && (
           <div className="mt-5 flex items-center justify-between border-t border-border/40 pt-4 text-xs text-muted-foreground">
             <span>
               Showing Page {tasksData.pagination.page} of {tasksData.pagination.totalPages} ({tasksData.pagination.total} total items)

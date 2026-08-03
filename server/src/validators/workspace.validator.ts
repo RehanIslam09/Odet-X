@@ -6,6 +6,7 @@ import {
   MIN_WORKSPACE_NAME_LENGTH,
   MIN_WORKSPACE_SLUG_LENGTH,
   WORKSPACE_SLUG_REGEX,
+  WORKSPACE_ROLES,
 } from "@/constants/workspace.js";
 
 // ---------------------------------------------------------------------------
@@ -60,20 +61,11 @@ export const workspaceSlugSchema = z
 // Endpoint Request Schemas
 // ---------------------------------------------------------------------------
 
-/**
- * Validates `POST /api/v1/workspaces`.
- * `ownerId`, `isPersonal`, and membership roles are server-controlled domain fields
- * and MUST NOT be accepted from client payloads.
- */
 export const createWorkspaceSchema = z.object({
   name: workspaceNameSchema,
   slug: workspaceSlugSchema.optional(),
 });
 
-/**
- * Validates `PATCH /api/v1/workspaces/:workspaceId`.
- * All fields are optional, but at least one field must be provided.
- */
 export const updateWorkspaceSchema = z
   .object({
     name: workspaceNameSchema.optional(),
@@ -86,9 +78,25 @@ export const updateWorkspaceSchema = z
     },
   );
 
+export const createInvitationSchema = z.object({
+  email: z.string({ error: "Email address is required." }).trim().toLowerCase().email("Invalid email address."),
+  role: z.enum(WORKSPACE_ROLES, { error: "Invalid workspace role." }).default("MEMBER"),
+});
+
+export const updateMemberRoleSchema = z.object({
+  role: z.enum(WORKSPACE_ROLES, { error: "Invalid workspace role." }),
+});
+
+export const transferOwnershipSchema = z.object({
+  newOwnerUserId: z.string({ error: "Target new owner user ID is required." }).min(1),
+});
+
 // ---------------------------------------------------------------------------
 // DTOs — inferred from schemas as single source of truth
 // ---------------------------------------------------------------------------
 
 export type CreateWorkspaceDto = z.infer<typeof createWorkspaceSchema>;
 export type UpdateWorkspaceDto = z.infer<typeof updateWorkspaceSchema>;
+export type CreateInvitationDto = z.infer<typeof createInvitationSchema>;
+export type UpdateMemberRoleDto = z.infer<typeof updateMemberRoleSchema>;
+export type TransferOwnershipDto = z.infer<typeof transferOwnershipSchema>;

@@ -14,16 +14,6 @@ import {
 
 /**
  * Canonical shape of a Workspace document in MongoDB.
- *
- * Field rationale:
- * - `name`       — Primary display identifier in the UI (1–80 characters).
- * - `slug`       — Unique URL-safe identifier (e.g., /w/:workspaceSlug).
- * - `ownerId`    — The creator/primary owner user who owns the workspace (immutable).
- * - `isPersonal` — Flag indicating whether this is the user's auto-provisioned
- *                  personal workspace. Uniqueness partial index guarantees at
- *                  most ONE personal workspace per owner user.
- * - `createdAt`  — Mongoose timestamps option injects this automatically.
- * - `updatedAt`  — Mongoose timestamps option injects this automatically.
  */
 export interface IWorkspace {
   name: string;
@@ -68,7 +58,6 @@ const workspaceSchema = new Schema<IWorkspaceDocument>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      immutable: true,
     },
 
     isPersonal: {
@@ -98,10 +87,8 @@ const workspaceSchema = new Schema<IWorkspaceDocument>(
 // Indexes
 // ---------------------------------------------------------------------------
 
-/**
- * Unique partial index: Guarantees at most ONE personal workspace (`isPersonal: true`)
- * per owner user. Allows an owner user to own multiple custom workspaces (`isPersonal: false`).
- */
+workspaceSchema.index({ slug: 1 }, { unique: true });
+
 workspaceSchema.index(
   { ownerId: 1, isPersonal: 1 },
   {

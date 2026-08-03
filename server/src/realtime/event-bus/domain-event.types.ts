@@ -8,9 +8,11 @@ export type DomainEventType =
   | "project.archived"
   | "project.deleted"
   | "activity.created"
+  | "member.invited"
   | "member.added"
   | "member.updated"
   | "member.removed"
+  | "workspace.ownerTransferred"
   | "plan.created"
   | "plan.committed";
 

@@ -213,4 +213,13 @@ describe("WP-5 — Client Real-Time Foundation & TanStack Query Invalidation Tes
     expect(typeof unsubscribe).toBe("function");
     unsubscribe();
   });
+
+  // ---------------------------------------------------------------------------
+  // 7. Socket.IO Origin Extraction (Namespace Mismatch Prevention)
+  // ---------------------------------------------------------------------------
+  it("extracts origin from VITE_API_URL so path /api/v1 is not passed as Socket.IO namespace", () => {
+    const apiUrl = "http://localhost:5000/api/v1";
+    const origin = new URL(apiUrl).origin;
+    expect(origin).toBe("http://localhost:5000");
+  });
 });

@@ -5,7 +5,7 @@ export interface INotification {
   recipientId: Types.ObjectId;
   actorId: Types.ObjectId | null;
   type: NotificationType;
-  entityType: "project" | "task" | "system" | null;
+  entityType: "project" | "task" | "workspaceMember" | "system" | null;
   entityId: Types.ObjectId | null;
 
   title: string;
@@ -27,7 +27,7 @@ const notificationSchema = new Schema<INotificationDocument>(
     recipientId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     actorId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     type: { type: String, enum: Object.values(NOTIFICATION_TYPES), required: true },
-    entityType: { type: String, enum: ["project", "task", "system"], default: null },
+    entityType: { type: String, enum: ["project", "task", "workspaceMember", "system"], default: null },
     entityId: { type: Schema.Types.ObjectId, default: null },
 
     title: { type: String, required: true },
@@ -52,10 +52,7 @@ const notificationSchema = new Schema<INotificationDocument>(
 );
 
 // Indexes
-// For cursor-paginated full feed retrieval
 notificationSchema.index({ recipientId: 1, _id: -1 });
-
-// For unread counts, unread-filtered feeds, and mark-all-read operations
 notificationSchema.index({ recipientId: 1, readAt: 1, _id: -1 });
 
 const Notification: Model<INotificationDocument> = model<INotificationDocument>(

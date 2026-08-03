@@ -4,12 +4,12 @@ import { ACTIVITY_TYPES, ActivityType } from "@/constants/activity.js";
 export interface IActivity {
   owner: Types.ObjectId;
   actorId: Types.ObjectId;
-  workspaceId?: Types.ObjectId; // Phase 32: tenant boundary (required: false for migration safety)
+  workspaceId?: Types.ObjectId;
   type: ActivityType;
-  entityType: "project" | "task";
+  entityType: "project" | "task" | "workspaceMember" | "workspace";
   entityId: Types.ObjectId;
-  projectId?: Types.ObjectId | null; // Primary project context (legacy filtering)
-  contextProjectIds: Types.ObjectId[]; // All projects this event is relevant to (e.g. source and destination on move)
+  projectId?: Types.ObjectId | null;
+  contextProjectIds: Types.ObjectId[];
   taskId?: Types.ObjectId | null;
   metadata: Record<string, any>;
   createdAt: Date;
@@ -23,7 +23,7 @@ const activitySchema = new Schema<IActivityDocument>(
     actorId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: false },
     type: { type: String, enum: Object.values(ACTIVITY_TYPES), required: true },
-    entityType: { type: String, enum: ["project", "task"], required: true },
+    entityType: { type: String, enum: ["project", "task", "workspaceMember", "workspace"], required: true },
     entityId: { type: Schema.Types.ObjectId, required: true },
     projectId: { type: Schema.Types.ObjectId, ref: "Project", default: null },
     contextProjectIds: { type: [Schema.Types.ObjectId], ref: "Project", default: [] },
@@ -31,7 +31,7 @@ const activitySchema = new Schema<IActivityDocument>(
     metadata: { type: Schema.Types.Mixed, default: {} },
   },
   {
-    timestamps: { createdAt: true, updatedAt: false }, // Activities are append-only
+    timestamps: { createdAt: true, updatedAt: false },
     toJSON: {
       virtuals: true,
       transform(_doc, ret) {
@@ -42,17 +42,12 @@ const activitySchema = new Schema<IActivityDocument>(
   },
 );
 
-// Phase 32 - Workspace-scoped activity feed (primary tenant index)
+// Indexes
 activitySchema.index({ workspaceId: 1, _id: -1 });
-// Phase 32 - Workspace + project activity feed
 activitySchema.index({ workspaceId: 1, projectId: 1, _id: -1 });
-// Legacy owner-scoped indexes (retained for backward compat during migration period)
 activitySchema.index({ owner: 1, _id: -1 });
-// Project activity feed (legacy)
 activitySchema.index({ owner: 1, projectId: 1, _id: -1 });
-// Project activity feed (new multikey index)
 activitySchema.index({ owner: 1, contextProjectIds: 1, _id: -1 });
-// Task activity feed
 activitySchema.index({ owner: 1, taskId: 1, _id: -1 });
 
 const Activity: Model<IActivityDocument> = model<IActivityDocument>("Activity", activitySchema);

@@ -40,11 +40,9 @@ const descriptionSchema = z
   .default("");
 
 /**
- * Emoji field — stored as a plain string. No unicode validation by design:
- * browsers handle rendering, and attempting to validate emoji codepoints adds
- * complexity with no meaningful safety benefit here.
+ * Emoji / Icon field — stored as a plain string (Lucide icon name or legacy emoji string).
  */
-const emojiSchema = z.string().max(10).optional().default("📁");
+const emojiSchema = z.string().max(50).optional().default("Folder");
 
 /**
  * Color field — hex color only. Validated against the 6-digit lowercase or

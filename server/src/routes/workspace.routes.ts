@@ -9,6 +9,13 @@ import {
   removeMember,
   updateWorkspace,
 } from "@/controllers/workspace.controller.js";
+import {
+  createInvitationHandler,
+  listPendingInvitationsHandler,
+  revokeInvitationHandler,
+  transferOwnershipHandler,
+  updateMemberRoleHandler,
+} from "@/controllers/workspace-invitation.controller.js";
 import { authenticate } from "@/middleware/auth.middleware.js";
 import { validate } from "@/middleware/validate.js";
 import {
@@ -19,7 +26,10 @@ import {
 } from "@/middleware/workspace-auth.middleware.js";
 import { Permission } from "@/constants/permissions.js";
 import {
+  createInvitationSchema,
   createWorkspaceSchema,
+  transferOwnershipSchema,
+  updateMemberRoleSchema,
   updateWorkspaceSchema,
 } from "@/validators/workspace.validator.js";
 
@@ -70,6 +80,45 @@ router.delete(
   requireWorkspaceMember,
   requirePermission(Permission.MEMBER_REMOVE),
   removeMember,
+);
+
+router.patch(
+  "/:workspaceId/members/:userId/role",
+  resolveWorkspace,
+  requireWorkspaceOwner,
+  validate(updateMemberRoleSchema),
+  updateMemberRoleHandler,
+);
+
+router.post(
+  "/:workspaceId/transfer-ownership",
+  resolveWorkspace,
+  requireWorkspaceOwner,
+  validate(transferOwnershipSchema),
+  transferOwnershipHandler,
+);
+
+// Invitation management routes
+router.post(
+  "/:workspaceId/invitations",
+  resolveWorkspace,
+  requirePermission(Permission.MEMBER_INVITE),
+  validate(createInvitationSchema),
+  createInvitationHandler,
+);
+
+router.get(
+  "/:workspaceId/invitations",
+  resolveWorkspace,
+  requirePermission(Permission.MEMBER_LIST),
+  listPendingInvitationsHandler,
+);
+
+router.delete(
+  "/:workspaceId/invitations/:invitationId",
+  resolveWorkspace,
+  requirePermission(Permission.MEMBER_INVITE),
+  revokeInvitationHandler,
 );
 
 export default router;

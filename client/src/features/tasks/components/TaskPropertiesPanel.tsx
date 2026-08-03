@@ -1,32 +1,35 @@
-import { Calendar, Clock, Folder, Tag, Sparkles, RefreshCw } from "lucide-react";
+import { memo } from "react";
 import { Link } from "react-router-dom";
+import { Folder, Calendar, User, Tag, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 
 import { Button } from "@/components/ui/button.js";
-import type { Task } from "../types/tasks.types.js";
-import { useProject } from "@/features/projects/hooks/useProject.js";
-import { useGenerateTaskLabels } from "@/features/ai";
+import { Badge } from "@/components/ui/badge.js";
+import { ProjectIcon } from "@/components/common/ProjectIcon.js";
 import { TaskStatusBadge } from "./TaskStatusBadge.js";
 import { TaskPriorityBadge } from "./TaskPriorityBadge.js";
-import { isTaskOverdue } from "../utils/task.utils.js";
+import { useGenerateTaskLabels } from "@/features/ai";
+import type { Task } from "@/features/tasks/types/tasks.types.js";
+import type { Project } from "@/features/projects/types/projects.types.js";
 
 interface TaskPropertiesPanelProps {
   task: Task;
+  project?: Project | null;
 }
 
-export function TaskPropertiesPanel({ task }: TaskPropertiesPanelProps) {
-  const { data: projectRes } = useProject(task.projectId ?? undefined);
-  const project = projectRes?.project;
-
-  const { mutate: generateLabels, isPending: isGeneratingLabels } = useGenerateTaskLabels(task.id);
-
-  const isOverdue = isTaskOverdue(task.dueDate, task.status);
+export const TaskPropertiesPanel = memo(function TaskPropertiesPanel({
+  task,
+  project,
+}: TaskPropertiesPanelProps) {
+  const { mutate: generateLabels, isPending: generatingLabels } = useGenerateTaskLabels(task.id);
 
   return (
-    <div className="flex flex-col gap-6 p-5 bg-muted/30 border border-border/60 rounded-xl">
-      <h3 className="font-semibold text-sm text-foreground">Properties</h3>
-      
-      <div className="flex flex-col gap-4 text-sm">
+    <div className="rounded-lg border bg-card p-4 space-y-4 text-xs">
+      <h3 className="font-semibold text-foreground tracking-tight text-sm border-b pb-2">
+        Properties
+      </h3>
+
+      <div className="space-y-3">
         {/* Project */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-muted-foreground w-28 shrink-0">
@@ -39,7 +42,7 @@ export function TaskPropertiesPanel({ task }: TaskPropertiesPanelProps) {
                 to={`/projects/${project.id}`}
                 className="inline-flex items-center gap-1.5 px-2 py-1 bg-background border border-border rounded-md hover:bg-muted transition-colors max-w-full"
               >
-                {project.emoji && <span className="shrink-0">{project.emoji}</span>}
+                <ProjectIcon icon={project.emoji} color={project.color} size="xs" />
                 <span className="truncate">{project.name}</span>
               </Link>
             ) : (
@@ -62,11 +65,26 @@ export function TaskPropertiesPanel({ task }: TaskPropertiesPanelProps) {
         {/* Priority */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-muted-foreground w-28 shrink-0">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-muted-foreground"><path d="M2 13V3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13Z" stroke="currentColor" strokeWidth="1.5"/></svg>
+            <Tag className="h-4 w-4" />
             <span>Priority</span>
           </div>
           <div className="flex-1 flex justify-end">
             <TaskPriorityBadge priority={task.priority} />
+          </div>
+        </div>
+
+        {/* Assignee */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-muted-foreground w-28 shrink-0">
+            <User className="h-4 w-4" />
+            <span>Assignee</span>
+          </div>
+          <div className="flex-1 text-right truncate">
+            {task.assigneeId ? (
+              <span className="font-medium text-foreground">Assigned</span>
+            ) : (
+              <span className="text-muted-foreground italic">Unassigned</span>
+            )}
           </div>
         </div>
 
@@ -76,38 +94,18 @@ export function TaskPropertiesPanel({ task }: TaskPropertiesPanelProps) {
             <Calendar className="h-4 w-4" />
             <span>Due Date</span>
           </div>
-          <div className="flex-1 min-w-0 flex justify-end">
+          <div className="flex-1 text-right font-medium text-foreground">
             {task.dueDate ? (
-              <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${isOverdue ? 'text-red-500 bg-red-500/10 border-red-500/20' : 'text-foreground bg-background border-border'}`}>
-                {format(new Date(task.dueDate), "MMM d, yyyy")}
-                {isOverdue && " (Overdue)"}
-              </span>
+              format(new Date(task.dueDate), "MMM d, yyyy")
             ) : (
-              <span className="text-muted-foreground italic">None</span>
-            )}
-          </div>
-        </div>
-
-        {/* Estimated Time */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-muted-foreground w-28 shrink-0">
-            <Clock className="h-4 w-4" />
-            <span>Estimate</span>
-          </div>
-          <div className="flex-1 min-w-0 flex justify-end">
-            {task.estimatedTime ? (
-              <span className="px-2 py-0.5 bg-background border border-border rounded-md text-xs font-medium text-foreground">
-                {task.estimatedTime}
-              </span>
-            ) : (
-              <span className="text-muted-foreground italic">None</span>
+              <span className="text-muted-foreground italic">No due date</span>
             )}
           </div>
         </div>
 
         {/* Labels */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-1 w-28 shrink-0 mt-1">
+        <div className="flex flex-col gap-2 pt-2 border-t">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Tag className="h-4 w-4" />
               <span>Labels</span>
@@ -115,53 +113,28 @@ export function TaskPropertiesPanel({ task }: TaskPropertiesPanelProps) {
             <Button
               variant="ghost"
               size="sm"
+              className="h-6 px-2 text-[11px] gap-1 text-primary hover:bg-primary/10 cursor-pointer"
               onClick={() => generateLabels()}
-              disabled={isGeneratingLabels}
-              className="h-6 px-1.5 text-[11px] gap-1 w-fit text-muted-foreground hover:text-foreground -ml-1 mt-0.5"
-              title="Auto-generate AI labels for this task"
+              disabled={generatingLabels}
+              aria-label="AI Labels"
             >
-              {isGeneratingLabels ? (
-                <>
-                  <RefreshCw className="h-3 w-3 animate-spin text-primary" />
-                  Generating…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-3 w-3 text-primary" />
-                  AI Labels
-                </>
-              )}
+              <Sparkles className="h-3 w-3 text-primary" />
+              <span>{generatingLabels ? "Generating..." : "AI Labels"}</span>
             </Button>
           </div>
-          <div className="flex-1 min-w-0 flex flex-wrap justify-end gap-1.5">
+          <div className="flex flex-wrap gap-1">
             {task.labels && task.labels.length > 0 ? (
               task.labels.map((label) => (
-                <span 
-                  key={label}
-                  className="px-2 py-0.5 rounded-md bg-secondary text-secondary-foreground text-[11px] font-medium border border-border/50"
-                >
+                <Badge key={label} variant="secondary" className="text-[10px] px-1.5 py-0.5">
                   {label}
-                </span>
+                </Badge>
               ))
             ) : (
-              <span className="text-muted-foreground italic mt-1">None</span>
+              <span className="text-muted-foreground italic text-[11px]">No labels</span>
             )}
           </div>
         </div>
       </div>
-
-      <div className="h-px bg-border/60 w-full my-1" />
-
-      <div className="flex flex-col gap-2 text-[11px] text-muted-foreground">
-        <div className="flex justify-between">
-          <span>Created</span>
-          <span>{format(new Date(task.createdAt), "MMM d, yyyy 'at' h:mm a")}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Last updated</span>
-          <span>{format(new Date(task.updatedAt), "MMM d, yyyy 'at' h:mm a")}</span>
-        </div>
-      </div>
     </div>
   );
-}
+});

@@ -74,25 +74,7 @@ export class PermissionEngine {
       };
     }
 
-    // 3. Viewer Read-Only Invariant
-    if (role === "VIEWER") {
-      const isMutation =
-        permission.includes(":create") ||
-        permission.includes(":update") ||
-        permission.includes(":delete") ||
-        permission.includes(":archive") ||
-        permission.includes(":assign") ||
-        permission === Permission.AI_ACTION_EXECUTE;
-
-      if (isMutation) {
-        return {
-          allowed: false,
-          reason: "Read-only viewers cannot execute mutations.",
-        };
-      }
-    }
-
-    // 4. Personal Workspace Invariants
+    // 3. Personal Workspace Invariants
     const isPersonal = resourceContext?.isPersonalWorkspace ?? workspace.isPersonal;
     if (isPersonal) {
       if (
@@ -107,7 +89,7 @@ export class PermissionEngine {
       }
     }
 
-    // 5. Resource Context Refinements for MEMBER role
+    // 4. Resource Context Refinements for MEMBER role
     if (role === "MEMBER") {
       // Task Delete Refinement: Members can only delete tasks if they are creator (owner) or assignee
       if (permission === Permission.TASK_DELETE && resourceContext) {

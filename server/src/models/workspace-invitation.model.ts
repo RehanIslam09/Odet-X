@@ -1,8 +1,7 @@
 import { Document, Model, Schema, Types, model } from "mongoose";
 import { WORKSPACE_ROLES, WorkspaceRole } from "@/constants/workspace.js";
 
-export const WORKSPACE_INVITATION_STATUSES = ["PENDING", "ACCEPTED", "EXPIRED", "REVOKED"] as const;
-export type WorkspaceInvitationStatus = (typeof WORKSPACE_INVITATION_STATUSES)[number];
+export type InvitationStatus = "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
 
 export interface IWorkspaceInvitation {
   workspaceId: Types.ObjectId;
@@ -10,9 +9,10 @@ export interface IWorkspaceInvitation {
   role: WorkspaceRole;
   invitedBy: Types.ObjectId;
   token: string;
-  status: WorkspaceInvitationStatus;
   expiresAt: Date;
   acceptedAt?: Date | null;
+  revokedAt?: Date | null;
+  status: InvitationStatus;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,13 +30,14 @@ const workspaceInvitationSchema = new Schema<IWorkspaceInvitationDocument>(
     email: {
       type: String,
       required: true,
-      trim: true,
       lowercase: true,
+      trim: true,
     },
 
     role: {
       type: String,
       enum: WORKSPACE_ROLES,
+      default: "MEMBER",
       required: true,
     },
 
@@ -50,13 +51,7 @@ const workspaceInvitationSchema = new Schema<IWorkspaceInvitationDocument>(
       type: String,
       required: true,
       unique: true,
-    },
-
-    status: {
-      type: String,
-      enum: WORKSPACE_INVITATION_STATUSES,
-      default: "PENDING",
-      required: true,
+      index: true,
     },
 
     expiresAt: {
@@ -67,6 +62,18 @@ const workspaceInvitationSchema = new Schema<IWorkspaceInvitationDocument>(
     acceptedAt: {
       type: Date,
       default: null,
+    },
+
+    revokedAt: {
+      type: Date,
+      default: null,
+    },
+
+    status: {
+      type: String,
+      enum: ["PENDING", "ACCEPTED", "REVOKED", "EXPIRED"],
+      default: "PENDING",
+      required: true,
     },
   },
   {
@@ -86,12 +93,10 @@ const workspaceInvitationSchema = new Schema<IWorkspaceInvitationDocument>(
   },
 );
 
+// Compound index for fast lookup of pending invites per workspace & email
 workspaceInvitationSchema.index({ workspaceId: 1, email: 1, status: 1 });
-workspaceInvitationSchema.index({ expiresAt: 1, status: 1 });
 
-const WorkspaceInvitation: Model<IWorkspaceInvitationDocument> = model<IWorkspaceInvitationDocument>(
-  "WorkspaceInvitation",
-  workspaceInvitationSchema,
-);
+const WorkspaceInvitation: Model<IWorkspaceInvitationDocument> =
+  model<IWorkspaceInvitationDocument>("WorkspaceInvitation", workspaceInvitationSchema);
 
 export default WorkspaceInvitation;

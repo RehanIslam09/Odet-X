@@ -1,25 +1,22 @@
 import { QueryClient } from "@tanstack/react-query";
-import type { RealtimeEventEnvelope } from "./realtime-types";
-import { taskKeys } from "@/features/tasks/hooks/useTasks";
-import { projectKeys } from "@/features/projects/hooks/useProjects";
-import { activityKeys } from "@/features/activity/hooks/activity.keys";
-import { workspaceKeys } from "@/features/workspaces/hooks/useWorkspaces";
-import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys";
-import { planKeys } from "@/features/ai/hooks/usePlanDraft";
+import type { RealtimeEventEnvelope } from "./realtime-types.js";
+import { activityKeys } from "@/features/activity/hooks/activity.keys.js";
+import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys.js";
+import { notificationKeys } from "@/features/notifications/hooks/notification.keys.js";
+import { planKeys } from "@/features/ai/hooks/usePlanDraft.js";
+import { projectKeys } from "@/features/projects/hooks/useProjects.js";
+import { taskKeys } from "@/features/tasks/hooks/useTasks.js";
+import { workspaceKeys } from "@/features/workspaces/hooks/useWorkspaces.js";
 
 /**
- * Maps incoming authoritative domain events to TanStack Query key invalidation.
- *
- * Core Rule:
- * Socket.IO notifies that server state changed. TanStack Query REST refetch
- * obtains authoritative new state.
+ * Centrally routes incoming Socket.io realtime domain event envelopes to the
+ * QueryClient to invalidate active query caches.
  */
 export function routeDomainEvent(
   event: RealtimeEventEnvelope,
   queryClient: QueryClient,
   activeWorkspaceId: string,
 ): void {
-  // Defense in depth: Verify workspace eligibility before triggering any invalidation
   if (event.workspaceId !== activeWorkspaceId) {
     return;
   }
@@ -32,6 +29,7 @@ export function routeDomainEvent(
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
       queryClient.invalidateQueries({ queryKey: activityKeys.all });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) });
         queryClient.invalidateQueries({ queryKey: projectKeys.summary(projectId) });
@@ -43,6 +41,7 @@ export function routeDomainEvent(
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
       queryClient.invalidateQueries({ queryKey: activityKeys.all });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       if (event.resource.id) {
         queryClient.invalidateQueries({ queryKey: taskKeys.detail(event.resource.id) });
       }
@@ -56,6 +55,7 @@ export function routeDomainEvent(
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
       queryClient.invalidateQueries({ queryKey: activityKeys.all });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       if (event.resource.id) {
         queryClient.removeQueries({ queryKey: taskKeys.detail(event.resource.id) });
       }
@@ -71,6 +71,7 @@ export function routeDomainEvent(
       queryClient.invalidateQueries({ queryKey: projectKeys.all });
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
       queryClient.invalidateQueries({ queryKey: activityKeys.all });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       if (event.resource.id) {
         queryClient.invalidateQueries({ queryKey: projectKeys.detail(event.resource.id) });
         queryClient.invalidateQueries({ queryKey: projectKeys.summary(event.resource.id) });
@@ -81,6 +82,7 @@ export function routeDomainEvent(
       queryClient.invalidateQueries({ queryKey: projectKeys.all });
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
       queryClient.invalidateQueries({ queryKey: activityKeys.all });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       if (event.resource.id) {
         queryClient.removeQueries({ queryKey: projectKeys.detail(event.resource.id) });
         queryClient.removeQueries({ queryKey: projectKeys.summary(event.resource.id) });
@@ -89,10 +91,17 @@ export function routeDomainEvent(
 
     case "activity.created":
       queryClient.invalidateQueries({ queryKey: activityKeys.all });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       break;
 
+    case "member.invited":
+    case "member.added":
+    case "member.updated":
     case "member.removed":
+    case "workspace.ownerTransferred":
       queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
+      queryClient.invalidateQueries({ queryKey: activityKeys.all });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       break;
 
     case "plan.committed":
@@ -101,6 +110,7 @@ export function routeDomainEvent(
       queryClient.invalidateQueries({ queryKey: projectKeys.all });
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
       queryClient.invalidateQueries({ queryKey: activityKeys.all });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: planKeys.project(projectId) });
         queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) });

@@ -8,16 +8,12 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge.js";
+import { Button } from "@/components/ui/button.js";
+import { Separator } from "@/components/ui/separator.js";
 
-import type { BriefInsight } from "@/features/dashboard/types/dashboard.types";
+import type { BriefInsight } from "@/features/dashboard/types/dashboard.types.js";
+import { useGlobalCopilot } from "@/features/ai/context/GlobalCopilotContext.js";
 
 const insights: BriefInsight[] = [
   {
@@ -30,30 +26,25 @@ const insights: BriefInsight[] = [
     id: "due-today",
     icon: CalendarClock,
     label: "Tasks due today",
-    description: "Pulled from every project once tasks are tracked.",
+    description: "Pulled from active projects in the current workspace.",
   },
   {
     id: "next-action",
     icon: Compass,
     label: "Suggested next action",
-    description: "The single most useful thing to do next, decided for you.",
+    description: "Prioritized recommendations produced by the AI Engine.",
   },
   {
     id: "blockers",
     icon: ShieldAlert,
     label: "Potential blockers",
-    description: "Dependencies or risks that could stall a project.",
+    description: "Dependencies or risk factors that could stall project progress.",
   },
 ];
 
-/**
- * AI Daily Brief.
- *
- * There's no AI backend generating insights yet, so this stays a labeled
- * "Preview" — it shows exactly what the card will surface without
- * fabricating numbers that don't exist.
- */
 export function AIDailyBrief() {
+  const { openCopilot } = useGlobalCopilot();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -70,14 +61,13 @@ export function AIDailyBrief() {
             Daily brief
           </h2>
         </div>
-        <Badge variant="secondary" className="text-xs font-medium">
-          Preview
+        <Badge variant="outline" className="text-xs font-medium border-primary/30 text-primary">
+          AI Engine Active
         </Badge>
       </div>
 
       <p className="mb-5 text-xs leading-relaxed text-muted-foreground">
-        Once your projects have tasks and activity, this card will generate a
-        short brief here every day, automatically.
+        Workspace telemetry is analyzed continuously by the Proactive Signal Engine to surface risk factors and task priorities.
       </p>
 
       <Separator className="mb-5" />
@@ -100,22 +90,17 @@ export function AIDailyBrief() {
         ))}
       </div>
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="mt-5 inline-flex w-full">
-            <Button
-              id="ai-daily-brief-ask-ai"
-              variant="outline"
-              disabled
-              className="w-full gap-1.5 border-dashed text-muted-foreground"
-            >
-              Ask AI about your workspace
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>The AI assistant is coming soon.</TooltipContent>
-      </Tooltip>
+      <div className="mt-5 w-full">
+        <Button
+          id="ai-daily-brief-ask-ai"
+          variant="outline"
+          className="w-full gap-1.5 border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+          onClick={() => openCopilot({ type: "workspace" })}
+        >
+          <span>Ask AI Copilot about your workspace</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </motion.div>
   );
 }

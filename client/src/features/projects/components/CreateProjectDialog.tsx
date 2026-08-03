@@ -9,60 +9,29 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/dialog.js";
+import { Button } from "@/components/ui/button.js";
+import { Input } from "@/components/ui/input.js";
+import { Label } from "@/components/ui/label.js";
+import { Textarea } from "@/components/ui/textarea.js";
 
 import {
   createProjectSchema,
   type CreateProjectFormInput,
   type CreateProjectFormValues,
-} from "@/features/projects/validators/projects.schemas";
+} from "@/features/projects/validators/projects.schemas.js";
 
-import { useCreateProject } from "@/features/projects/hooks";
-import { applyServerErrors } from "@/utils/form-errors";
-import { getApiError } from "@/utils/api-error";
-
-// ---------------------------------------------------------------------------
-// Color Palette
-// ---------------------------------------------------------------------------
-
-const COLOR_PALETTE = [
-  "#6366f1", // Indigo
-  "#8b5cf6", // Violet
-  "#06b6d4", // Cyan
-  "#10b981", // Emerald
-  "#f59e0b", // Amber
-  "#ef4444", // Red
-  "#ec4899", // Pink
-  "#64748b", // Slate
-];
-
-const EMOJI_PRESETS = ["📁", "🚀", "⚡", "🎯", "🔥", "💡", "🌟", "🛠️", "📊", "🎨"];
-
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
+import { useCreateProject } from "@/features/projects/hooks/index.js";
+import { ProjectIdentityPicker } from "@/features/projects/components/ProjectIdentityPicker.js";
+import { DEFAULT_PROJECT_ICON, DEFAULT_PROJECT_COLOR } from "@/features/projects/config/project-identity.config.js";
+import { applyServerErrors } from "@/utils/form-errors.js";
+import { getApiError } from "@/utils/api-error.js";
 
 interface CreateProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
-/**
- * Dialog for creating a new project.
- *
- * Uses React Hook Form + Zod for validation. Server validation errors are
- * applied to the form via `applyServerErrors`, matching the auth form pattern.
- * On success, the dialog closes automatically — the mutation hook handles
- * cache invalidation and the toast.
- */
 export function CreateProjectDialog({
   open,
   onOpenChange,
@@ -74,8 +43,8 @@ export function CreateProjectDialog({
     defaultValues: {
       name: "",
       description: "",
-      emoji: "📁",
-      color: "#6366f1",
+      emoji: DEFAULT_PROJECT_ICON,
+      color: DEFAULT_PROJECT_COLOR,
     },
   });
 
@@ -94,6 +63,14 @@ export function CreateProjectDialog({
     control: form.control,
     name: "color",
   });
+  const projectName = useWatch({
+    control: form.control,
+    name: "name",
+  });
+  const projectDescription = useWatch({
+    control: form.control,
+    name: "description",
+  });
 
   function onSubmit(values: CreateProjectFormValues) {
     createProject(values, {
@@ -111,63 +88,31 @@ export function CreateProjectDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>New Project</DialogTitle>
           <DialogDescription>
-            Give your project a name and make it yours.
+            Configure your project identity, name, and description.
           </DialogDescription>
         </DialogHeader>
 
         <form
           id="create-project-form"
           onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-5"
+          className="space-y-4"
         >
-          {/* Emoji picker */}
-          <div className="space-y-2">
-            <Label>Icon</Label>
-            <div className="flex flex-wrap gap-2">
-              {EMOJI_PRESETS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => form.setValue("emoji", emoji)}
-                  className={`flex h-9 w-9 items-center justify-center rounded-lg border text-lg transition-all duration-150 hover:scale-110 ${
-                    selectedEmoji === emoji
-                      ? "border-primary bg-primary/10 shadow-sm"
-                      : "border-border bg-background hover:border-muted-foreground"
-                  }`}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Project Identity Picker (Icon + Color + Live Preview) */}
+          <ProjectIdentityPicker
+            selectedIcon={selectedEmoji}
+            selectedColor={selectedColor}
+            projectName={projectName}
+            projectDescription={projectDescription}
+            onIconChange={(iconId) => form.setValue("emoji", iconId)}
+            onColorChange={(colorHex) => form.setValue("color", colorHex)}
+          />
 
-          {/* Color picker */}
-          <div className="space-y-2">
-            <Label>Color</Label>
-            <div className="flex flex-wrap gap-2">
-              {COLOR_PALETTE.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => form.setValue("color", color)}
-                  className={`h-7 w-7 rounded-full transition-all duration-150 hover:scale-110 ${
-                    selectedColor === color
-                      ? "ring-2 ring-foreground ring-offset-2"
-                      : ""
-                  }`}
-                  style={{ backgroundColor: color }}
-                  aria-label={`Select color ${color}`}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Project name */}
-          <div className="space-y-2">
+          {/* Project Name */}
+          <div className="space-y-1.5">
             <Label htmlFor="create-project-name">Name</Label>
             <Input
               id="create-project-name"
@@ -182,7 +127,7 @@ export function CreateProjectDialog({
           </div>
 
           {/* Description */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="create-project-description">
               Description{" "}
               <span className="font-normal text-muted-foreground">(optional)</span>
@@ -190,8 +135,8 @@ export function CreateProjectDialog({
             <Textarea
               id="create-project-description"
               placeholder="What is this project about?"
-              rows={3}
-              className="resize-none"
+              rows={2}
+              className="resize-none text-xs"
               {...form.register("description")}
             />
             {form.formState.errors.description && (

@@ -1,17 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys";
+import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys.js";
 import { tasksApi } from "@/features/tasks/services/tasks.api.js";
 import { taskKeys } from "@/features/tasks/hooks/useTasks.js";
 import { activityKeys } from "@/features/activity/hooks/activity.keys.js";
 import { projectKeys } from "@/features/projects/hooks/useProjects.js";
 
-/**
- * Archive (toggle) task mutation hook.
- *
- * On success: invalidates all task lists and the specific task's detail cache.
- */
 export function useArchiveTask() {
   const queryClient = useQueryClient();
 
@@ -22,15 +17,14 @@ export function useArchiveTask() {
       const { task } = responseData;
       const verb = task.archived ? "archived" : "unarchived";
 
-      queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(task.id) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
 
-      // Phase 12.3: Invalidate project summary because archived tasks are excluded from live metrics
       if (task.projectId) {
         queryClient.invalidateQueries({ queryKey: projectKeys.summary(task.projectId) });
       }
-      
-      queryClient.invalidateQueries({ queryKey: dashboardKeys.overview() });
+
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
       queryClient.invalidateQueries({ queryKey: activityKeys.lists() });
 
       toast.success(`Task ${verb} successfully.`);

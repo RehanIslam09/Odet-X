@@ -9,5 +9,7 @@ export * from "./registry/command.registry.js";
 export * from "./executor/command.executor.js";
 export * from "./catalog/default-commands.js";
 export * from "./utils/keyboard.utils.js";
+export * from "./context/CommandPaletteContext.js";
+export * from "./context/CommandPaletteProvider.js";
 export * from "./hooks/useCommandPalette.js";
 export * from "./components/CommandPalette.js";

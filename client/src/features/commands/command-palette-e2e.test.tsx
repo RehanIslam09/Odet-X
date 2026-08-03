@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { CommandPalette } from "@/features/commands/components/CommandPalette";
+import { CommandPaletteProvider } from "@/features/commands/context/CommandPaletteProvider";
 import { defaultCommandRegistry } from "@/features/commands/registry/command.registry";
 import { defaultCommands } from "@/features/commands/catalog/default-commands";
 import { searchApi } from "@/features/search/services/search.api";
@@ -36,17 +37,19 @@ function TestShell({ initialEntries = ["/"] }: { initialEntries?: string[] }) {
   return (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={initialEntries}>
-        <div data-testid="dashboard-layout-shell">
-          <LocationDisplay />
-          <Routes>
-            <Route path="/" element={<div>Dashboard Page</div>} />
-            <Route path="/projects" element={<div>Projects List Page</div>} />
-            <Route path="/tasks" element={<div>Tasks List Page</div>} />
-            <Route path="/tasks/:taskId" element={<div>Task Details Page</div>} />
-            <Route path="/projects/:projectId" element={<div>Project Details Page</div>} />
-          </Routes>
-          <CommandPalette />
-        </div>
+        <CommandPaletteProvider>
+          <div data-testid="dashboard-layout-shell">
+            <LocationDisplay />
+            <Routes>
+              <Route path="/" element={<div>Dashboard Page</div>} />
+              <Route path="/projects" element={<div>Projects List Page</div>} />
+              <Route path="/tasks" element={<div>Tasks List Page</div>} />
+              <Route path="/tasks/:taskId" element={<div>Task Details Page</div>} />
+              <Route path="/projects/:projectId" element={<div>Project Details Page</div>} />
+            </Routes>
+            <CommandPalette />
+          </div>
+        </CommandPaletteProvider>
       </MemoryRouter>
     </QueryClientProvider>
   );

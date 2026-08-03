@@ -1,4 +1,6 @@
 import { useParams } from "react-router-dom";
+import { useEffect } from "react";
+
 import { useTask } from "../hooks/useTask.js";
 import { TaskDetailHeader } from "../components/TaskDetailHeader.js";
 import { TaskPropertiesPanel } from "../components/TaskPropertiesPanel.js";
@@ -7,17 +9,18 @@ import { TaskNotFoundState } from "../components/TaskNotFoundState.js";
 import { TaskDetailSkeleton } from "../components/TaskDetailSkeleton.js";
 import { Button } from "@/components/ui/button.js";
 import { ErrorState } from "@/components/common/ErrorState.js";
-import { useEffect } from "react";
 import { TaskActivityTimeline } from "@/features/activity/components/TaskActivityTimeline.js";
+import { useRecentlyViewed } from "@/features/navigation/hooks/useRecentlyViewed.js";
 
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
-  
-  const { 
-    data: taskRes, 
-    isLoading, 
+  const { addRecentlyViewed } = useRecentlyViewed();
+
+  const {
+    data: taskRes,
+    isLoading,
     error,
-    refetch
+    refetch,
   } = useTask(taskId);
   const task = taskRes?.task;
 
@@ -25,6 +28,17 @@ export default function TaskDetailPage() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [taskId]);
+
+  useEffect(() => {
+    if (task?.id && task?.title) {
+      addRecentlyViewed({
+        id: task.id,
+        title: task.title,
+        type: "task",
+        url: `/tasks/${task.id}`,
+      });
+    }
+  }, [task?.id, task?.title, addRecentlyViewed]);
 
   if (isLoading) {
     return <TaskDetailSkeleton />;
@@ -63,7 +77,7 @@ export default function TaskDetailPage() {
   return (
     <div className="mx-auto w-full max-w-5xl animate-in fade-in duration-500">
       <TaskDetailHeader task={task} />
-      
+
       <div className="flex flex-col md:flex-row gap-6 md:gap-8">
         {/* Main Content (Description) */}
         <div className="flex-1 min-w-0">

@@ -33,9 +33,9 @@ export const createProjectSchema = z.object({
 
   emoji: z
     .string()
-    .max(10)
+    .max(50)
     .optional()
-    .default("📁"),
+    .default("Folder"),
 
   color: z
     .string()
@@ -66,7 +66,7 @@ export const updateProjectSchema = z.object({
     .max(DESCRIPTION_MAX, `Description must be at most ${DESCRIPTION_MAX} characters.`)
     .optional(),
 
-  emoji: z.string().max(10).optional(),
+  emoji: z.string().max(50).optional(),
 
   color: z
     .string()

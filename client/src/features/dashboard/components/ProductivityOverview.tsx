@@ -1,18 +1,16 @@
-import { FolderKanban, CheckCircle2, Clock, ListTodo } from "lucide-react";
+import { memo } from "react";
+import { FolderKanban, CheckCircle2, Clock, ListTodo, TrendingUp } from "lucide-react";
 
-import type { DashboardSummary } from "@/features/dashboard/types/dashboard.types";
+import { Progress } from "@/components/ui/progress.js";
+import type { DashboardSummary } from "@/features/dashboard/types/dashboard.types.js";
 
 interface ProductivityOverviewProps {
   summary?: DashboardSummary;
 }
 
-/**
- * Productivity overview.
- *
- * Displays real metrics derived from the authenticated user's projects and tasks
- * using the unified Dashboard endpoint.
- */
-export function ProductivityOverview({ summary }: ProductivityOverviewProps) {
+export const ProductivityOverview = memo(function ProductivityOverview({
+  summary,
+}: ProductivityOverviewProps) {
   const activeProjects = summary?.projects.active ?? 0;
   const totalActiveTasks = summary?.tasks.totalActive ?? 0;
   const completedTasks = summary?.tasks.completed ?? 0;
@@ -20,59 +18,82 @@ export function ProductivityOverview({ summary }: ProductivityOverviewProps) {
   const completionPercentage = summary?.tasks.completionPercentage ?? 0;
 
   return (
-    <div className="flex h-full flex-col rounded-xl border bg-card p-6 shadow-sm">
+    <div className="flex h-full flex-col rounded-xl border border-border/60 bg-card p-5 shadow-2xs">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-tight">
-          Overview
-        </h2>
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/10 text-sky-500">
+            <TrendingUp className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight text-foreground">
+              Productivity Overview
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Workspace task execution & resolution metrics
+            </p>
+          </div>
+        </div>
+
         {completionPercentage > 0 && (
-          <span className="text-xs font-medium text-muted-foreground">
-            {completionPercentage}% complete
+          <span className="text-xs font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+            {completionPercentage}% resolution
           </span>
         )}
       </div>
 
-      <div className="grid flex-1 grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-3">
-          <FolderKanban className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xl font-semibold tracking-tight">
+      <div className="grid flex-1 grid-cols-2 gap-3 mb-4">
+        <div className="flex flex-col justify-between gap-1 rounded-lg border border-border/40 bg-muted/20 p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground font-medium">Projects</span>
+            <FolderKanban className="h-4 w-4 text-indigo-500" />
+          </div>
+          <span className="text-2xl font-bold tracking-tight text-foreground">
             {activeProjects}
           </span>
-          <span className="text-xs text-muted-foreground">
-            Active projects
-          </span>
+          <span className="text-[10px] text-muted-foreground">Active in workspace</span>
         </div>
 
-        <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-3">
-          <ListTodo className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xl font-semibold tracking-tight">
+        <div className="flex flex-col justify-between gap-1 rounded-lg border border-border/40 bg-muted/20 p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground font-medium">Active Tasks</span>
+            <ListTodo className="h-4 w-4 text-sky-500" />
+          </div>
+          <span className="text-2xl font-bold tracking-tight text-foreground">
             {totalActiveTasks}
           </span>
-          <span className="text-xs text-muted-foreground">
-            Total active tasks
-          </span>
+          <span className="text-[10px] text-muted-foreground">Pending resolution</span>
         </div>
 
-        <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-3">
-          <CheckCircle2 className="h-4 w-4 text-emerald-500/70" />
-          <span className="text-xl font-semibold tracking-tight">
+        <div className="flex flex-col justify-between gap-1 rounded-lg border border-border/40 bg-muted/20 p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground font-medium">Completed</span>
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+          </div>
+          <span className="text-2xl font-bold tracking-tight text-foreground">
             {completedTasks}
           </span>
-          <span className="text-xs text-muted-foreground">
-            Completed tasks
-          </span>
+          <span className="text-[10px] text-muted-foreground">Resolved tasks</span>
         </div>
 
-        <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-3">
-          <Clock className="h-4 w-4 text-blue-500/70" />
-          <span className="text-xl font-semibold tracking-tight">
+        <div className="flex flex-col justify-between gap-1 rounded-lg border border-border/40 bg-muted/20 p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground font-medium">In Progress</span>
+            <Clock className="h-4 w-4 text-amber-500" />
+          </div>
+          <span className="text-2xl font-bold tracking-tight text-foreground">
             {inProgressTasks}
           </span>
-          <span className="text-xs text-muted-foreground">
-            In progress tasks
-          </span>
+          <span className="text-[10px] text-muted-foreground">Currently active</span>
         </div>
+      </div>
+
+      <div className="mt-auto space-y-1.5 pt-3 border-t border-border/40">
+        <div className="flex justify-between items-center text-xs">
+          <span className="text-muted-foreground font-medium">Resolution Velocity</span>
+          <span className="font-semibold text-foreground">{completionPercentage}%</span>
+        </div>
+        <Progress value={completionPercentage} className="h-1.5" />
       </div>
     </div>
   );
-}
+});

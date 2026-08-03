@@ -1,10 +1,15 @@
 import { apiClient } from "@/services/axios";
 import type {
+  AcceptInvitationResult,
+  CreateInvitationInput,
   CreateWorkspaceInput,
+  InvitationValidationDetails,
   UpdateWorkspaceInput,
   Workspace,
   WorkspaceDetails,
+  WorkspaceInvitation,
   WorkspaceMember,
+  WorkspaceRole,
 } from "../types/workspace.types";
 
 interface ApiResponse<T> {
@@ -78,4 +83,92 @@ export async function removeWorkspaceMemberApi(
   userId: string,
 ): Promise<void> {
   await apiClient.delete(`/workspaces/${workspaceId}/members/${userId}`);
+}
+
+/**
+ * POST /api/v1/workspaces/:workspaceId/invitations
+ * Sends an email invitation to join the workspace.
+ */
+export async function createInvitationApi(
+  workspaceId: string,
+  input: CreateInvitationInput,
+): Promise<WorkspaceInvitation> {
+  const res = await apiClient.post<ApiResponse<WorkspaceInvitation>>(
+    `/workspaces/${workspaceId}/invitations`,
+    input,
+  );
+  return res.data.data;
+}
+
+/**
+ * GET /api/v1/workspaces/:workspaceId/invitations
+ * Lists active pending invitations for a workspace.
+ */
+export async function fetchPendingInvitationsApi(
+  workspaceId: string,
+): Promise<WorkspaceInvitation[]> {
+  const res = await apiClient.get<ApiResponse<WorkspaceInvitation[]>>(
+    `/workspaces/${workspaceId}/invitations`,
+  );
+  return res.data.data;
+}
+
+/**
+ * DELETE /api/v1/workspaces/:workspaceId/invitations/:invitationId
+ * Revokes a pending workspace invitation.
+ */
+export async function revokeInvitationApi(
+  workspaceId: string,
+  invitationId: string,
+): Promise<void> {
+  await apiClient.delete(`/workspaces/${workspaceId}/invitations/${invitationId}`);
+}
+
+/**
+ * GET /api/v1/invitations/:token
+ * Validates an invitation token (Public endpoint).
+ */
+export async function validateInvitationTokenApi(
+  token: string,
+): Promise<InvitationValidationDetails> {
+  const res = await apiClient.get<ApiResponse<InvitationValidationDetails>>(
+    `/invitations/${token}`,
+  );
+  return res.data.data;
+}
+
+/**
+ * POST /api/v1/invitations/:token/accept
+ * Accepts an invitation and joins the workspace.
+ */
+export async function acceptInvitationTokenApi(
+  token: string,
+): Promise<AcceptInvitationResult> {
+  const res = await apiClient.post<ApiResponse<AcceptInvitationResult>>(
+    `/invitations/${token}/accept`,
+  );
+  return res.data.data;
+}
+
+/**
+ * PATCH /api/v1/workspaces/:workspaceId/members/:userId/role
+ * Updates a member's role in the workspace.
+ */
+export async function updateMemberRoleApi(
+  workspaceId: string,
+  userId: string,
+  role: WorkspaceRole,
+): Promise<void> {
+  await apiClient.patch(`/workspaces/${workspaceId}/members/${userId}/role`, { role });
+}
+
+/**
+ * POST /api/v1/workspaces/:workspaceId/transfer-ownership
+ * Transfers primary ownership of the workspace to another active member.
+ */
+export async function transferWorkspaceOwnershipApi(
+  workspaceId: string,
+  newOwnerUserId: string,
+): Promise<void> {
+  await apiClient.post(`/workspaces/${workspaceId}/transfer-ownership`, { newOwnerUserId });
 }

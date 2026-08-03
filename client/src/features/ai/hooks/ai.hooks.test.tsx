@@ -4,12 +4,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode } from "react";
 import { toast } from "sonner";
 
-import { aiApi } from "../services/ai.api";
-import type { Project } from "@/features/projects/types/projects.types";
-import type { Task } from "@/features/tasks/types/tasks.types";
-import { useGenerateTasks } from "./useGenerateTasks";
-import { useGenerateProjectSummary } from "./useGenerateProjectSummary";
-import { useGenerateTaskLabels } from "./useGenerateTaskLabels";
+import { aiApi } from "../services/ai.api.js";
+import type { Project } from "@/features/projects/types/projects.types.js";
+import type { Task } from "@/features/tasks/types/tasks.types.js";
+import { useGenerateTasks } from "./useGenerateTasks.js";
+import { useGenerateProjectSummary } from "./useGenerateProjectSummary.js";
+import { useGenerateTaskLabels } from "./useGenerateTaskLabels.js";
 
 // Mock sonner toast
 vi.mock("sonner", () => ({
@@ -72,7 +72,7 @@ describe("AI Mutation Hooks", () => {
       expect(aiApi.generateTasks).toHaveBeenCalledWith("proj-123", { description: "Build feature" });
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["tasks", "list"] });
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["projects", "summary", "proj-123"] });
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["dashboard", "overview"] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["dashboard"] });
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["activities"] });
       expect(toast.success).toHaveBeenCalledWith("2 tasks generated successfully.");
     });

@@ -13,10 +13,12 @@ import type {
   WorkspacePresenceSnapshot,
   ResourceViewing,
 } from "./realtime-types";
+import type { RealtimeStatus } from "./RealtimeContext";
 
 type DomainEventHandler = (event: RealtimeEventEnvelope) => void;
 type EvictedHandler = (payload: WorkspaceEvictedPayload) => void;
 type ConnectionStateListener = (isConnected: boolean) => void;
+type StatusListener = (status: RealtimeStatus) => void;
 type PresenceHandler = (snapshot: WorkspacePresenceSnapshot) => void;
 
 class RealtimeClient {
@@ -24,10 +26,12 @@ class RealtimeClient {
   private activeWorkspaceId: string | null = null;
   private subscribedWorkspaceId: string | null = null;
   private currentPresence: WorkspacePresenceSnapshot | null = null;
+  private status: RealtimeStatus = "disconnected";
 
   private domainEventHandlers = new Set<DomainEventHandler>();
   private evictedHandlers = new Set<EvictedHandler>();
   private connectionStateListeners = new Set<ConnectionStateListener>();
+  private statusListeners = new Set<StatusListener>();
   private presenceHandlers = new Set<PresenceHandler>();
 
   // Bounded LRU-like recent event ID cache (max 500 IDs)
@@ -36,6 +40,49 @@ class RealtimeClient {
 
   // Track subscription request in flight to resolve races
   private pendingSubscriptionWorkspaceId: string | null = null;
+
+  constructor() {
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", () => {
+        if (this.socket && !this.socket.connected) {
+          this.setStatus("reconnecting");
+          this.socket.connect();
+        } else if (!this.socket && this.activeWorkspaceId) {
+          this.setStatus("connecting");
+          this.connect();
+        }
+      });
+      window.addEventListener("offline", () => {
+        if (this.status !== "disconnected") {
+          this.setStatus("offline");
+        }
+      });
+    }
+  }
+
+  public getStatus(): RealtimeStatus {
+    return this.status;
+  }
+
+  public onStatusChange(listener: StatusListener): () => void {
+    this.statusListeners.add(listener);
+    listener(this.status);
+    return () => {
+      this.statusListeners.delete(listener);
+    };
+  }
+
+  private setStatus(newStatus: RealtimeStatus): void {
+    if (this.status === newStatus) return;
+    this.status = newStatus;
+    for (const listener of this.statusListeners) {
+      try {
+        listener(newStatus);
+      } catch (err) {
+        console.error("[RealtimeClient] Error in status listener:", err);
+      }
+    }
+  }
 
   /**
    * Initializes or updates the socket connection using the current access token.
@@ -47,19 +94,40 @@ class RealtimeClient {
       return;
     }
 
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      this.setStatus("offline");
+      return;
+    }
+
     if (this.socket) {
       if (this.socket.connected) {
+        this.setStatus("connected");
         return;
       }
+      this.setStatus("connecting");
       this.socket.connect();
       return;
     }
 
-    const serverUrl =
-      customServerUrl ||
-      import.meta.env.VITE_WS_URL ||
-      import.meta.env.VITE_API_URL ||
-      (typeof window !== "undefined" ? window.location.origin : "");
+    this.setStatus("connecting");
+
+    let serverUrl = customServerUrl || import.meta.env.VITE_WS_URL;
+
+    if (!serverUrl) {
+      const apiUrl = import.meta.env.VITE_API_URL;
+      if (apiUrl) {
+        try {
+          // Extract origin (e.g. "http://localhost:5000") to prevent Socket.IO from treating path (e.g. "/api/v1") as a namespace
+          serverUrl = new URL(apiUrl).origin;
+        } catch {
+          serverUrl = apiUrl;
+        }
+      } else if (typeof window !== "undefined") {
+        serverUrl = window.location.origin;
+      } else {
+        serverUrl = "";
+      }
+    }
 
     this.socket = io(serverUrl, {
       auth: (cb) => {
@@ -81,13 +149,25 @@ class RealtimeClient {
    */
   public disconnect(): void {
     if (this.socket) {
+      if (this.subscribedWorkspaceId) {
+        try {
+          this.socket.emit(REALTIME_EVENTS.WORKSPACE_UNSUBSCRIBE, {
+            workspaceId: this.subscribedWorkspaceId,
+          });
+        } catch {
+          // Ignore error if socket is already closed
+        }
+      }
       this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
     }
+    this.activeWorkspaceId = null;
     this.subscribedWorkspaceId = null;
     this.pendingSubscriptionWorkspaceId = null;
+    this.currentPresence = null;
     this.notifyConnectionState(false);
+    this.setStatus("disconnected");
   }
 
   /**
@@ -98,8 +178,15 @@ class RealtimeClient {
 
     this.activeWorkspaceId = workspaceId;
 
+    // Prevent duplicate subscription calls if already subscribed or currently subscribing
+    if (
+      this.subscribedWorkspaceId === workspaceId ||
+      this.pendingSubscriptionWorkspaceId === workspaceId
+    ) {
+      return;
+    }
+
     if (!this.socket || !this.socket.connected) {
-      // Connect if not already connected; connect listener will trigger subscription
       this.connect();
       return;
     }
@@ -224,22 +311,37 @@ class RealtimeClient {
    */
   private setupSocketListeners(socket: Socket): void {
     socket.on("connect", () => {
+      this.setStatus("connected");
       this.notifyConnectionState(true);
       // Re-authorize active workspace on connect / reconnect
       if (this.activeWorkspaceId) {
-        this.subscribeWorkspace(this.activeWorkspaceId);
+        const wsToSubscribe = this.activeWorkspaceId;
+        this.subscribedWorkspaceId = null;
+        this.subscribeWorkspace(wsToSubscribe);
       }
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
       this.subscribedWorkspaceId = null;
+      this.pendingSubscriptionWorkspaceId = null;
       this.currentPresence = null;
       this.notifyConnectionState(false);
+
+      if (reason === "io client disconnect") {
+        this.setStatus("disconnected");
+      } else {
+        const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+        this.setStatus(isOffline ? "offline" : "reconnecting");
+      }
     });
 
     socket.on("connect_error", (err) => {
       console.warn("[RealtimeClient] Connection error:", err.message);
       this.notifyConnectionState(false);
+      if (this.status !== "disconnected") {
+        const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+        this.setStatus(isOffline ? "offline" : "reconnecting");
+      }
     });
 
     socket.on(REALTIME_EVENTS.DOMAIN_EVENT, (data: unknown) => {
@@ -352,7 +454,6 @@ class RealtimeClient {
 
   private recordProcessedEventId(id: string): void {
     if (this.processedEventIds.size >= this.maxDeduplicationSize) {
-      // Remove oldest inserted item
       const oldestId = this.processedEventIds.values().next().value;
       if (oldestId) {
         this.processedEventIds.delete(oldestId);

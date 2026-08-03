@@ -14,6 +14,12 @@ export const ACTIVITY_TYPES = {
   TASK_RESTORED: "task.restored", // from archive
   TASK_DELETED: "task.deleted",
 
+  MEMBER_INVITED: "member.invited",
+  MEMBER_ADDED: "member.added",
+  MEMBER_REMOVED: "member.removed",
+  MEMBER_ROLE_CHANGED: "member.role_changed",
+  WORKSPACE_OWNER_TRANSFERRED: "workspace.owner_transferred",
+
   AI_TASKS_GENERATED: "ai.tasks_generated",
   AI_SUMMARY_GENERATED: "ai.summary_generated",
   AI_LABELS_GENERATED: "ai.labels_generated",

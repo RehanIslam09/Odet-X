@@ -9,18 +9,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/dialog.js";
+import { Button } from "@/components/ui/button.js";
+import { Input } from "@/components/ui/input.js";
+import { Label } from "@/components/ui/label.js";
+import { Textarea } from "@/components/ui/textarea.js";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui/select.js";
+import { ProjectIcon } from "@/components/common/ProjectIcon.js";
 
 import {
   updateTaskSchema,
@@ -29,8 +30,8 @@ import {
 } from "@/features/tasks/validators/tasks.schemas.js";
 
 import type { Task } from "@/features/tasks/types/tasks.types.js";
-import { useUpdateTask } from "@/features/tasks/hooks/index.js";
-import { useProjectOptions } from "@/features/projects/hooks/useProjectOptions";
+import { useUpdateTask } from "@/features/tasks/hooks/useUpdateTask.js";
+import { useProjectOptions } from "@/features/projects/hooks/useProjectOptions.js";
 import { applyServerErrors } from "@/utils/form-errors.js";
 import { getApiError } from "@/utils/api-error.js";
 
@@ -40,37 +41,31 @@ interface EditTaskDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-/**
- * Dialog for editing an existing task.
- *
- * Pre-fills form state from the selected task prop.
- */
-export function EditTaskDialog({ task, open, onOpenChange }: EditTaskDialogProps) {
+export function EditTaskDialog({
+  task,
+  open,
+  onOpenChange,
+}: EditTaskDialogProps) {
   const { mutate: updateTask, isPending } = useUpdateTask();
-
-  // Load projects to select from
-  const { data: projectsData } = useProjectOptions();
-  const projects = projectsData || [];
+  const { data: projects = [] } = useProjectOptions();
 
   const form = useForm<UpdateTaskFormInput, undefined, UpdateTaskFormValues>({
     resolver: zodResolver(updateTaskSchema),
     defaultValues: {
       title: "",
       description: "",
-      projectId: null,
+      projectId: "no-project",
       status: "todo",
-      priority: "none",
+      priority: "medium",
       dueDate: "",
-      estimatedTime: "",
-      labelsString: "",
     },
   });
 
-  // Sync form values when the target task changes
   useEffect(() => {
-    if (task) {
-      // If dueDate is a full datetime ISO string, extract the date portion (YYYY-MM-DD)
-      const datePart = task.dueDate ? task.dueDate.split("T")[0] || "" : "";
+    if (task && open) {
+      const formattedDueDate = task.dueDate
+        ? new Date(task.dueDate).toISOString().split("T")[0]
+        : "";
 
       form.reset({
         title: task.title,
@@ -78,33 +73,20 @@ export function EditTaskDialog({ task, open, onOpenChange }: EditTaskDialogProps
         projectId: task.projectId || "no-project",
         status: task.status,
         priority: task.priority,
-        dueDate: datePart,
-        estimatedTime: task.estimatedTime || "",
-        labelsString: task.labels ? task.labels.join(", ") : "",
+        dueDate: formattedDueDate,
       });
     }
-  }, [task, form]);
+  }, [task, open, form]);
 
   function onSubmit(values: UpdateTaskFormValues) {
     if (!task) return;
 
-    // Process labelsString into labels array
-    const labels = values.labelsString !== undefined
-      ? values.labelsString
-          .split(",")
-          .map((lbl) => lbl.trim())
-          .filter((lbl) => lbl.length > 0)
-      : undefined;
-
     const payload = {
-      title: values.title,
-      description: values.description,
-      projectId: values.projectId === "no-project" ? null : values.projectId,
-      status: values.status,
-      priority: values.priority,
-      dueDate: values.dueDate || null,
-      estimatedTime: values.estimatedTime || null,
-      labels,
+      ...values,
+      projectId:
+        values.projectId === "no-project" || !values.projectId
+          ? undefined
+          : values.projectId,
     };
 
     updateTask(
@@ -129,7 +111,7 @@ export function EditTaskDialog({ task, open, onOpenChange }: EditTaskDialogProps
         <DialogHeader>
           <DialogTitle>Edit Task</DialogTitle>
           <DialogDescription>
-            Update your task details below.
+            Update task details, status, or assignment.
           </DialogDescription>
         </DialogHeader>
 
@@ -143,9 +125,9 @@ export function EditTaskDialog({ task, open, onOpenChange }: EditTaskDialogProps
             <Label htmlFor="edit-task-title">Title</Label>
             <Input
               id="edit-task-title"
-              placeholder="e.g. Implement OAuth Flow"
-              {...form.register("title")}
+              placeholder="e.g. Implement authentication flow"
               disabled={isPending}
+              {...form.register("title")}
             />
             {form.formState.errors.title && (
               <p className="text-xs text-destructive">
@@ -156,14 +138,17 @@ export function EditTaskDialog({ task, open, onOpenChange }: EditTaskDialogProps
 
           {/* Description */}
           <div className="space-y-1.5">
-            <Label htmlFor="edit-task-description">Description</Label>
+            <Label htmlFor="edit-task-description">
+              Description{" "}
+              <span className="font-normal text-muted-foreground">(optional)</span>
+            </Label>
             <Textarea
               id="edit-task-description"
-              placeholder="Add details about this task..."
+              placeholder="Add details, acceptance criteria, or notes..."
               rows={3}
               className="resize-none"
-              {...form.register("description")}
               disabled={isPending}
+              {...form.register("description")}
             />
             {form.formState.errors.description && (
               <p className="text-xs text-destructive">
@@ -172,8 +157,8 @@ export function EditTaskDialog({ task, open, onOpenChange }: EditTaskDialogProps
             )}
           </div>
 
-          {/* Grid for Project, Status, Priority */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {/* Project & Status row */}
+          <div className="grid grid-cols-2 gap-4">
             {/* Project */}
             <div className="space-y-1.5">
               <Label htmlFor="edit-task-project">Project</Label>
@@ -193,7 +178,10 @@ export function EditTaskDialog({ task, open, onOpenChange }: EditTaskDialogProps
                       <SelectItem value="no-project">No Project</SelectItem>
                       {projects.map((proj) => (
                         <SelectItem key={proj.id} value={proj.id}>
-                          {proj.emoji} {proj.name}
+                          <div className="flex items-center gap-1.5">
+                            <ProjectIcon icon={proj.emoji} color={proj.color} size="xs" />
+                            <span className="truncate">{proj.name}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -215,21 +203,22 @@ export function EditTaskDialog({ task, open, onOpenChange }: EditTaskDialogProps
                     value={field.value}
                   >
                     <SelectTrigger id="edit-task-status">
-                      <SelectValue placeholder="Select Status" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="backlog">Backlog</SelectItem>
-                      <SelectItem value="todo">Todo</SelectItem>
+                      <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="in_review">In Review</SelectItem>
                       <SelectItem value="done">Done</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
               />
             </div>
+          </div>
 
+          {/* Priority & Due Date row */}
+          <div className="grid grid-cols-2 gap-4">
             {/* Priority */}
             <div className="space-y-1.5">
               <Label htmlFor="edit-task-priority">Priority</Label>
@@ -243,10 +232,9 @@ export function EditTaskDialog({ task, open, onOpenChange }: EditTaskDialogProps
                     value={field.value}
                   >
                     <SelectTrigger id="edit-task-priority">
-                      <SelectValue placeholder="Select Priority" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
                       <SelectItem value="low">Low</SelectItem>
                       <SelectItem value="medium">Medium</SelectItem>
                       <SelectItem value="high">High</SelectItem>
@@ -256,49 +244,22 @@ export function EditTaskDialog({ task, open, onOpenChange }: EditTaskDialogProps
                 )}
               />
             </div>
-          </div>
 
-          {/* Grid for Due Date & Estimated Time */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Due Date */}
             <div className="space-y-1.5">
-              <Label htmlFor="edit-task-due-date">Due Date</Label>
+              <Label htmlFor="edit-task-due-date">
+                Due Date{" "}
+                <span className="font-normal text-muted-foreground">
+                  (optional)
+                </span>
+              </Label>
               <Input
-                type="date"
                 id="edit-task-due-date"
+                type="date"
+                disabled={isPending}
                 {...form.register("dueDate")}
-                disabled={isPending}
               />
             </div>
-
-            {/* Estimated Time */}
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-task-est-time">Estimated Time</Label>
-              <Input
-                id="edit-task-est-time"
-                placeholder="e.g. 2h, 1d"
-                {...form.register("estimatedTime")}
-                disabled={isPending}
-              />
-              {form.formState.errors.estimatedTime && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.estimatedTime.message}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Labels */}
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-task-labels">
-              Labels <span className="font-normal text-muted-foreground">(comma-separated)</span>
-            </Label>
-            <Input
-              id="edit-task-labels"
-              placeholder="e.g. frontend, auth, bug"
-              {...form.register("labelsString")}
-              disabled={isPending}
-            />
           </div>
         </form>
 

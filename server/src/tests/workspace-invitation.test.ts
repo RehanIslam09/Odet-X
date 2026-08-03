@@ -11,10 +11,10 @@ import { setupTestDatabase, teardownTestDatabase } from "./test-db.js";
 
 function expect(condition: boolean, message: string) {
   if (!condition) {
-    console.error(`? Assertion Failed: ${message}`);
+    console.error(`❌ Assertion Failed: ${message}`);
     process.exit(1);
   }
-  console.log(`? Passed: ${message}`);
+  console.log(`✅ Passed: ${message}`);
 }
 
 async function runTests() {
@@ -22,31 +22,24 @@ async function runTests() {
 
   try {
     console.log("\n==================================================");
-    console.log("? Phase 33 WP-02 ? Workspace Collaboration Model Tests");
+    console.log("🧪 Phase 33 WP-02 — Workspace Collaboration Model Tests");
     console.log("==================================================\n");
 
     const wsId = new Types.ObjectId("507f1f77bcf86cd799439011");
     const user1 = new Types.ObjectId("507f1f77bcf86cd799439022");
     const user2 = new Types.ObjectId("507f1f77bcf86cd799439033");
     const user3 = new Types.ObjectId("507f1f77bcf86cd799439044");
-    const user4 = new Types.ObjectId("507f1f77bcf86cd799439055");
 
     // -------------------------------------------------------------------------
-    // 1. WorkspaceMember Accepts All 4 Roles
+    // 1. WorkspaceMember Role Validation
     // -------------------------------------------------------------------------
     console.log(">> 1. Verifying WorkspaceMember schema role validation...");
 
     const mOwner = await WorkspaceMember.create({ workspaceId: wsId, userId: user1, role: "OWNER" });
     expect(mOwner.role === "OWNER", "1. OWNER role accepted by WorkspaceMember");
 
-    const mAdmin = await WorkspaceMember.create({ workspaceId: wsId, userId: user2, role: "ADMIN" });
-    expect(mAdmin.role === "ADMIN", "2. ADMIN role accepted by WorkspaceMember");
-
     const mMember = await WorkspaceMember.create({ workspaceId: wsId, userId: user3, role: "MEMBER" });
-    expect(mMember.role === "MEMBER", "3. MEMBER role accepted by WorkspaceMember");
-
-    const mViewer = await WorkspaceMember.create({ workspaceId: wsId, userId: user4, role: "VIEWER" });
-    expect(mViewer.role === "VIEWER", "4. VIEWER role accepted by WorkspaceMember");
+    expect(mMember.role === "MEMBER", "2. MEMBER role accepted by WorkspaceMember");
 
     let invalidRoleErr = false;
     try {
@@ -58,7 +51,7 @@ async function runTests() {
     } catch {
       invalidRoleErr = true;
     }
-    expect(invalidRoleErr, "5. Invalid role rejected by WorkspaceMember schema");
+    expect(invalidRoleErr, "3. Invalid role rejected by WorkspaceMember schema");
 
     // -------------------------------------------------------------------------
     // 2. WorkspaceInvitation Schema & Token Uniqueness
@@ -78,9 +71,9 @@ async function runTests() {
       expiresAt,
     });
 
-    expect(invite1.email === "newmember@test.com", "6. Invitation email normalized to lowercase");
-    expect(invite1.status === "PENDING", "7. Invitation status defaults to PENDING");
-    expect(invite1.role === "MEMBER", "8. Invitation role saved as MEMBER");
+    expect(invite1.email === "newmember@test.com", "4. Invitation email normalized to lowercase");
+    expect(invite1.status === "PENDING", "5. Invitation status defaults to PENDING");
+    expect(invite1.role === "MEMBER", "6. Invitation role saved as MEMBER");
 
     // Test token uniqueness
     let duplicateTokenErr = false;
@@ -88,7 +81,7 @@ async function runTests() {
       await WorkspaceInvitation.create({
         workspaceId: wsId,
         email: "another@test.com",
-        role: "VIEWER",
+        role: "MEMBER",
         invitedBy: user1,
         token: token1, // Duplicate token
         status: "PENDING",
@@ -97,7 +90,7 @@ async function runTests() {
     } catch {
       duplicateTokenErr = true;
     }
-    expect(duplicateTokenErr, "9. Duplicate invitation token rejected by unique index");
+    expect(duplicateTokenErr, "7. Duplicate invitation token rejected by unique index");
 
     // Test status enum validation
     let invalidStatusErr = false;
@@ -114,7 +107,7 @@ async function runTests() {
     } catch {
       invalidStatusErr = true;
     }
-    expect(invalidStatusErr, "10. Invalid invitation status rejected by schema enum");
+    expect(invalidStatusErr, "8. Invalid invitation status rejected by schema enum");
 
     // -------------------------------------------------------------------------
     // 3. Task Assignee & Watcher Fields
@@ -129,12 +122,12 @@ async function runTests() {
       watcherIds: [user1, user2, user3],
     });
 
-    expect(task.assigneeId?.toString() === user2.toString(), "11. Task assigneeId saved and retrieved");
-    expect(task.watcherIds?.length === 3, "12. Task watcherIds array persisted");
-    expect(task.watcherIds?.[1]?.toString() === user2.toString(), "13. Task watcher user ObjectId matched");
+    expect(task.assigneeId?.toString() === user2.toString(), "9. Task assigneeId saved and retrieved");
+    expect(task.watcherIds?.length === 3, "10. Task watcherIds array persisted");
+    expect(task.watcherIds?.[1]?.toString() === user2.toString(), "11. Task watcher user ObjectId matched");
 
     console.log("\n==================================================");
-    console.log("?? ALL WORKSPACE COLLABORATION MODEL TESTS PASSED!");
+    console.log("🎉 ALL WORKSPACE COLLABORATION MODEL TESTS PASSED!");
     console.log("==================================================\n");
   } finally {
     await teardownTestDatabase();
@@ -142,6 +135,6 @@ async function runTests() {
 }
 
 runTests().catch((err) => {
-  console.error("? Test runner crashed:", err);
+  console.error("❌ Test runner crashed:", err);
   process.exit(1);
 });

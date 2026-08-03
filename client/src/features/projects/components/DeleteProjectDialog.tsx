@@ -5,11 +5,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+} from "@/components/ui/dialog.js";
+import { Button } from "@/components/ui/button.js";
 
-import type { Project } from "@/features/projects/types/projects.types";
-import { useDeleteProject } from "@/features/projects/hooks";
+import { ProjectIcon } from "@/components/common/ProjectIcon.js";
+import type { Project } from "@/features/projects/types/projects.types.js";
+import { useDeleteProject } from "@/features/projects/hooks/index.js";
 
 interface DeleteProjectDialogProps {
   project: Project | null;
@@ -18,15 +19,6 @@ interface DeleteProjectDialogProps {
   onSuccess?: () => void;
 }
 
-/**
- * Confirmation dialog for project deletion.
- *
- * Deletion is intentional and irreversible from the user's perspective.
- * The copy makes this clear. The confirm button is styled destructively.
- *
- * Internally, deletion is a soft-delete (isDeleted: true) — the record
- * is retained for AI context. But the user should not need to know this.
- */
 export function DeleteProjectDialog({
   project,
   open,
@@ -51,11 +43,14 @@ export function DeleteProjectDialog({
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Delete project?</DialogTitle>
-          <DialogDescription>
-            <span className="font-medium text-foreground">
-              {project?.emoji} {project?.name}
-            </span>{" "}
-            will be permanently deleted. This action cannot be undone.
+          <DialogDescription asChild>
+            <div className="text-xs text-muted-foreground mt-2">
+              <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                <ProjectIcon icon={project?.emoji} color={project?.color} size="xs" />
+                {project?.name}
+              </span>{" "}
+              will be permanently deleted. This action cannot be undone.
+            </div>
           </DialogDescription>
         </DialogHeader>
 

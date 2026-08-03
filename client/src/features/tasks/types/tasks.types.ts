@@ -1,7 +1,3 @@
-/**
- * Type definitions for the Tasks feature.
- */
-
 export type TaskStatus = "backlog" | "todo" | "in_progress" | "in_review" | "done" | "cancelled";
 export type TaskPriority = "none" | "low" | "medium" | "high" | "urgent";
 
@@ -13,11 +9,11 @@ export interface Task {
   priority: TaskPriority;
   projectId: string | null;
   projectName?: string;
-  projectColor?: string; // Hex or HSL color code to match modern aesthetics
+  projectColor?: string;
   assigneeId?: string | null;
   watcherIds?: string[];
-  dueDate: string | null; // ISO format: YYYY-MM-DD
-  estimatedTime: string | null; // e.g., "2h", "1d", "30m"
+  dueDate: string | null;
+  estimatedTime: string | null;
   labels: string[];
   archived: boolean;
   isDeleted: boolean;
@@ -26,6 +22,18 @@ export interface Task {
   updatedAt: string;
   notes?: string;
   version: number;
+}
+
+export interface CreateTaskDto {
+  title: string;
+  description?: string;
+  projectId?: string | null;
+  assigneeId?: string | null;
+  dueDate?: string | null;
+  priority?: TaskPriority;
+  status?: TaskStatus;
+  labels?: string[];
+  estimatedTime?: string | null;
 }
 
 export interface TasksQueryParams {

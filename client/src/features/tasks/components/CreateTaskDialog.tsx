@@ -9,18 +9,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/dialog.js";
+import { Button } from "@/components/ui/button.js";
+import { Input } from "@/components/ui/input.js";
+import { Label } from "@/components/ui/label.js";
+import { Textarea } from "@/components/ui/textarea.js";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui/select.js";
+import { ProjectIcon } from "@/components/common/ProjectIcon.js";
 
 import {
   createTaskSchema,
@@ -28,9 +29,9 @@ import {
   type CreateTaskFormValues,
 } from "@/features/tasks/validators/tasks.schemas.js";
 
-import { useCreateTask } from "@/features/tasks/hooks/useCreateTask";
-import { useProjectOptions } from "@/features/projects/hooks/useProjectOptions";
-import { useProject } from "@/features/projects/hooks/useProject";
+import { useCreateTask } from "@/features/tasks/hooks/useCreateTask.js";
+import { useProjectOptions } from "@/features/projects/hooks/useProjectOptions.js";
+import { useProject } from "@/features/projects/hooks/useProject.js";
 import { applyServerErrors } from "@/utils/form-errors.js";
 import { getApiError } from "@/utils/api-error.js";
 
@@ -38,82 +39,52 @@ interface CreateTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialProjectId?: string;
-  fixedProject?: boolean;
 }
 
-/**
- * Dialog for creating a new task.
- *
- * Design Decisions:
- * - Integrates with React Hook Form + Zod.
- * - Project dropdown is populated from the real Projects API.
- * - Uses Controller from React Hook Form for custom Select components.
- * - Form resets when the dialog is closed.
- */
-export function CreateTaskDialog({ open, onOpenChange, initialProjectId, fixedProject }: CreateTaskDialogProps) {
+export function CreateTaskDialog({
+  open,
+  onOpenChange,
+  initialProjectId,
+}: CreateTaskDialogProps) {
   const { mutate: createTask, isPending } = useCreateTask();
 
-  // Load projects to select from (up to 100 for dropdown)
-  const { data: projectsData } = useProjectOptions({ enabled: !fixedProject });
-  
-  // If fixedProject is true, we fetch just the initial project from cache 
-  // so the dropdown can display its name instead of being blank.
-  const { data: fixedProjectData } = useProject(fixedProject && initialProjectId ? initialProjectId : undefined);
+  const { data: projects = [] } = useProjectOptions();
 
-  // Combine them for rendering
-  const projects = projectsData || (fixedProject && fixedProjectData?.project ? [
-    {
-      id: fixedProjectData.project.id,
-      name: fixedProjectData.project.name,
-      emoji: fixedProjectData.project.emoji,
-      color: fixedProjectData.project.color,
-    }
-  ] : []);
+  const { data: fixedProjectData } = useProject(initialProjectId);
+  const fixedProject = initialProjectId ? fixedProjectData?.project : undefined;
 
   const form = useForm<CreateTaskFormInput, undefined, CreateTaskFormValues>({
     resolver: zodResolver(createTaskSchema),
     defaultValues: {
       title: "",
       description: "",
-      projectId: null,
+      projectId: initialProjectId || undefined,
       status: "todo",
-      priority: "none",
+      priority: "medium",
       dueDate: "",
-      estimatedTime: "",
-      labelsString: "",
     },
   });
 
-  // Reset form when dialog closes or opens with new initialProjectId
   useEffect(() => {
     if (open) {
-      // If opened with an initial project (Phase 12.3), set it
-      if (initialProjectId) {
-        form.setValue("projectId", initialProjectId);
-      }
-    } else {
-      form.reset();
+      form.reset({
+        title: "",
+        description: "",
+        projectId: initialProjectId || undefined,
+        status: "todo",
+        priority: "medium",
+        dueDate: "",
+      });
     }
-  }, [open, form, initialProjectId]);
+  }, [open, initialProjectId, form]);
 
   function onSubmit(values: CreateTaskFormValues) {
-    // Process labelsString into labels array
-    const labels = values.labelsString
-      ? values.labelsString
-          .split(",")
-          .map((lbl) => lbl.trim())
-          .filter((lbl) => lbl.length > 0)
-      : [];
-
     const payload = {
-      title: values.title,
-      description: values.description || "",
-      projectId: values.projectId === "no-project" ? null : values.projectId,
-      status: values.status,
-      priority: values.priority,
-      dueDate: values.dueDate || null,
-      estimatedTime: values.estimatedTime || null,
-      labels,
+      ...values,
+      projectId:
+        values.projectId === "no-project" || !values.projectId
+          ? undefined
+          : values.projectId,
     };
 
     createTask(payload, {
@@ -135,7 +106,9 @@ export function CreateTaskDialog({ open, onOpenChange, initialProjectId, fixedPr
         <DialogHeader>
           <DialogTitle>New Task</DialogTitle>
           <DialogDescription>
-            Create a task to track your work.
+            {fixedProject
+              ? `Creating a task in project "${fixedProject.name}".`
+              : "Create a new task for your workspace."}
           </DialogDescription>
         </DialogHeader>
 
@@ -149,9 +122,9 @@ export function CreateTaskDialog({ open, onOpenChange, initialProjectId, fixedPr
             <Label htmlFor="create-task-title">Title</Label>
             <Input
               id="create-task-title"
-              placeholder="e.g. Implement OAuth Flow"
-              {...form.register("title")}
+              placeholder="e.g. Implement authentication flow"
               disabled={isPending}
+              {...form.register("title")}
             />
             {form.formState.errors.title && (
               <p className="text-xs text-destructive">
@@ -162,14 +135,17 @@ export function CreateTaskDialog({ open, onOpenChange, initialProjectId, fixedPr
 
           {/* Description */}
           <div className="space-y-1.5">
-            <Label htmlFor="create-task-description">Description</Label>
+            <Label htmlFor="create-task-description">
+              Description{" "}
+              <span className="font-normal text-muted-foreground">(optional)</span>
+            </Label>
             <Textarea
               id="create-task-description"
-              placeholder="Add details about this task..."
+              placeholder="Add details, acceptance criteria, or notes..."
               rows={3}
               className="resize-none"
-              {...form.register("description")}
               disabled={isPending}
+              {...form.register("description")}
             />
             {form.formState.errors.description && (
               <p className="text-xs text-destructive">
@@ -178,8 +154,8 @@ export function CreateTaskDialog({ open, onOpenChange, initialProjectId, fixedPr
             )}
           </div>
 
-          {/* Grid for Project, Status, Priority */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {/* Project & Status row */}
+          <div className="grid grid-cols-2 gap-4">
             {/* Project */}
             <div className="space-y-1.5">
               <Label htmlFor="create-task-project">Project</Label>
@@ -188,7 +164,7 @@ export function CreateTaskDialog({ open, onOpenChange, initialProjectId, fixedPr
                 name="projectId"
                 render={({ field }) => (
                   <Select
-                    disabled={isPending || fixedProject}
+                    disabled={isPending || Boolean(fixedProject)}
                     onValueChange={field.onChange}
                     value={field.value || "no-project"}
                   >
@@ -199,7 +175,10 @@ export function CreateTaskDialog({ open, onOpenChange, initialProjectId, fixedPr
                       <SelectItem value="no-project">No Project</SelectItem>
                       {projects.map((proj) => (
                         <SelectItem key={proj.id} value={proj.id}>
-                          {proj.emoji} {proj.name}
+                          <div className="flex items-center gap-1.5">
+                            <ProjectIcon icon={proj.emoji} color={proj.color} size="xs" />
+                            <span className="truncate">{proj.name}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -221,21 +200,22 @@ export function CreateTaskDialog({ open, onOpenChange, initialProjectId, fixedPr
                     value={field.value}
                   >
                     <SelectTrigger id="create-task-status">
-                      <SelectValue placeholder="Select Status" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="backlog">Backlog</SelectItem>
-                      <SelectItem value="todo">Todo</SelectItem>
+                      <SelectItem value="todo">To Do</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="in_review">In Review</SelectItem>
                       <SelectItem value="done">Done</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
               />
             </div>
+          </div>
 
+          {/* Priority & Due Date row */}
+          <div className="grid grid-cols-2 gap-4">
             {/* Priority */}
             <div className="space-y-1.5">
               <Label htmlFor="create-task-priority">Priority</Label>
@@ -249,11 +229,10 @@ export function CreateTaskDialog({ open, onOpenChange, initialProjectId, fixedPr
                     value={field.value}
                   >
                     <SelectTrigger id="create-task-priority">
-                      <SelectValue placeholder="Select Priority" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="low font-normal">Low</SelectItem>
                       <SelectItem value="medium">Medium</SelectItem>
                       <SelectItem value="high">High</SelectItem>
                       <SelectItem value="urgent">Urgent</SelectItem>
@@ -262,49 +241,22 @@ export function CreateTaskDialog({ open, onOpenChange, initialProjectId, fixedPr
                 )}
               />
             </div>
-          </div>
 
-          {/* Grid for Due Date & Estimated Time */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Due Date */}
             <div className="space-y-1.5">
-              <Label htmlFor="create-task-due-date">Due Date</Label>
+              <Label htmlFor="create-task-due-date">
+                Due Date{" "}
+                <span className="font-normal text-muted-foreground">
+                  (optional)
+                </span>
+              </Label>
               <Input
-                type="date"
                 id="create-task-due-date"
+                type="date"
+                disabled={isPending}
                 {...form.register("dueDate")}
-                disabled={isPending}
               />
             </div>
-
-            {/* Estimated Time */}
-            <div className="space-y-1.5">
-              <Label htmlFor="create-task-est-time">Estimated Time</Label>
-              <Input
-                id="create-task-est-time"
-                placeholder="e.g. 2h, 1d"
-                {...form.register("estimatedTime")}
-                disabled={isPending}
-              />
-              {form.formState.errors.estimatedTime && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.estimatedTime.message}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Labels */}
-          <div className="space-y-1.5">
-            <Label htmlFor="create-task-labels">
-              Labels <span className="font-normal text-muted-foreground">(comma-separated)</span>
-            </Label>
-            <Input
-              id="create-task-labels"
-              placeholder="e.g. frontend, auth, bug"
-              {...form.register("labelsString")}
-              disabled={isPending}
-            />
           </div>
         </form>
 

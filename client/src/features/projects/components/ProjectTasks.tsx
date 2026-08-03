@@ -174,7 +174,6 @@ export function ProjectTasks({ projectId }: ProjectTasksProps) {
         open={createOpen}
         onOpenChange={setCreateOpen}
         initialProjectId={projectId}
-        fixedProject={true}
       />
 
       <GenerateTasksDialog

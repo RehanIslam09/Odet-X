@@ -8,11 +8,6 @@ import { activityKeys } from "@/features/activity/hooks/activity.keys.js";
 import { projectKeys } from "@/features/projects/hooks/useProjects.js";
 import type { Task, TasksListResponseData } from "@/features/tasks/types/tasks.types.js";
 
-/**
- * Update task mutation hook.
- *
- * On success: invalidates task details and all list queries to reflect changes.
- */
 export function useUpdateTask() {
   const queryClient = useQueryClient();
 
@@ -21,7 +16,6 @@ export function useUpdateTask() {
       tasksApi.update(id, data),
 
     onMutate: async ({ id }) => {
-      // Find the task in the cache to get its previous projectId
       let previousTask: Task | undefined;
       const detail = queryClient.getQueryData<{ task: Task }>(taskKeys.detail(id));
       if (detail?.task) {
@@ -44,8 +38,6 @@ export function useUpdateTask() {
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(task.id) });
       queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
 
-      // Phase 12.3: Invalidate project summaries
-      // If the task was moved between projects, invalidate both.
       if (task.projectId !== context?.previousProjectId) {
         if (task.projectId) {
           queryClient.invalidateQueries({ queryKey: projectKeys.summary(task.projectId) });
@@ -55,13 +47,13 @@ export function useUpdateTask() {
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: dashboardKeys.overview() });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
       queryClient.invalidateQueries({ queryKey: activityKeys.lists() });
       toast.success("Task updated successfully.");
     },
 
     onError: () => {
-      // Validation errors are mapped onto input elements by form controllers
+      // Handled by forms
     },
   });
 }

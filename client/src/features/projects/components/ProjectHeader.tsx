@@ -1,9 +1,10 @@
 import { Archive, ArrowLeft, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import type { Project } from "@/features/projects/types/projects.types";
+import { Button } from "@/components/ui/button.js";
+import { Badge } from "@/components/ui/badge.js";
+import { ProjectIcon } from "@/components/common/ProjectIcon.js";
+import type { Project } from "@/features/projects/types/projects.types.js";
 
 interface ProjectHeaderProps {
   project: Project;
@@ -36,12 +37,12 @@ export function ProjectHeader({
         </Button>
 
         <div className="flex items-center gap-3">
-          <div
-            className="flex h-12 w-12 items-center justify-center rounded-xl text-3xl shadow-sm"
-            style={{ backgroundColor: `${project.color}18` }}
-          >
-            {project.emoji}
-          </div>
+          <ProjectIcon
+            icon={project.emoji}
+            color={project.color}
+            size="lg"
+          />
+
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">
@@ -55,7 +56,7 @@ export function ProjectHeader({
             </div>
           </div>
         </div>
-        
+
         {project.description && (
           <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground mt-2">
             {project.description}

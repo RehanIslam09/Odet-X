@@ -1,4 +1,4 @@
-import { Bell, Palette, Shield, Trash2, User, UserCog } from "lucide-react";
+import { Bell, Palette, Shield, Trash2, User, UserCog, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavLink } from "react-router-dom";
 
@@ -12,6 +12,7 @@ export interface NavItem {
 const navigationItems: NavItem[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "account", label: "Account", icon: UserCog },
+  { id: "members", label: "Members", icon: Users },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "security", label: "Security", icon: Shield },

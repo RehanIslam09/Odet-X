@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext";
 import { useAuthStore } from "@/store/auth.store";
 import { realtimeClient } from "./realtime-client";
@@ -12,7 +11,7 @@ import { routeDomainEvent } from "./event-router";
  */
 export function useRealtimeSync(): void {
   const queryClient = useQueryClient();
-  const { currentWorkspace, workspaces, switchWorkspace } = useActiveWorkspace();
+  const { currentWorkspace } = useActiveWorkspace();
   const { isAuthenticated } = useAuthStore();
 
   const activeWorkspaceId = currentWorkspace?.id || null;
@@ -42,33 +41,26 @@ export function useRealtimeSync(): void {
     };
   }, [activeWorkspaceId, queryClient]);
 
-  // 3. Workspace Eviction Listener
+  // 3. Reconnect Recovery Listener: Invalidate active queries when socket reconnects
   useEffect(() => {
     if (!activeWorkspaceId) return;
 
-    const unsubscribeEvicted = realtimeClient.onEvicted((payload) => {
-      if (payload.workspaceId === activeWorkspaceId) {
-        toast.error("Your access to this workspace was revoked.");
+    let wasDisconnected = false;
 
-        // Clear query cache to prevent cross-tenant stale data rendering
-        queryClient.clear();
-
-        // Select fallback workspace (personal workspace or first available workspace)
-        const fallbackWs =
-          workspaces.find((w) => w.id !== activeWorkspaceId && w.isPersonal) ||
-          workspaces.find((w) => w.id !== activeWorkspaceId);
-
-        if (fallbackWs) {
-          switchWorkspace(fallbackWs.slug);
-        } else {
-          // If no fallback workspace, navigate to root
-          window.location.href = "/";
-        }
+    const unsubscribeStatus = realtimeClient.onStatusChange((status) => {
+      if (status === "reconnecting" || status === "offline") {
+        wasDisconnected = true;
+      } else if (status === "connected" && wasDisconnected) {
+        wasDisconnected = false;
+        // Reconnect recovery: Invalidate active workspace queries only
+        queryClient.invalidateQueries({
+          predicate: (query) => query.isActive(),
+        });
       }
     });
 
     return () => {
-      unsubscribeEvicted();
+      unsubscribeStatus();
     };
-  }, [activeWorkspaceId, workspaces, switchWorkspace, queryClient]);
+  }, [activeWorkspaceId, queryClient]);
 }

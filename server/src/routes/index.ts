@@ -10,6 +10,7 @@ import notificationRoutes from "@/routes/notification.routes.js";
 import copilotActionRoutes from "@/routes/copilot-action.routes.js";
 import searchRoutes from "@/routes/search.routes.js";
 import workspaceRoutes from "@/routes/workspace.routes.js";
+import invitationRoutes from "@/routes/invitation.routes.js";
 import { workspaceRecommendationRoutes } from "@/routes/project-recommendation.routes.js";
 import { resolveOptionalWorkspace } from "@/middleware/workspace-auth.middleware.js";
 
@@ -24,6 +25,7 @@ router.get("/health", (_req, res) => {
 
 router.use("/auth", authRoutes);
 router.use("/workspaces", workspaceRoutes);
+router.use("/invitations", invitationRoutes);
 router.use("/dashboard", resolveOptionalWorkspace, dashboardRoutes);
 router.use("/projects", resolveOptionalWorkspace, projectRoutes);
 router.use("/tasks", resolveOptionalWorkspace, taskRoutes);

@@ -1,48 +1,25 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys";
-import { projectsApi } from "@/features/projects/services/projects.api";
-import { projectKeys } from "@/features/projects/hooks/useProjects";
-import { activityKeys } from "@/features/activity/hooks/activity.keys";
+import { dashboardKeys } from "@/features/dashboard/hooks/dashboard.keys.js";
+import { projectsApi } from "@/features/projects/services/projects.api.js";
+import { projectKeys } from "@/features/projects/hooks/useProjects.js";
+import { activityKeys } from "@/features/activity/hooks/activity.keys.js";
+import type { CreateProjectDto } from "@/features/projects/types/projects.types.js";
 
-/**
- * Create project mutation.
- *
- * On success: invalidates all project lists so the new project appears
- * immediately without a manual refresh.
- *
- * No optimistic update here — creation requires a server-assigned ID.
- * The invalidation is fast enough that the UX remains snappy.
- */
 export function useCreateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: projectsApi.create,
+    mutationFn: (data: CreateProjectDto) => projectsApi.create(data),
 
-    onSuccess: () => {
-      // Invalidate all list queries — the new project should appear on any
-      // active list regardless of current filters.
-      queryClient.invalidateQueries({
-        queryKey: projectKeys.lists(),
-      });
-      queryClient.invalidateQueries({
-        queryKey: projectKeys.options(),
-      });
-      queryClient.invalidateQueries({
-        queryKey: dashboardKeys.overview(),
-      });
-      queryClient.invalidateQueries({
-        queryKey: activityKeys.lists(),
-      });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: projectKeys.options() });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+      queryClient.invalidateQueries({ queryKey: activityKeys.lists() });
 
-      toast.success("Project created successfully.");
-    },
-
-    onError: () => {
-      // Individual field errors are handled by the form via applyServerErrors.
-      // A toast is not shown here to avoid duplicate feedback.
+      toast.success(`Project "${data.project.name}" created successfully.`);
     },
   });
 }

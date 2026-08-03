@@ -10,6 +10,7 @@ import { AuthLayout, DashboardLayout } from "@/components/layout";
 import { AuthBootstrap } from "@/features/auth/components/AuthBootstrap";
 import LoginPage from "@/features/auth/pages/LoginPage";
 import RegisterPage from "@/features/auth/pages/RegisterPage";
+import AcceptInvitationPage from "@/features/auth/pages/AcceptInvitationPage";
 import SessionExpiredPage from "@/features/auth/pages/SessionExpiredPage";
 import UnauthorizedPage from "@/features/auth/pages/UnauthorizedPage";
 import DashboardPage from "@/features/dashboard/pages/DashboardPage";
@@ -19,6 +20,7 @@ import ProjectDetailPage from "@/features/projects/pages/ProjectDetailPage";
 import SettingsPage from "@/features/settings/pages/SettingsPage";
 import { ProfileSettings } from "@/features/settings/components/ProfileSettings";
 import { AccountSettings } from "@/features/settings/components/AccountSettings";
+import { WorkspaceMembersTab } from "@/features/settings/components/WorkspaceMembersTab";
 import { AppearanceSettings } from "@/features/settings/components/AppearanceSettings";
 import { NotificationSettings } from "@/features/settings/components/NotificationSettings";
 import { SecuritySettings } from "@/features/settings/components/SecuritySettings";
@@ -58,6 +60,9 @@ export const router = createBrowserRouter(
           </AuthBootstrap>
         }
       >
+        {/* Workspace Invitation Acceptance Route */}
+        <Route path="invitations/:token" element={<AcceptInvitationPage />} />
+
         {/* Protected Workspace Application Routes */}
         <Route
           path="w/:workspaceSlug"
@@ -101,6 +106,7 @@ export const router = createBrowserRouter(
             <Route index element={<Navigate to="profile" replace />} />
             <Route path="profile" element={<ProfileSettings />} />
             <Route path="account" element={<AccountSettings />} />
+            <Route path="members" element={<WorkspaceMembersTab />} />
             <Route path="appearance" element={<AppearanceSettings />} />
             <Route path="notifications" element={<NotificationSettings />} />
             <Route path="security" element={<SecuritySettings />} />

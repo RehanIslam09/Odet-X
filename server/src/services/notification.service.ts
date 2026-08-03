@@ -8,8 +8,9 @@ export interface CreateNotificationPayload {
   recipientId: string;
   actorId?: string | null;
   type: NotificationType;
-  entityType?: "project" | "task" | "system" | null;
+  entityType?: "project" | "task" | "workspaceMember" | "system" | null;
   entityId?: string | null;
+  workspaceId?: string | null;
   title: string;
   message: string;
   metadata?: Record<string, unknown>;
@@ -39,8 +40,6 @@ export const createNotification = async (payload: CreateNotificationPayload): Pr
 
 /**
  * Strict internal helper for background workers.
- * Distinguishes expected deduplication (E11000 on dedupeKey) from genuine database failures.
- * Throws genuine errors so workers can handle retries safely.
  */
 export const createNotificationStrict = async (payload: CreateNotificationPayload): Promise<boolean> => {
   try {
@@ -54,13 +53,11 @@ export const createNotificationStrict = async (payload: CreateNotificationPayloa
     if (docData.dedupeKey === null) delete docData.dedupeKey;
     const notification = new Notification(docData);
     await notification.save();
-    return true; // Successfully created
+    return true;
   } catch (error: any) {
-    // E11000 Duplicate Key Error explicitly caught to verify idempotency
     if (error?.code === 11000) {
-      return false; // Safely ignored as deduplication
+      return false;
     }
-    // Genuine DB failure, throw to let the worker handle it
     throw error;
   }
 };
@@ -75,7 +72,6 @@ export const getNotifications = async (
   const { cursor, limit, readStatus } = query;
   const userObjectId = new Types.ObjectId(userId);
 
-  // Base filter enforces strict BOLA/tenant isolation
   const filter: Record<string, any> = { recipientId: userObjectId };
 
   if (readStatus === "unread") {
@@ -88,7 +84,6 @@ export const getNotifications = async (
     filter._id = { $lt: new Types.ObjectId(cursor) };
   }
 
-  // Fetch limit + 1 to determine if there is a next page
   const items = await Notification.find(filter)
     .sort({ _id: -1 })
     .limit(limit + 1)
@@ -97,7 +92,7 @@ export const getNotifications = async (
   const hasMore = items.length > limit;
   
   if (hasMore) {
-    items.pop(); // Remove the extra item
+    items.pop();
   }
 
   const nextCursor =
@@ -125,7 +120,6 @@ export const getUnreadCount = async (userId: string): Promise<number> => {
 
 /**
  * Marks a specific notification as read.
- * Idempotent: safe to call on an already-read notification.
  */
 export const markNotificationAsRead = async (
   userId: string,
@@ -147,7 +141,6 @@ export const markNotificationAsRead = async (
 
 /**
  * Marks all unread notifications for a user as read.
- * Returns the number of updated documents.
  */
 export const markAllNotificationsAsRead = async (
   userId: string,

@@ -3,9 +3,11 @@ export const NOTIFICATION_TYPES = {
   TASK_DUE_SOON: "task.due_soon",
   TASK_OVERDUE: "task.overdue",
 
-  // Deferred: Collaboration
+  // Collaboration & Workspace
   TASK_ASSIGNED: "task.assigned",
   PROJECT_INVITED: "project.invited",
+  WORKSPACE_INVITATION: "workspace.invitation",
+  MEMBER_JOINED: "member.joined",
   MENTION_CREATED: "mention.created",
 
   // Deferred: AI

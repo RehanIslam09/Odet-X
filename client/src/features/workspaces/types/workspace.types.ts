@@ -42,3 +42,36 @@ export interface UpdateWorkspaceInput {
   name?: string;
   slug?: string;
 }
+
+export interface WorkspaceInvitation {
+  id: string;
+  workspaceId: string;
+  email: string;
+  role: WorkspaceRole;
+  invitedBy: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  token: string;
+  expiresAt: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface CreateInvitationInput {
+  email: string;
+  role: WorkspaceRole;
+}
+
+export interface InvitationValidationDetails {
+  invitation: WorkspaceInvitation;
+  workspaceName: string;
+  workspaceSlug: string;
+}
+
+export interface AcceptInvitationResult {
+  workspaceId: string;
+  workspaceSlug: string;
+  role: WorkspaceRole;
+}

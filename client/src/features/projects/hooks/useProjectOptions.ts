@@ -4,6 +4,7 @@ import axios from "axios";
 import { projectsApi } from "@/features/projects/services/projects.api";
 import { projectKeys } from "@/features/projects/hooks/useProjects";
 import type { ProjectOption } from "@/features/projects/types/projects.types";
+import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext.js";
 
 interface UseProjectOptionsProps {
   /** 
@@ -18,8 +19,10 @@ interface UseProjectOptionsProps {
  * Used exclusively for populating dropdowns and selectors.
  */
 export function useProjectOptions({ enabled = true }: UseProjectOptionsProps = {}) {
+  const { activeWorkspaceId } = useActiveWorkspace();
+
   return useQuery<ProjectOption[]>({
-    queryKey: projectKeys.options(),
+    queryKey: projectKeys.options(activeWorkspaceId),
     queryFn: projectsApi.getOptions,
     enabled,
     // Since dropdown lists shouldn't constantly refetch in the background

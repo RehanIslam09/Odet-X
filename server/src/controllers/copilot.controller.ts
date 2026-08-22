@@ -6,11 +6,33 @@ import { BadRequestError } from "@/utils/app-error.js";
 import { buildCopilotContext } from "@/domain/copilot-context-builder.js";
 import { queryProjectCopilot } from "@/services/project-copilot-ai.service.js";
 import type { CopilotQueryDto } from "@/validators/copilot.validator.js";
+import Project from "@/models/project.model.js";
 
-function getValidatedProjectId(req: Request): string {
-  const projectId = req.params.projectId || req.params.id;
+async function getValidatedProjectId(req: Request): Promise<string> {
+  const rawParam = req.params.projectId || req.params.id;
+  const projectId = typeof rawParam === "string" ? rawParam : undefined;
 
-  if (!projectId || typeof projectId !== "string" || !Types.ObjectId.isValid(projectId)) {
+  if (!projectId) {
+    throw new BadRequestError("Invalid project id.");
+  }
+
+  if (projectId === "global") {
+    const userId = req.user!._id;
+    const workspaceId = req.workspace?._id;
+
+    const filter: Record<string, any> = { owner: userId, isDeleted: false };
+    if (workspaceId) {
+      filter.workspaceId = workspaceId;
+    }
+
+    const latestProject = await Project.findOne(filter).sort({ updatedAt: -1 }).exec();
+    if (!latestProject) {
+      throw new BadRequestError("No active project found in this workspace to query Copilot.");
+    }
+    return latestProject._id.toString();
+  }
+
+  if (!Types.ObjectId.isValid(projectId)) {
     throw new BadRequestError("Invalid project id.");
   }
 
@@ -33,7 +55,7 @@ function getValidatedProjectId(req: Request): string {
  */
 export const queryCopilot = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
-  const projectId = getValidatedProjectId(req);
+  const projectId = await getValidatedProjectId(req);
   const { question, history } = req.body as CopilotQueryDto;
 
   // 1. Authorize Project Ownership & Build Context

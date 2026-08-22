@@ -198,17 +198,19 @@ export function generateMemorySnippet(content: string, query: string): string {
 export function generateNavigationUrl(
   type: SearchEntityType,
   id: string,
-  projectId?: string
+  projectId?: string,
+  workspaceSlug?: string,
 ): string {
+  const prefix = workspaceSlug ? `/w/${workspaceSlug}` : "";
   switch (type) {
     case "project":
-      return `/projects/${id}`;
+      return `${prefix}/projects/${id}`;
     case "task":
-      return `/tasks/${id}`;
+      return `${prefix}/tasks/${id}`;
     case "milestone":
     case "memory":
-      return `/projects/${projectId || id}`;
+      return `${prefix}/projects/${projectId || id}`;
     default:
-      return `/projects/${id}`;
+      return `${prefix}/projects/${id}`;
   }
 }

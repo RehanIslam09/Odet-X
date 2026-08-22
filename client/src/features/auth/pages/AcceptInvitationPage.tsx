@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { AlertCircle, Building2, Loader2, Sparkles } from "lucide-react";
+import { AlertCircle, Building2, Clock, Loader2, Sparkles, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button.js";
@@ -48,20 +48,30 @@ export default function AcceptInvitationPage() {
     });
   };
 
-  const validationErrorMessage = (
-    error as { response?: { data?: { message?: string } } }
-  )?.response?.data?.message;
+  const errorResponse = (error as { response?: { status?: number; data?: { code?: string; message?: string } } })?.response;
+  const isExpired = errorResponse?.status === 410 || errorResponse?.data?.code === "INVITATION_EXPIRED";
+  const validationErrorMessage = errorResponse?.data?.message;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md border-border/80 shadow-xl">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Building2 className="h-6 w-6" />
+          <div
+            className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl ${
+              isExpired
+                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                : "bg-primary/10 text-primary"
+            }`}
+          >
+            {isExpired ? <Clock className="h-6 w-6" /> : <Building2 className="h-6 w-6" />}
           </div>
-          <CardTitle className="text-2xl font-bold">Workspace Invitation</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            {isExpired ? "Invitation Link Expired" : "Workspace Invitation"}
+          </CardTitle>
           <CardDescription>
-            You have been invited to collaborate on AI Project Manager.
+            {isExpired
+              ? "This invitation token is no longer valid."
+              : "You have been invited to collaborate on AI Project Manager."}
           </CardDescription>
         </CardHeader>
 
@@ -71,10 +81,18 @@ export default function AcceptInvitationPage() {
               <Loader2 className="h-8 w-8 animate-spin mb-2" />
               <p className="text-sm">Validating invitation token...</p>
             </div>
+          ) : isExpired ? (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-center text-sm text-amber-700 dark:text-amber-300 space-y-2">
+              <Clock className="mx-auto h-8 w-8 text-amber-600 dark:text-amber-400 shrink-0" />
+              <p className="font-semibold text-foreground">Link Expired for Security</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Workspace invitation links automatically expire 7 days after issuance. Please request a new invitation from your workspace administrator or primary owner.
+              </p>
+            </div>
           ) : isError || !details ? (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-center text-sm text-destructive">
               <AlertCircle className="mx-auto h-8 w-8 mb-2 shrink-0" />
-              <p className="font-semibold">Invalid or Expired Invitation</p>
+              <p className="font-semibold">Invalid Invitation</p>
               <p className="mt-1 text-xs text-destructive/80">
                 {validationErrorMessage ||
                   "This invitation token is invalid, expired, or has already been revoked."}
@@ -103,7 +121,7 @@ export default function AcceptInvitationPage() {
         </CardContent>
 
         <CardFooter className="flex flex-col gap-2">
-          {details && !isError && (
+          {details && !isError && !isExpired && (
             <Button
               className="w-full gap-2"
               onClick={handleAccept}
@@ -120,6 +138,20 @@ export default function AcceptInvitationPage() {
                   Accept Invitation & Join
                 </>
               )}
+            </Button>
+          )}
+
+          {isExpired && (
+            <Button
+              variant="default"
+              className="w-full gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={() => {
+                toast.info("Please request a new invitation from your workspace admin.");
+                navigate("/auth/login");
+              }}
+            >
+              <RefreshCw className="h-4 w-4" />
+              Request New Invitation Link
             </Button>
           )}
 

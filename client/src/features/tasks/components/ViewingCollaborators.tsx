@@ -1,5 +1,6 @@
-import { usePresenceAwareness } from "@/realtime/usePresenceAwareness";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { usePresenceAwareness } from "@/realtime/usePresenceAwareness.js";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar.js";
+import type { PresenceUser } from "@/realtime/realtime-types.js";
 
 function getInitials(name: string): string {
   if (!name) return "?";
@@ -42,7 +43,7 @@ export function ViewingCollaborators() {
       aria-label={viewingText}
     >
       <div className="flex items-center -space-x-1.5 overflow-hidden">
-        {visibleViewers.map((viewer) => (
+        {visibleViewers.map((viewer: PresenceUser) => (
           <Avatar
             key={viewer.userId}
             className="h-5 w-5 border border-background"

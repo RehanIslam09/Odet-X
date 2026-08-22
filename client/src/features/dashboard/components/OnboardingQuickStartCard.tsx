@@ -5,9 +5,14 @@ import { FolderPlus, SquareCheckBig, Sparkles, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.js";
 import { Button } from "@/components/ui/button.js";
 import { useGlobalCopilot } from "@/features/ai/context/GlobalCopilotContext.js";
+import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext.js";
 
 export const OnboardingQuickStartCard = memo(function OnboardingQuickStartCard() {
   const { openCopilot } = useGlobalCopilot();
+  const { currentWorkspace } = useActiveWorkspace();
+
+  const projectsLink = currentWorkspace ? `/w/${currentWorkspace.slug}/projects` : "/projects";
+  const tasksLink = currentWorkspace ? `/w/${currentWorkspace.slug}/tasks` : "/tasks";
 
   return (
     <Card className="flex flex-col border-border/60 bg-card shadow-2xs p-2">
@@ -40,7 +45,7 @@ export const OnboardingQuickStartCard = memo(function OnboardingQuickStartCard()
               </p>
             </div>
             <Button size="sm" variant="outline" asChild className="h-8 text-xs gap-1 cursor-pointer">
-              <Link to="/projects">
+              <Link to={projectsLink}>
                 <span>New Project</span>
                 <ArrowRight className="h-3 w-3" />
               </Link>
@@ -58,7 +63,7 @@ export const OnboardingQuickStartCard = memo(function OnboardingQuickStartCard()
               </p>
             </div>
             <Button size="sm" variant="outline" asChild className="h-8 text-xs gap-1 cursor-pointer">
-              <Link to="/tasks">
+              <Link to={tasksLink}>
                 <span>Create Task</span>
                 <ArrowRight className="h-3 w-3" />
               </Link>

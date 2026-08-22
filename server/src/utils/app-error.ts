@@ -52,3 +52,13 @@ export class ConflictError extends AppError {
     this.name = "ConflictError";
   }
 }
+
+export class GoneError extends AppError {
+  public readonly code: string;
+
+  constructor(message: string, code = "GONE") {
+    super(410, message);
+    this.name = "GoneError";
+    this.code = code;
+  }
+}

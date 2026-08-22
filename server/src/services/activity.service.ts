@@ -111,6 +111,7 @@ export async function listActivities(
   if (cursor) filter._id = { $lt: new Types.ObjectId(cursor) };
 
   const items = await Activity.find(filter)
+    .populate("actorId", "name email avatar")
     .sort({ _id: -1 })
     .limit(limit + 1)
     .exec();

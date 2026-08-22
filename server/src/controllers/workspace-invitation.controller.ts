@@ -4,6 +4,7 @@ import { asyncHandler } from "@/utils/async-handler.js";
 import {
   acceptInvitation,
   createInvitation,
+  declineInvitation,
   getInvitationByToken,
   listPendingInvitations,
   revokeInvitation,
@@ -110,6 +111,22 @@ export const acceptInvitationHandler = asyncHandler(
       success: true,
       message: "Invitation accepted successfully.",
       data: result,
+    });
+  },
+);
+
+/**
+ * Handles POST /api/v1/invitations/:token/decline
+ */
+export const declineInvitationHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    const token = req.params.token as string;
+
+    await declineInvitation(token, req.user!._id.toString());
+
+    res.status(200).json({
+      success: true,
+      message: "Invitation declined successfully.",
     });
   },
 );

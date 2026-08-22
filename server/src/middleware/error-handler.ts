@@ -21,9 +21,11 @@ export default function errorHandler(
 ) {
   // --- Operational errors ---
   if (error instanceof AppError) {
+    const errObj = error as AppError & { code?: string };
     return res.status(error.statusCode).json({
       success: false,
       message: error.message,
+      ...(errObj.code ? { code: errObj.code } : {}),
     });
   }
 

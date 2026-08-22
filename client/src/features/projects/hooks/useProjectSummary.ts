@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { projectsApi } from "@/features/projects/services/projects.api.js";
 import { projectKeys } from "@/features/projects/hooks/useProjects.js";
+import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext.js";
 
 /**
  * Fetches the progress metrics summary for a specific project.
@@ -10,8 +11,10 @@ import { projectKeys } from "@/features/projects/hooks/useProjects.js";
  * to be called unconditionally in components.
  */
 export function useProjectSummary(id: string | undefined) {
+  const { activeWorkspaceId } = useActiveWorkspace();
+
   return useQuery({
-    queryKey: projectKeys.summary(id ?? ""),
+    queryKey: id ? projectKeys.summary(id, activeWorkspaceId) : [],
     queryFn: () => {
       if (!id) {
         throw new Error("Project id is required.");

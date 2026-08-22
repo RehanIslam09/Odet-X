@@ -80,39 +80,39 @@ export const ExecutiveSummaryWidget = memo(function ExecutiveSummaryWidget({
     {
       id: "stat-health",
       title: "Workspace Health",
-      value: completionRate >= 70 ? "98%" : "84%",
-      subtitle: "Optimal performance",
+      value: summary?.health ? `${summary.health.score}%` : "100%",
+      subtitle: summary?.health?.status || "Optimal performance",
       icon: TrendingUp,
       color: "text-amber-500 bg-amber-500/10 border-amber-500/20",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
       {stats.map((stat) => {
         const Icon = stat.icon;
         return (
           <Card
             key={stat.id}
-            className="group relative overflow-hidden border-border/50 bg-card p-4 transition-all hover:border-primary/40 hover:shadow-xs"
+            className="group relative overflow-hidden border-border/60 bg-card p-4.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-sm"
           >
             <CardContent className="p-0 flex flex-col justify-between gap-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground truncate">
+                <span className="text-xs font-semibold tracking-tight text-muted-foreground truncate uppercase">
                   {stat.title}
                 </span>
                 <div
-                  className={`flex h-7 w-7 items-center justify-center rounded-lg border ${stat.color}`}
+                  className={`flex h-7.5 w-7.5 items-center justify-center rounded-lg border transition-transform duration-200 group-hover:scale-105 ${stat.color}`}
                 >
                   <Icon className="h-3.5 w-3.5" />
                 </div>
               </div>
 
               <div className="flex flex-col">
-                <span className="text-2xl font-bold tracking-tight text-foreground">
+                <span className="text-2xl font-bold tracking-tight text-foreground font-mono">
                   {stat.value}
                 </span>
-                <span className="text-[11px] text-muted-foreground truncate">
+                <span className="text-[11px] text-muted-foreground truncate mt-0.5">
                   {stat.subtitle}
                 </span>
               </div>

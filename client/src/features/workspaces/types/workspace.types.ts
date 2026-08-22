@@ -22,6 +22,14 @@ export interface Workspace {
   slug: string;
   ownerId: string;
   isPersonal: boolean;
+  type?: "PERSONAL" | "TEAM";
+  accentColor?: string;
+  color?: string;
+  aiSettings?: {
+    model?: string;
+    proactiveEnabled?: boolean;
+    memoryRetentionDays?: number;
+  };
   role?: WorkspaceRole;
   memberCount?: number;
   createdAt: string;
@@ -33,14 +41,31 @@ export interface WorkspaceDetails {
   members: WorkspaceMember[];
 }
 
+export interface InitialInviteInput {
+  email: string;
+  role: WorkspaceRole;
+}
+
 export interface CreateWorkspaceInput {
   name: string;
   slug?: string;
+  type?: "PERSONAL" | "TEAM";
+  accentColor?: string;
+  color?: string;
+  initialInvites?: InitialInviteInput[];
 }
 
 export interface UpdateWorkspaceInput {
   name?: string;
   slug?: string;
+  type?: "PERSONAL" | "TEAM";
+  accentColor?: string;
+  color?: string;
+  aiSettings?: {
+    model?: string;
+    proactiveEnabled?: boolean;
+    memoryRetentionDays?: number;
+  };
 }
 
 export interface WorkspaceInvitation {

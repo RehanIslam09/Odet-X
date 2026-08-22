@@ -10,6 +10,7 @@ import {
   FolderPlus,
   PlusSquare,
   Command as CommandIcon,
+  FolderKanban,
   Flag,
   Brain,
   Loader2,
@@ -28,7 +29,6 @@ import {
   CommandItem,
   CommandShortcut,
 } from "@/components/ui/command.js";
-import { ProjectIcon } from "@/components/common/ProjectIcon.js";
 import { useCommandPalette } from "../hooks/useCommandPalette.js";
 import type { CommandDefinition, CommandGroup as GroupName } from "../types/command.types.js";
 import { CreateProjectDialog } from "@/features/projects/components/CreateProjectDialog.js";
@@ -37,6 +37,7 @@ import { useGlobalSearch } from "@/features/search/hooks/useGlobalSearch.js";
 import { isSafeInternalUrl } from "@/features/search/utils/url.utils.js";
 import type { SearchResultDto, SearchEntityType } from "@/features/search/types/search.types.js";
 import { useGlobalCopilot } from "@/features/ai/context/GlobalCopilotContext.js";
+import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext.js";
 
 function renderCommandIcon(iconKey?: string) {
   switch (iconKey) {
@@ -61,10 +62,10 @@ function renderCommandIcon(iconKey?: string) {
   }
 }
 
-function renderEntityIcon(item: SearchResultDto) {
-  switch (item.type) {
+function renderEntityIcon(type: SearchEntityType) {
+  switch (type) {
     case "project":
-      return <ProjectIcon icon={item.subtitle} size="xs" className="mr-2" />;
+      return <FolderKanban className="mr-2 h-4 w-4 shrink-0 text-primary" />;
     case "task":
       return <CheckSquare className="mr-2 h-4 w-4 shrink-0 text-sky-500" />;
     case "milestone":
@@ -91,6 +92,7 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { openCopilot } = useGlobalCopilot();
+  const { currentWorkspace } = useActiveWorkspace();
 
   const {
     open,
@@ -172,11 +174,16 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
       if (onSelectEntity && item) {
         onSelectEntity(item);
       }
-      navigate(targetUrl);
+      let finalUrl = targetUrl;
+      if (currentWorkspace?.slug && !targetUrl.startsWith("/w/")) {
+        const cleanSubpath = targetUrl.startsWith("/") ? targetUrl : `/${targetUrl}`;
+        finalUrl = `/w/${currentWorkspace.slug}${cleanSubpath}`;
+      }
+      navigate(finalUrl);
       setOpen(false);
       setQuery("");
     },
-    [navigate, queryClient, setOpen, setQuery, onSelectEntity],
+    [navigate, queryClient, setOpen, setQuery, onSelectEntity, currentWorkspace],
   );
 
   return (
@@ -314,7 +321,7 @@ export function CommandPalette({ onSelectEntity }: CommandPaletteProps = {}) {
                       onSelect={() => handleSelectEntity(item.url, item)}
                       data-testid={`entity-item-${item.type}-${item.id}`}
                     >
-                      {renderEntityIcon(item)}
+                      {renderEntityIcon(item.type)}
                       <div className="flex flex-col flex-1 min-w-0">
                         <span className="font-medium text-sm text-foreground truncate">
                           {item.title}

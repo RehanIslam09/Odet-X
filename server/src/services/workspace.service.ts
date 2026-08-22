@@ -41,6 +41,14 @@ export interface WorkspaceDto {
   slug: string;
   ownerId: string;
   isPersonal: boolean;
+  type?: "PERSONAL" | "TEAM";
+  accentColor?: string;
+  color?: string;
+  aiSettings?: {
+    model?: string;
+    proactiveEnabled?: boolean;
+    memoryRetentionDays?: number;
+  };
   role?: WorkspaceRole;
   memberCount?: number;
   createdAt: Date;
@@ -56,12 +64,17 @@ export function toWorkspaceDto(
   role?: WorkspaceRole,
   memberCount?: number,
 ): WorkspaceDto {
+  const workspaceType = workspace.type || (workspace.isPersonal ? "PERSONAL" : "TEAM");
+  const isPersonal = workspaceType === "PERSONAL" || Boolean(workspace.isPersonal);
   return {
     id: workspace._id.toString(),
     name: workspace.name,
     slug: workspace.slug,
     ownerId: workspace.ownerId.toString(),
-    isPersonal: workspace.isPersonal,
+    isPersonal,
+    type: workspaceType,
+    ...(workspace.accentColor ? { accentColor: workspace.accentColor, color: workspace.accentColor } : {}),
+    ...(workspace.aiSettings ? { aiSettings: workspace.aiSettings } : {}),
     ...(role ? { role } : {}),
     ...(typeof memberCount === "number" ? { memberCount } : {}),
     createdAt: workspace.createdAt,
@@ -141,7 +154,9 @@ export async function provisionPersonalWorkspace(user: {
     name: wsName,
     slug,
     ownerId: userId,
+    type: "PERSONAL",
     isPersonal: true,
+    isDefault: true,
   });
 
   try {
@@ -219,11 +234,16 @@ export async function createCustomWorkspace(
     slug = `${baseSlug.slice(0, 40)}-${suffix}`;
   }
 
+  const workspaceType: "PERSONAL" | "TEAM" = data.type === "PERSONAL" ? "PERSONAL" : "TEAM";
+
   const workspace = new Workspace({
     name: data.name,
     slug,
     ownerId: userObjId,
+    type: workspaceType,
     isPersonal: false,
+    isDefault: false,
+    ...(data.accentColor || data.color ? { accentColor: data.accentColor || data.color } : {}),
   });
 
   try {
@@ -392,6 +412,21 @@ export async function updateCustomWorkspace(
     }
   }
 
+  const accentColorInput = data.accentColor || data.color;
+  if (accentColorInput !== undefined) {
+    workspace.accentColor = accentColorInput;
+  }
+
+  if (data.aiSettings !== undefined) {
+    const existingAi = workspace.aiSettings || {};
+    const updatedAi = { ...existingAi };
+    if (data.aiSettings.model !== undefined) updatedAi.model = data.aiSettings.model;
+    if (data.aiSettings.proactiveEnabled !== undefined) updatedAi.proactiveEnabled = data.aiSettings.proactiveEnabled;
+    if (data.aiSettings.memoryRetentionDays !== undefined) updatedAi.memoryRetentionDays = data.aiSettings.memoryRetentionDays;
+    workspace.aiSettings = updatedAi;
+    workspace.markModified("aiSettings");
+  }
+
   await workspace.save();
   return toWorkspaceDto(workspace, "OWNER");
 }
@@ -436,6 +471,27 @@ export async function deleteCustomWorkspace(workspaceId: string, userId: string)
 
   await WorkspaceMember.deleteMany({ workspaceId: workspaceObjId });
   await Workspace.deleteOne({ _id: workspaceObjId });
+
+  try {
+    await domainEventBus.publish(
+      createDomainEvent({
+        type: "member.updated",
+        workspaceId,
+        actorId: userId,
+        resource: {
+          type: "workspaceMember",
+          id: workspaceId,
+        },
+        payload: {
+          action: "WORKSPACE_DELETED",
+          workspaceId,
+          evict: true,
+        },
+      }),
+    );
+  } catch (err) {
+    console.error("[Workspace Service] Failed to publish workspace eviction event:", err);
+  }
 }
 
 /**
@@ -485,18 +541,18 @@ export async function removeWorkspaceMember(
     throw new ForbiddenError("Workspace owner permission required.");
   }
 
-  if (targetMember.role === "OWNER") {
-    const ownerCount = await WorkspaceMember.countDocuments({
-      workspaceId: workspaceObjId,
-      role: "OWNER",
-    });
+  const workspace = await Workspace.findById(workspaceObjId);
+  if (!workspace) {
+    throw new NotFoundError("Workspace not found.");
+  }
 
-    if (ownerCount <= 1) {
-      if (isSelfLeaving) {
-        throw new ForbiddenError("Cannot leave workspace as sole OWNER.");
-      } else {
-        throw new ForbiddenError("Workspace owner cannot be removed.");
-      }
+  const isPrimaryOwner = workspace.ownerId.toString() === targetUserId || targetMember.role === "OWNER";
+
+  if (isPrimaryOwner) {
+    if (isSelfLeaving) {
+      throw new ForbiddenError("Cannot leave workspace as sole OWNER.");
+    } else {
+      throw new ForbiddenError("Workspace owner cannot be removed.");
     }
   }
 

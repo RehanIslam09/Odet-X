@@ -12,6 +12,8 @@ import { ErrorState } from "@/components/common/ErrorState.js";
 import { TaskActivityTimeline } from "@/features/activity/components/TaskActivityTimeline.js";
 import { useRecentlyViewed } from "@/features/navigation/hooks/useRecentlyViewed.js";
 
+import { isApiError } from "@/utils/api-error.js";
+
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const { addRecentlyViewed } = useRecentlyViewed();
@@ -45,7 +47,7 @@ export default function TaskDetailPage() {
   }
 
   // 404 or BOLA/Security block translates to a generic NotFound error
-  if (error?.message?.includes("404") || error?.name === "NotFoundError" || (error as { status?: number })?.status === 404) {
+  if (isApiError(error, 404) || error?.message?.includes("404") || error?.name === "NotFoundError" || (error as { status?: number })?.status === 404) {
     return (
       <div className="mx-auto w-full max-w-5xl animate-in fade-in duration-500">
         <TaskNotFoundState />

@@ -6,6 +6,7 @@ import { format, isToday, isTomorrow, isBefore, startOfDay, addDays } from "date
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.js";
 import { Button } from "@/components/ui/button.js";
 import { TaskPriorityBadge } from "@/features/tasks/components/TaskPriorityBadge.js";
+import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext.js";
 import type { DashboardAttentionTask } from "@/features/dashboard/types/dashboard.types.js";
 
 interface UpcomingDeadlinesWidgetProps {
@@ -15,7 +16,10 @@ interface UpcomingDeadlinesWidgetProps {
 export const UpcomingDeadlinesWidget = memo(function UpcomingDeadlinesWidget({
   tasks,
 }: UpcomingDeadlinesWidgetProps) {
+  const { currentWorkspace } = useActiveWorkspace();
   const now = startOfDay(new Date());
+
+  const tasksLink = currentWorkspace ? `/w/${currentWorkspace.slug}/tasks` : "/tasks";
 
   const overdueTasks = tasks.filter(
     (t) => t.dueDate && isBefore(new Date(t.dueDate), now) && t.status !== "done",
@@ -31,6 +35,9 @@ export const UpcomingDeadlinesWidget = memo(function UpcomingDeadlinesWidget({
     const d = new Date(t.dueDate);
     return isBefore(d, addDays(now, 7)) && !isBefore(d, now) && !isToday(d) && !isTomorrow(d);
   });
+
+  const getTaskUrl = (taskId: string) =>
+    currentWorkspace ? `/w/${currentWorkspace.slug}/tasks/${taskId}` : `/tasks/${taskId}`;
 
   return (
     <Card className="flex flex-col border-border/60 bg-card shadow-2xs">
@@ -50,7 +57,7 @@ export const UpcomingDeadlinesWidget = memo(function UpcomingDeadlinesWidget({
             </div>
           </div>
           <Button variant="ghost" size="sm" asChild className="h-7 text-xs gap-1 cursor-pointer">
-            <Link to="/tasks">
+            <Link to={tasksLink}>
               <span>View All</span>
               <ChevronRight className="h-3 w-3" />
             </Link>
@@ -77,7 +84,7 @@ export const UpcomingDeadlinesWidget = memo(function UpcomingDeadlinesWidget({
                 {overdueTasks.slice(0, 3).map((task) => (
                   <Link
                     key={task.id}
-                    to={`/tasks/${task.id}`}
+                    to={getTaskUrl(task.id)}
                     className="flex items-center justify-between p-2 rounded-lg border border-destructive/30 bg-destructive/5 hover:bg-destructive/10 transition-colors text-xs"
                   >
                     <div className="flex items-center gap-2 min-w-0">
@@ -104,7 +111,7 @@ export const UpcomingDeadlinesWidget = memo(function UpcomingDeadlinesWidget({
                 {todayTasks.slice(0, 3).map((task) => (
                   <Link
                     key={task.id}
-                    to={`/tasks/${task.id}`}
+                    to={getTaskUrl(task.id)}
                     className="flex items-center justify-between p-2 rounded-lg border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition-colors text-xs"
                   >
                     <span className="font-medium text-foreground truncate">{task.title}</span>
@@ -124,7 +131,7 @@ export const UpcomingDeadlinesWidget = memo(function UpcomingDeadlinesWidget({
                 {[...tomorrowTasks, ...upcomingWeekTasks].slice(0, 3).map((task) => (
                   <Link
                     key={task.id}
-                    to={`/tasks/${task.id}`}
+                    to={getTaskUrl(task.id)}
                     className="flex items-center justify-between p-2 rounded-lg border border-border/40 hover:bg-muted/20 transition-colors text-xs"
                   >
                     <span className="font-medium text-foreground truncate">{task.title}</span>

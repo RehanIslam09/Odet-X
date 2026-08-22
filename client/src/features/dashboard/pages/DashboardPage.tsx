@@ -3,141 +3,82 @@ import { AlertCircle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
 import { Skeleton } from "@/components/ui/skeleton.js";
 import { ActivityTimeline } from "@/features/dashboard/components/ActivityTimeline.js";
-import { DashboardHeader } from "@/features/dashboard/components/DashboardHeader.js";
+import { DashboardHero } from "@/features/dashboard/components/DashboardHero.js";
 import { FocusToday } from "@/features/dashboard/components/FocusToday.js";
-import { ProductivityOverview } from "@/features/dashboard/components/ProductivityOverview.js";
 import { RecentProjects } from "@/features/dashboard/components/RecentProjects.js";
 import { ExecutiveSummaryWidget } from "@/features/dashboard/components/ExecutiveSummaryWidget.js";
-import { UpcomingDeadlinesWidget } from "@/features/dashboard/components/UpcomingDeadlinesWidget.js";
-import { AIWorkspaceAssistant } from "@/features/dashboard/components/AIWorkspaceAssistant.js";
-import { OnboardingQuickStartCard } from "@/features/dashboard/components/OnboardingQuickStartCard.js";
+import { WorkspaceIntelligenceSidebar } from "@/features/dashboard/components/WorkspaceIntelligenceSidebar.js";
+import { WorkspaceExecutionAnalytics } from "@/features/dashboard/components/WorkspaceExecutionAnalytics.js";
 import { useDashboardOverview } from "@/features/dashboard/hooks/useDashboardOverview.js";
-import {
-  DashboardShell,
-  DashboardGrid,
-  DashboardStream,
-  DashboardWidgetSlot,
-} from "@/features/dashboard/components/layout/index.js";
 
 /**
- * Phase 34.5 — Dashboard Production Execution (Milestone 5 & 6: Progressive Disclosure & Density Contracts)
+ * Phase 35.13 — Executive Dashboard Final Polish (RC-04)
  *
- * Implements Stage 1 Empty Workspace onboarding disclosure & Stage 2+ Dual Stream architecture.
+ * Integrated Execution Stream (66%) and Unified Workspace Intelligence Sidebar (33%).
  */
 function DashboardPage() {
   const { data, isLoading, isError, refetch } = useDashboardOverview();
 
-  // Progressive Disclosure Stage 1: Empty Workspace
-  const isEmptyWorkspace =
-    !isLoading &&
-    !isError &&
-    data?.summary?.projects.active === 0 &&
-    (data?.recentProjects?.length ?? 0) === 0 &&
-    (data?.attentionTasks?.length ?? 0) === 0;
-
   if (isError) {
     return (
-      <DashboardShell>
-        <DashboardHeader summary={data?.summary} />
-        <DashboardGrid>
-          <DashboardStream span={12}>
-            <DashboardWidgetSlot>
-              <div className="flex flex-col gap-4 rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5" />
-                  <h3 className="font-semibold">Error loading dashboard</h3>
-                </div>
-                <p className="text-sm">
-                  There was a problem retrieving your dashboard analytics. Please try again.
-                </p>
-                <Button variant="outline" size="sm" onClick={() => refetch()} className="w-fit gap-2">
-                  <RotateCcw className="h-4 w-4" />
-                  Retry
-                </Button>
-              </div>
-            </DashboardWidgetSlot>
-          </DashboardStream>
-        </DashboardGrid>
-      </DashboardShell>
+      <div className="flex flex-col gap-6 max-w-7xl mx-auto w-full">
+        <DashboardHero />
+        <div className="flex h-full flex-col gap-4 rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5" />
+            <h3 className="font-semibold">Error loading dashboard</h3>
+          </div>
+          <p className="text-sm">
+            There was a problem retrieving your dashboard analytics. Please try again.
+          </p>
+          <Button variant="outline" size="sm" onClick={() => refetch()} className="w-fit gap-2">
+            <RotateCcw className="h-4 w-4" />
+            Retry
+          </Button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <DashboardShell>
-      {/* HEADER COMMAND BAR: Hero Greeting, Ambient Presence, Health & Quick Actions */}
-      <DashboardHeader summary={data?.summary} />
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto w-full animate-in fade-in duration-300">
+      {/* HEADER COMMAND BAR: Workspace Greeting, Status & Quick Action Strip */}
+      <DashboardHero />
 
-      {/* STAGE 1: EMPTY WORKSPACE ONBOARDING */}
-      {isEmptyWorkspace ? (
-        <DashboardGrid>
-          <DashboardStream span={12}>
-            <DashboardWidgetSlot>
-              <OnboardingQuickStartCard />
-            </DashboardWidgetSlot>
-          </DashboardStream>
-        </DashboardGrid>
-      ) : (
-        <>
-          {/* TOP METRICS: Executive Telemetry Summary */}
-          <ExecutiveSummaryWidget summary={data?.summary} isLoading={isLoading} />
+      {/* TOP METRICS: Executive Telemetry Summary */}
+      <ExecutiveSummaryWidget summary={data?.summary} isLoading={isLoading} />
 
-          {/* DUAL INDEPENDENT STREAM LAYOUT */}
-          <DashboardGrid>
-            {/* PRIMARY STREAM (7 Cols / 65% Width) */}
-            <DashboardStream span={7}>
-              {/* 1. Focus Today (Urgent Execution) */}
-              <DashboardWidgetSlot>
-                {isLoading ? (
-                  <Skeleton className="h-[280px] w-full rounded-xl" />
-                ) : (
-                  <FocusToday attentionTasks={data?.attentionTasks ?? []} />
-                )}
-              </DashboardWidgetSlot>
+      {/* CONTINUOUS DUAL-STREAM CANVAS: Execution Stream (66%) <-> Intelligence Sidebar (33%) */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 items-start">
+        {/* LEFT COLUMN: PRIMARY EXECUTION STREAM (66% / 2 Cols) */}
+        <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
+          {/* 1. Focus Today & Critical Deliverables Feed */}
+          {isLoading ? (
+            <Skeleton className="h-[300px] w-full rounded-xl" />
+          ) : (
+            <FocusToday attentionTasks={data?.attentionTasks ?? []} />
+          )}
 
-              {/* 2. Recent Projects (Primary Wayfinding) */}
-              <DashboardWidgetSlot>
-                {isLoading ? (
-                  <Skeleton className="h-[320px] w-full rounded-xl" />
-                ) : (
-                  <RecentProjects recentProjects={data?.recentProjects ?? []} />
-                )}
-              </DashboardWidgetSlot>
+          {/* 2. Active Projects & Resolution Progress */}
+          {isLoading ? (
+            <Skeleton className="h-[280px] w-full rounded-xl" />
+          ) : (
+            <RecentProjects recentProjects={data?.recentProjects ?? []} />
+          )}
 
-              {/* 3. Activity Timeline (Audit Feed - Below Fold) */}
-              <DashboardWidgetSlot>
-                <ActivityTimeline />
-              </DashboardWidgetSlot>
-            </DashboardStream>
+          {/* 3. Real-Time Workspace Activity Timeline */}
+          <ActivityTimeline />
 
-            {/* SECONDARY STREAM (5 Cols / 35% Width) */}
-            <DashboardStream span={5}>
-              {/* 1. AI Workspace Assistant (Merged Risk & Proactive Intelligence) */}
-              <DashboardWidgetSlot>
-                <AIWorkspaceAssistant />
-              </DashboardWidgetSlot>
+          {/* 4. Workspace Execution Analytics & 14-Day Trends */}
+          <WorkspaceExecutionAnalytics summary={data?.summary} />
+        </div>
 
-              {/* 2. Upcoming Deadlines (Forward Horizon Schedule) */}
-              <DashboardWidgetSlot>
-                {isLoading ? (
-                  <Skeleton className="h-[280px] w-full rounded-xl" />
-                ) : (
-                  <UpcomingDeadlinesWidget tasks={data?.attentionTasks ?? []} />
-                )}
-              </DashboardWidgetSlot>
-
-              {/* 3. Productivity Overview (Resolution Velocity) */}
-              <DashboardWidgetSlot>
-                {isLoading ? (
-                  <Skeleton className="h-[200px] w-full rounded-xl" />
-                ) : (
-                  <ProductivityOverview summary={data?.summary} />
-                )}
-              </DashboardWidgetSlot>
-            </DashboardStream>
-          </DashboardGrid>
-        </>
-      )}
-    </DashboardShell>
+        {/* RIGHT COLUMN: UNIFIED WORKSPACE INTELLIGENCE SIDEBAR (33% / 1 Col) */}
+        <div className="flex flex-col min-w-0">
+          <WorkspaceIntelligenceSidebar summary={data?.summary} isLoading={isLoading} />
+        </div>
+      </div>
+    </div>
   );
 }
 

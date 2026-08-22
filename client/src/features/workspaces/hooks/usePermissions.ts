@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { Permission, ROLE_PERMISSIONS } from "@/constants/permissions";
-import { useActiveWorkspace } from "../context/WorkspaceContext";
-import type { WorkspaceRole } from "../types/workspace.types";
+import { Permission, ROLE_PERMISSIONS } from "@/constants/permissions.js";
+import { useActiveWorkspace } from "../context/WorkspaceContext.js";
+import type { WorkspaceRole } from "../types/workspace.types.js";
 
 export interface PermissionsHookResult {
   role: WorkspaceRole | null;
@@ -16,7 +16,8 @@ export interface PermissionsHookResult {
 }
 
 export function usePermissions(): PermissionsHookResult {
-  const { currentRole: role } = useActiveWorkspace();
+  const { currentRole } = useActiveWorkspace();
+  const role: WorkspaceRole | null = currentRole || null;
 
   const permissionsSet = useMemo(() => {
     if (!role || !ROLE_PERMISSIONS[role]) return new Set<Permission>();

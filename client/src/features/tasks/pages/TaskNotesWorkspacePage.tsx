@@ -19,6 +19,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog.js";
 
+import { isApiError } from "@/utils/api-error.js";
+
 export default function TaskNotesWorkspacePage() {
   const { taskId } = useParams<{ taskId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -64,7 +66,7 @@ export default function TaskNotesWorkspacePage() {
   }
 
   // Error States (404/BOLA)
-  if (taskError?.message?.includes("404") || taskError?.name === "NotFoundError" || (taskError as { status?: number })?.status === 404) {
+  if (isApiError(taskError, 404) || taskError?.message?.includes("404") || taskError?.name === "NotFoundError" || (taskError as { status?: number })?.status === 404) {
     return (
       <PageContainer maxWidth="5xl">
         <TaskNotFoundState />

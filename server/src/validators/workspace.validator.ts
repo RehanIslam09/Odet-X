@@ -64,17 +64,34 @@ export const workspaceSlugSchema = z
 export const createWorkspaceSchema = z.object({
   name: workspaceNameSchema,
   slug: workspaceSlugSchema.optional(),
+  type: z.enum(["PERSONAL", "TEAM"]).optional(),
+  accentColor: z.string().optional(),
+  color: z.string().optional(),
 });
 
 export const updateWorkspaceSchema = z
   .object({
     name: workspaceNameSchema.optional(),
     slug: workspaceSlugSchema.optional(),
+    accentColor: z.string().optional(),
+    color: z.string().optional(),
+    aiSettings: z
+      .object({
+        model: z.string().optional(),
+        proactiveEnabled: z.boolean().optional(),
+        memoryRetentionDays: z.number().optional(),
+      })
+      .optional(),
   })
   .refine(
-    (data) => data.name !== undefined || data.slug !== undefined,
+    (data) =>
+      data.name !== undefined ||
+      data.slug !== undefined ||
+      data.accentColor !== undefined ||
+      data.color !== undefined ||
+      data.aiSettings !== undefined,
     {
-      message: "At least one field (name or slug) must be provided for update.",
+      message: "At least one field must be provided for update.",
     },
   );
 

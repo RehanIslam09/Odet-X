@@ -5,6 +5,7 @@ import type {
   ProjectRecommendation,
   RecommendationQueryParams,
 } from "@/features/projects/types/project-recommendations.types";
+import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext.js";
 
 // ---------------------------------------------------------------------------
 // Query Key Factory
@@ -12,12 +13,18 @@ import type {
 
 export const recommendationKeys = {
   all: ["recommendations"] as const,
-  workspaceLists: () => [...recommendationKeys.all, "workspace"] as const,
-  workspaceList: (params?: RecommendationQueryParams) =>
-    [...recommendationKeys.workspaceLists(), params ?? {}] as const,
-  projectLists: () => [...recommendationKeys.all, "project"] as const,
-  projectList: (projectId: string, params?: RecommendationQueryParams) =>
-    [...recommendationKeys.projectLists(), projectId, params ?? {}] as const,
+  workspaceLists: (workspaceId?: string | null) =>
+    workspaceId
+      ? ([...recommendationKeys.all, "workspace", workspaceId] as const)
+      : ([...recommendationKeys.all, "workspace"] as const),
+  workspaceList: (params?: RecommendationQueryParams, workspaceId?: string | null) =>
+    [...recommendationKeys.workspaceLists(workspaceId), params ?? {}] as const,
+  projectLists: (workspaceId?: string | null) =>
+    workspaceId
+      ? ([...recommendationKeys.all, "project", workspaceId] as const)
+      : ([...recommendationKeys.all, "project"] as const),
+  projectList: (projectId: string, params?: RecommendationQueryParams, workspaceId?: string | null) =>
+    [...recommendationKeys.projectLists(workspaceId), projectId, params ?? {}] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -30,8 +37,10 @@ export const recommendationKeys = {
 export function useWorkspaceRecommendations(
   params: RecommendationQueryParams = { page: 1, limit: 10, status: "ACTIVE" },
 ) {
+  const { activeWorkspaceId } = useActiveWorkspace();
+
   return useQuery<PaginatedRecommendationsResponse>({
-    queryKey: recommendationKeys.workspaceList(params),
+    queryKey: recommendationKeys.workspaceList(params, activeWorkspaceId),
     queryFn: () => projectRecommendationsApi.listWorkspace(params),
     placeholderData: (previousData) => previousData,
     staleTime: 60 * 1000, // 1 minute stale time
@@ -46,8 +55,10 @@ export function useProjectRecommendations(
   params: RecommendationQueryParams = { page: 1, limit: 5, status: "ACTIVE" },
   options: { enabled?: boolean } = {},
 ) {
+  const { activeWorkspaceId } = useActiveWorkspace();
+
   return useQuery<PaginatedRecommendationsResponse>({
-    queryKey: recommendationKeys.projectList(projectId, params),
+    queryKey: recommendationKeys.projectList(projectId, params, activeWorkspaceId),
     queryFn: () => projectRecommendationsApi.listProject(projectId, params),
     enabled: Boolean(projectId) && (options.enabled ?? true),
     placeholderData: (previousData) => previousData,

@@ -57,9 +57,10 @@ function getValidatedRecommendationQuery(req: Request): RecommendationQueryDto {
  */
 export const listWorkspace = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
+  const workspaceId = req.workspace?._id?.toString();
   const query = getValidatedRecommendationQuery(req);
 
-  const result = await listWorkspaceRecommendations(userId, query);
+  const result = await listWorkspaceRecommendations(userId, query, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Workspace recommendations retrieved successfully.",
@@ -77,9 +78,10 @@ export const listWorkspace = asyncHandler(async (req: Request, res: Response) =>
 export const listProject = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const projectId = getOptionalProjectId(req)!;
+  const workspaceId = req.workspace?._id?.toString();
   const query = getValidatedRecommendationQuery(req);
 
-  const result = await listProjectRecommendations(userId, projectId, query);
+  const result = await listProjectRecommendations(userId, projectId, query, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Project recommendations retrieved successfully.",
@@ -98,8 +100,9 @@ export const getOne = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const projectId = getOptionalProjectId(req);
   const recommendationId = getRequiredRecommendationId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const recommendation = await getRecommendationById(userId, recommendationId, projectId);
+  const recommendation = await getRecommendationById(userId, recommendationId, projectId, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Recommendation retrieved successfully.",
@@ -117,8 +120,9 @@ export const dismiss = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const projectId = getOptionalProjectId(req);
   const recommendationId = getRequiredRecommendationId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const recommendation = await dismissRecommendationApi(userId, recommendationId, projectId);
+  const recommendation = await dismissRecommendationApi(userId, recommendationId, projectId, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Recommendation dismissed successfully.",

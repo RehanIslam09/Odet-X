@@ -1,33 +1,12 @@
 import { Types } from "mongoose";
-import Project, { IProjectDocument } from "@/models/project.model.js";
 import Task from "@/models/task.model.js";
-import { NotFoundError, BadRequestError } from "@/utils/app-error.js";
+import { BadRequestError } from "@/utils/app-error.js";
 import { AIModelTier } from '../ai/types/index.js';
 import { aiService } from "../ai/ai.service.js";
 import { promptRegistry } from "@/ai/prompts/registry/prompt.registry.js";
 import { GenerateTasksResponseSchema } from "@/ai/schemas/project-tasks.schema.js";
 import { createTask } from "./task.service.js";
-
-/**
- * Ensures the project exists and belongs to the user, throwing NotFoundError if not.
- * Excludes soft-deleted projects.
- */
-async function assertProjectOwnership(
-  projectId: string,
-  userId: string
-): Promise<IProjectDocument> {
-  const project = await Project.findOne({
-    _id: new Types.ObjectId(projectId),
-    owner: new Types.ObjectId(userId),
-    isDeleted: false,
-  });
-
-  if (!project) {
-    throw new NotFoundError("Project not found.");
-  }
-
-  return project;
-}
+import { getProjectById } from "./project.service.js";
 
 /**
  * Orchestrates the generation of structured tasks for a project using AI,
@@ -36,24 +15,25 @@ async function assertProjectOwnership(
  * @param projectId The ID of the project to generate tasks for
  * @param userId The ID of the user requesting task generation
  * @param description Unstructured text describing the project and desired tasks
+ * @param workspaceId Optional active workspace ID
  * @returns Array of created task documents
  */
 export async function generateTasksForProject(
   projectId: string,
   userId: string,
-  description: string
+  description: string,
+  workspaceId?: string,
 ) {
   if (!description || description.trim().length === 0) {
     throw new BadRequestError("Project description cannot be empty.");
   }
 
   // 1. Context Preparation
-  const project = await assertProjectOwnership(projectId, userId);
+  const project = await getProjectById(projectId, userId, workspaceId);
 
   // Load existing tasks to provide context against duplicates
   const existingTasks = await Task.find({
     projectId: new Types.ObjectId(projectId),
-    owner: new Types.ObjectId(userId),
     isDeleted: false,
   }).select('title').lean();
 
@@ -122,9 +102,10 @@ export async function generateTasksForProject(
 
   // 5. Persistence
   // We sequentially call createTask to ensure activity logging and domain boundaries are preserved.
+  const targetWsId = workspaceId || (project.workspaceId ? project.workspaceId.toString() : undefined);
   const createdTasks = [];
   for (const taskData of validTasksToCreate) {
-    const createdTask = await createTask(userId, taskData);
+    const createdTask = await createTask(userId, taskData, targetWsId);
     createdTasks.push(createdTask);
   }
 

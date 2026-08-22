@@ -4,6 +4,7 @@ import Milestone from "@/models/milestone.model.js";
 import ProjectMemory from "@/models/project-memory.model.js";
 import Project from "@/models/project.model.js";
 import Task from "@/models/task.model.js";
+import WorkspaceMember from "@/models/workspace-member.model.js";
 
 import {
   SEARCH_ALL_MAX_RESULTS,
@@ -32,6 +33,7 @@ export interface GlobalSearchOptions {
   type?: SearchTypeFilter;
   limit?: number;
   workspaceId?: string | Types.ObjectId;
+  workspaceSlug?: string;
 }
 
 export interface SearchResultsEnvelopeDto {
@@ -46,12 +48,19 @@ interface RankedResultItem extends SearchResultDto {
 
 /**
  * Executes a scoped global search query across Project, Task, Milestone, and ProjectMemory collections.
- * Supports optional `workspaceId` tenant scoping while retaining existing user owner isolation.
+ * Supports workspaceId tenant scoping for shared workspace entities, falling back to owner isolation.
  */
 export async function searchGlobalEntities(
   options: GlobalSearchOptions,
 ): Promise<SearchResultsEnvelopeDto> {
-  const { ownerId, query, type = "all", limit = SEARCH_DEFAULT_LIMIT, workspaceId } = options;
+  const {
+    ownerId,
+    query,
+    type = "all",
+    limit = SEARCH_DEFAULT_LIMIT,
+    workspaceId,
+    workspaceSlug,
+  } = options;
 
   const norm = normalizeSearchQuery(query);
 
@@ -66,6 +75,22 @@ export async function searchGlobalEntities(
   const effectiveLimit = Math.min(SEARCH_MAX_LIMIT, Math.max(1, limit));
   const ownerObjectId = new Types.ObjectId(ownerId.toString());
   const workspaceObjectId = workspaceId ? new Types.ObjectId(workspaceId.toString()) : undefined;
+
+  // Defensive membership check if workspaceId is explicitly supplied
+  if (workspaceObjectId) {
+    const isMember = await WorkspaceMember.exists({
+      workspaceId: workspaceObjectId,
+      userId: ownerObjectId,
+    });
+    if (!isMember) {
+      return {
+        query: norm.trimmed,
+        totalResults: 0,
+        items: [],
+      };
+    }
+  }
+
   const regexFilter = { $regex: norm.escaped, $options: "i" };
 
   const searchAll = type === "all";
@@ -76,17 +101,17 @@ export async function searchGlobalEntities(
   const fetchMemories = searchAll || type === "memory";
 
   const projectFilter: Record<string, unknown> = {
-    owner: ownerObjectId,
     isDeleted: false,
     archived: false,
     $or: [{ name: regexFilter }, { description: regexFilter }],
   };
   if (workspaceObjectId) {
     projectFilter.workspaceId = workspaceObjectId;
+  } else {
+    projectFilter.owner = ownerObjectId;
   }
 
   const taskFilter: Record<string, unknown> = {
-    owner: ownerObjectId,
     isDeleted: false,
     archived: false,
     $or: [
@@ -97,23 +122,27 @@ export async function searchGlobalEntities(
   };
   if (workspaceObjectId) {
     taskFilter.workspaceId = workspaceObjectId;
+  } else {
+    taskFilter.owner = ownerObjectId;
   }
 
   const milestoneFilter: Record<string, unknown> = {
-    owner: ownerObjectId,
     isDeleted: false,
     $or: [{ title: regexFilter }, { description: regexFilter }],
   };
   if (workspaceObjectId) {
     milestoneFilter.workspaceId = workspaceObjectId;
+  } else {
+    milestoneFilter.owner = ownerObjectId;
   }
 
   const memoryFilter: Record<string, unknown> = {
-    owner: ownerObjectId,
     content: regexFilter,
   };
   if (workspaceObjectId) {
     memoryFilter.workspaceId = workspaceObjectId;
+  } else {
+    memoryFilter.owner = ownerObjectId;
   }
 
   // 1. Parallel Candidate Retrieval across relevant collections
@@ -186,12 +215,13 @@ export async function searchGlobalEntities(
 
     const parentLookupFilter: Record<string, unknown> = {
       _id: { $in: parentObjectIds },
-      owner: ownerObjectId,
       isDeleted: false,
       archived: false,
     };
     if (workspaceObjectId) {
       parentLookupFilter.workspaceId = workspaceObjectId;
+    } else {
+      parentLookupFilter.owner = ownerObjectId;
     }
 
     const activeParents = await Project.find(
@@ -219,7 +249,7 @@ export async function searchGlobalEntities(
         type: "project",
         title: p.name,
         subtitle: p.description ? p.description.slice(0, 100) : undefined,
-        url: generateNavigationUrl("project", p._id.toString()),
+        url: generateNavigationUrl("project", p._id.toString(), undefined, workspaceSlug),
         updatedAt: p.updatedAt.toISOString(),
         score,
       });
@@ -250,7 +280,7 @@ export async function searchGlobalEntities(
         type: "task",
         title: t.title,
         subtitle: t.description ? t.description.slice(0, 100) : undefined,
-        url: generateNavigationUrl("task", t._id.toString()),
+        url: generateNavigationUrl("task", t._id.toString(), undefined, workspaceSlug),
         projectId: t.projectId ? t.projectId.toString() : undefined,
         projectName,
         status: t.status,
@@ -280,7 +310,7 @@ export async function searchGlobalEntities(
         type: "milestone",
         title: m.title,
         subtitle: m.description ? m.description.slice(0, 100) : undefined,
-        url: generateNavigationUrl("milestone", m._id.toString(), pIdStr),
+        url: generateNavigationUrl("milestone", m._id.toString(), pIdStr, workspaceSlug),
         projectId: pIdStr,
         projectName,
         updatedAt: m.updatedAt.toISOString(),
@@ -308,7 +338,7 @@ export async function searchGlobalEntities(
         type: "memory",
         title: "Project Memory",
         subtitle: generateMemorySnippet(mem.content, norm.trimmed),
-        url: generateNavigationUrl("memory", mem._id.toString(), pIdStr),
+        url: generateNavigationUrl("memory", mem._id.toString(), pIdStr, workspaceSlug),
         projectId: pIdStr,
         projectName,
         updatedAt: mem.updatedAt.toISOString(),

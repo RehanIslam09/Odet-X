@@ -20,6 +20,7 @@ import {
 import { executeCommand } from "../executor/command.executor.js";
 import { defaultCommands } from "../catalog/default-commands.js";
 import { isGlobalCommandPaletteSuppressed } from "../utils/keyboard.utils.js";
+import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext.js";
 
 // Ensure default catalog is registered once on module load
 if (defaultCommandRegistry.getAllCommands().length === 0) {
@@ -93,10 +94,18 @@ export function CommandPaletteProvider({
     return registry.searchCommands(query, context);
   }, [query, context, registry]);
 
+  const { currentWorkspace } = useActiveWorkspace();
+
   const adapters: CommandExecutionAdapters = useMemo(
     () => ({
       navigate: (path: string) => {
-        navigate(path);
+        if (currentWorkspace?.slug && !path.startsWith("/w/")) {
+          const subpath = path === "/" ? "/dashboard" : path;
+          const cleanSubpath = subpath.startsWith("/") ? subpath : `/${subpath}`;
+          navigate(`/w/${currentWorkspace.slug}${cleanSubpath}`);
+        } else {
+          navigate(path);
+        }
       },
       openCreateProject: () => {
         setCreateProjectOpen(true);
@@ -106,7 +115,7 @@ export function CommandPaletteProvider({
         setCreateTaskOpen(true);
       },
     }),
-    [navigate],
+    [navigate, currentWorkspace],
   );
 
   const handleExecuteCommand = useCallback(

@@ -151,6 +151,14 @@ export async function acceptInvitationTokenApi(
 }
 
 /**
+ * POST /api/v1/invitations/:token/decline
+ * Declines a workspace invitation token.
+ */
+export async function declineInvitationTokenApi(token: string): Promise<void> {
+  await apiClient.post(`/invitations/${token}/decline`);
+}
+
+/**
  * PATCH /api/v1/workspaces/:workspaceId/members/:userId/role
  * Updates a member's role in the workspace.
  */

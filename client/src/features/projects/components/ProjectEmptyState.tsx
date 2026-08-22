@@ -22,16 +22,9 @@ export function ProjectEmptyState({ onCreateProject }: ProjectEmptyStateProps) {
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="flex flex-col items-center justify-center py-24 text-center"
     >
-      {/* Illustration */}
-      <div className="relative mb-8">
-        <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-500/20 to-indigo-500/10 shadow-inner">
-          <span className="text-5xl">🚀</span>
-        </div>
-
-        {/* Decorative sparkles */}
-        <div className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-primary shadow-sm">
-          <Sparkles className="h-3.5 w-3.5 text-primary-foreground" />
-        </div>
+      {/* Icon */}
+      <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 shadow-2xs">
+        <Sparkles className="h-10 w-10 text-primary" />
       </div>
 
       {/* Headline */}

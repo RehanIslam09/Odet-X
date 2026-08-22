@@ -19,6 +19,7 @@ import {
 } from "../registry/command.registry.js";
 import { executeCommand } from "../executor/command.executor.js";
 import { defaultCommands } from "../catalog/default-commands.js";
+import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext.js";
 import { isGlobalCommandPaletteSuppressed } from "../utils/keyboard.utils.js";
 import { CommandPaletteContext, type CommandPaletteState } from "./CommandPaletteContext.js";
 
@@ -46,6 +47,7 @@ export function CommandPaletteProvider({
   const location = useLocation();
   const navigate = useNavigate();
   const params = useParams<{ projectId?: string; taskId?: string }>();
+  const { currentWorkspace } = useActiveWorkspace();
 
   const openCommandPalette = useCallback(() => {
     setOpen(true);
@@ -78,7 +80,13 @@ export function CommandPaletteProvider({
   const adapters: CommandExecutionAdapters = useMemo(
     () => ({
       navigate: (path: string) => {
-        navigate(path);
+        if (currentWorkspace?.slug && !path.startsWith("/w/")) {
+          const subpath = path === "/" ? "/dashboard" : path;
+          const cleanSubpath = subpath.startsWith("/") ? subpath : `/${subpath}`;
+          navigate(`/w/${currentWorkspace.slug}${cleanSubpath}`);
+        } else {
+          navigate(path);
+        }
       },
       openCreateProject: () => {
         setCreateProjectOpen(true);
@@ -88,7 +96,7 @@ export function CommandPaletteProvider({
         setCreateTaskOpen(true);
       },
     }),
-    [navigate],
+    [navigate, currentWorkspace],
   );
 
   const handleExecuteCommand = useCallback(

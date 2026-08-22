@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   acceptInvitationHandler,
+  declineInvitationHandler,
   getInvitationByTokenHandler,
 } from "@/controllers/workspace-invitation.controller.js";
 import { authenticate } from "@/middleware/auth.middleware.js";
@@ -13,5 +14,8 @@ router.get("/:token", getInvitationByTokenHandler);
 
 // POST /api/v1/invitations/:token/accept - Accept invitation and join workspace (Authenticated)
 router.post("/:token/accept", authenticate, acceptInvitationHandler);
+
+// POST /api/v1/invitations/:token/decline - Decline invitation (Authenticated)
+router.post("/:token/decline", authenticate, declineInvitationHandler);
 
 export default router;

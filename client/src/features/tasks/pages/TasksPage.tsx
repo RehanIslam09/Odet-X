@@ -54,7 +54,7 @@ export default function TasksPage() {
   const projectOptions = useMemo(() => {
     return (projectsData || []).map((proj) => ({
       id: proj.id,
-      name: proj.name,
+      name: `${proj.emoji} ${proj.name}`,
     }));
   }, [projectsData]);
 

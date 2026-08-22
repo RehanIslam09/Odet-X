@@ -92,7 +92,7 @@ describe("DashboardPage Workspace Command Center Layout & Integration", () => {
     queryClient.clear();
   });
 
-  it("1. LOADING STATE: renders Hero, AI Workspace Assistant, and Quick Actions without layout crashing", () => {
+  it("1. LOADING STATE: renders Hero, Daily Brief, Quick Actions, and Workspace Recommendations without layout crashing", () => {
     vi.mocked(useDashboardOverview).mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -102,8 +102,9 @@ describe("DashboardPage Workspace Command Center Layout & Integration", () => {
 
     const { container } = render(<DashboardPage />, { wrapper });
 
-    expect(screen.getByText("AI Workspace Assistant")).toBeInTheDocument();
+    expect(screen.getByText("Daily brief")).toBeInTheDocument();
     expect(screen.getByText("Quick Actions")).toBeInTheDocument();
+    expect(screen.getByText("Project Insights")).toBeInTheDocument();
 
     const row1Grid = container.querySelector(".grid.items-start");
     expect(row1Grid).toBeInTheDocument();
@@ -129,7 +130,7 @@ describe("DashboardPage Workspace Command Center Layout & Integration", () => {
     expect(screen.getByText("Focus Today")).toBeInTheDocument();
     expect(screen.getByText("Recent Projects")).toBeInTheDocument();
     expect(screen.getByText("Upcoming Deadlines")).toBeInTheDocument();
-    expect(screen.getAllByText(/Workspace Health/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Workspace Health").length).toBeGreaterThan(0);
     expect(screen.getByText("Online Team (1)")).toBeInTheDocument();
     expect(screen.getByText("Recent Activity")).toBeInTheDocument();
     expect(screen.getByText("Productivity Overview")).toBeInTheDocument();
@@ -177,7 +178,7 @@ describe("DashboardPage Workspace Command Center Layout & Integration", () => {
     expect(screen.getByText("Personal Alpha")).toBeInTheDocument();
   });
 
-  it("5. PROGRESSIVE DISCLOSURE: empty workspace renders Stage 1 onboarding quick start", () => {
+  it("5. WORKSPACE ISOLATION: empty workspace shows no personal projects", () => {
     vi.mocked(useDashboardOverview).mockReturnValue({
       data: {
         attentionTasks: [],
@@ -194,6 +195,7 @@ describe("DashboardPage Workspace Command Center Layout & Integration", () => {
     expect(screen.queryByText("Personal Alpha")).not.toBeInTheDocument();
     expect(screen.queryByText("Personal Beta")).not.toBeInTheDocument();
 
-    expect(screen.getByText("Welcome to your Workspace")).toBeInTheDocument();
+    expect(screen.getByText("Recent Projects")).toBeInTheDocument();
+    expect(screen.getByText("Recent Activity")).toBeInTheDocument();
   });
 });

@@ -20,6 +20,15 @@ export interface IWorkspace {
   slug: string;
   ownerId: Types.ObjectId;
   isPersonal: boolean;
+  type?: "PERSONAL" | "TEAM";
+  isDefault?: boolean;
+  accentColor?: string;
+  aiSettings?: {
+    model?: string;
+    proactiveEnabled?: boolean;
+    memoryRetentionDays?: number;
+  };
+  preferences?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,6 +74,32 @@ const workspaceSchema = new Schema<IWorkspaceDocument>(
       default: false,
       required: true,
     },
+
+    type: {
+      type: String,
+      enum: ["PERSONAL", "TEAM"],
+      default: "TEAM",
+    },
+
+    isDefault: {
+      type: Boolean,
+      default: false,
+    },
+
+    accentColor: {
+      type: String,
+      required: false,
+    },
+
+    aiSettings: {
+      type: Schema.Types.Mixed,
+      required: false,
+    },
+
+    preferences: {
+      type: Schema.Types.Mixed,
+      required: false,
+    },
   },
   {
     timestamps: true,
@@ -73,8 +108,12 @@ const workspaceSchema = new Schema<IWorkspaceDocument>(
       virtuals: true,
       transform(_doc, ret) {
         const { _id, __v, ...safe } = ret as Record<string, unknown>;
+        const computedType = ret.type || (ret.isPersonal ? "PERSONAL" : "TEAM");
         return {
           id: typeof _id === "object" && _id !== null ? _id.toString() : String(_id),
+          type: computedType,
+          isPersonal: computedType === "PERSONAL" || Boolean(ret.isPersonal),
+          isDefault: Boolean(ret.isDefault),
           ...safe,
           version: typeof __v === "number" ? __v : 0,
         };

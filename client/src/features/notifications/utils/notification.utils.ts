@@ -8,13 +8,19 @@ import type { Notification } from "../types/notification.types";
  * Soft-deleted projects or tasks will gracefully trigger a 404 in the application router.
  */
 export function getNotificationUrl(notification: Notification): string | null {
-  if (!notification.entityId) return null;
+  if (!notification.entityId && notification.entityType !== "workspaceMember") return null;
+
+  const slug =
+    notification.workspaceSlug ||
+    (typeof notification.metadata?.workspaceSlug === "string" ? notification.metadata.workspaceSlug : null);
 
   switch (notification.entityType) {
     case "project":
-      return `/projects/${notification.entityId}`;
+      return slug ? `/w/${slug}/projects/${notification.entityId}` : `/projects/${notification.entityId}`;
     case "task":
-      return `/tasks/${notification.entityId}`;
+      return slug ? `/w/${slug}/tasks/${notification.entityId}` : `/tasks/${notification.entityId}`;
+    case "workspaceMember":
+      return slug ? `/w/${slug}/settings` : `/settings`;
     case "system":
     default:
       return null;

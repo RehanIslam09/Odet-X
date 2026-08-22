@@ -50,39 +50,39 @@ export function AIDailyBrief() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
-      className="flex h-auto flex-col rounded-xl border bg-card p-6 shadow-sm"
+      className="flex h-auto flex-col rounded-xl border border-border/60 bg-card p-4 sm:p-5 shadow-2xs"
     >
-      <div className="mb-1 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-            <Sparkles className="h-4 w-4 text-primary" />
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
           </div>
-          <h2 className="text-sm font-semibold tracking-tight text-foreground">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground truncate">
             Daily brief
           </h2>
         </div>
-        <Badge variant="outline" className="text-xs font-medium border-primary/30 text-primary">
+        <Badge variant="outline" className="text-[10px] font-medium border-primary/30 text-primary shrink-0">
           AI Engine Active
         </Badge>
       </div>
 
-      <p className="mb-5 text-xs leading-relaxed text-muted-foreground">
+      <p className="mb-4 text-xs leading-relaxed text-muted-foreground break-words">
         Workspace telemetry is analyzed continuously by the Proactive Signal Engine to surface risk factors and task priorities.
       </p>
 
-      <Separator className="mb-5" />
+      <Separator className="mb-4" />
 
-      <div className="flex flex-1 flex-col gap-4">
+      <div className="flex flex-1 flex-col gap-3.5">
         {insights.map((insight) => (
-          <div key={insight.id} className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted">
+          <div key={insight.id} className="flex items-start gap-2.5 min-w-0">
+            <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted/60 border border-border/30">
               <insight.icon className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-foreground/90">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-foreground/90 truncate">
                 {insight.label}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground leading-relaxed break-words">
                 {insight.description}
               </p>
             </div>

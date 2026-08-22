@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { projectsApi } from "@/features/projects/services/projects.api";
 import { projectKeys } from "@/features/projects/hooks/useProjects";
+import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext.js";
 
 /**
  * Fetches a single project by ID.
@@ -11,8 +12,10 @@ import { projectKeys } from "@/features/projects/hooks/useProjects";
  * to be called unconditionally in components.
  */
 export function useProject(id: string | undefined) {
+  const { activeWorkspaceId } = useActiveWorkspace();
+
   return useQuery({
-    queryKey: projectKeys.detail(id ?? ""),
+    queryKey: id ? projectKeys.detail(id, activeWorkspaceId) : [],
     queryFn: () => {
       if (!id) {
         throw new Error("Project id is required.");

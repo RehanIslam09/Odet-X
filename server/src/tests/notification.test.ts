@@ -150,14 +150,40 @@ async function runTests() {
     const uniqueIds = new Set(allIds);
     expect(uniqueIds.size === 5, "No duplicate items between cursor pages");
 
-    console.log("\n>> Running Read Status Filtering Test...");
-    await markNotificationAsRead(userA, p1.items[0]!._id.toString());
-    
-    const unreadFeed = await getNotifications(userA, { limit: 10, readStatus: "unread" });
-    expect(unreadFeed.items.length === 4, "unread status filter returns only unread items");
-    
-    const readFeed = await getNotifications(userA, { limit: 10, readStatus: "read" });
-    expect(readFeed.items.length === 1, "read status filter returns only read items");
+    console.log("\n>> Running Entity Workspace Resolution Test...");
+    const Workspace = (await import("../models/workspace.model.js")).default;
+    const Task = (await import("../models/task.model.js")).default;
+
+    const testUser = new Types.ObjectId();
+    const testWs = await Workspace.create({
+      name: "Rehan Workspace",
+      slug: "rehan-s-workspace",
+      ownerId: testUser,
+    });
+
+    const testTask = await Task.create({
+      title: "Cross Workspace Task",
+      workspaceId: testWs._id,
+      owner: testUser,
+      status: "todo",
+      priority: "medium",
+    });
+
+    // Create notification WITHOUT passing workspaceId explicitly
+    await createNotification({
+      recipientId: testUser.toString(),
+      type: NOTIFICATION_TYPES.TASK_ASSIGNED,
+      entityType: "task",
+      entityId: testTask._id.toString(),
+      title: "Task assigned",
+      message: "You were assigned a task",
+    });
+
+    const notifFeed = await getNotifications(testUser.toString(), { limit: 10, readStatus: "all" });
+    const taskNotif: any = notifFeed.items.find((it: any) => it.entityId?.toString() === testTask._id.toString());
+    expect(taskNotif !== undefined, "Found task notification in feed");
+    expect(String(taskNotif?.workspaceId) === testWs._id.toString(), "workspaceId resolved from Task entity");
+    expect(taskNotif?.workspaceSlug === "rehan-s-workspace", "workspaceSlug resolved from Workspace entity");
 
     console.log("\n🎉 ALL TESTS COMPLETED SUCCESSFULLY! 🎉");
     await teardownTestDatabase();

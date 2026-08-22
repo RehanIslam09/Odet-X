@@ -1,51 +1,85 @@
-import { useEffect } from "react";
-import { motion } from "framer-motion";
-import { Outlet, useLocation } from "react-router-dom";
+import { useMemo } from "react";
+import { Link, Outlet, useLocation } from "react-router-dom";
+import { Sliders, Users, Wifi, Sparkles, AlertTriangle } from "lucide-react";
+import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext.js";
 
-import { SettingsNavigation } from "../components/SettingsNavigation";
+export interface SettingsTabItem {
+  id: string;
+  label: string;
+  subpath: string;
+  icon: React.ElementType;
+  teamOnly?: boolean;
+}
 
-export default function SettingsPage() {
+export function SettingsPage() {
   const location = useLocation();
+  const { currentWorkspace } = useActiveWorkspace();
 
-  // Reset primary vertical scroll owner (`main`) to top on route change
-  useEffect(() => {
-    const mainElement = document.querySelector('main');
-    if (mainElement) {
-      mainElement.scrollTo({ top: 0, behavior: 'instant' });
+  const slug = currentWorkspace?.slug || "personal";
+  const isPersonal = currentWorkspace?.type === "PERSONAL" || currentWorkspace?.isPersonal === true;
+
+  const ALL_TABS: SettingsTabItem[] = useMemo(
+    () => [
+      { id: "general", label: "General", subpath: "general", icon: Sliders },
+      { id: "members", label: "Members & Roles", subpath: "members", icon: Users, teamOnly: true },
+      { id: "realtime", label: "Realtime & Sockets", subpath: "realtime", icon: Wifi, teamOnly: true },
+      { id: "ai", label: "AI Settings", subpath: "ai", icon: Sparkles },
+      { id: "danger-zone", label: "Danger Zone", subpath: "danger-zone", icon: AlertTriangle },
+    ],
+    []
+  );
+
+  // Adaptively filter tabs based on tenancy type
+  const visibleTabs = useMemo(() => {
+    if (isPersonal) {
+      return ALL_TABS.filter((t) => !t.teamOnly);
     }
-  }, [location.pathname]);
-
-
+    return ALL_TABS;
+  }, [ALL_TABS, isPersonal]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="max-w-6xl mx-auto"
-    >
-      {/* Main Settings Layout */}
-      <div className="flex flex-col md:flex-row gap-8 lg:gap-12 items-start">
-        {/* Navigation Sidebar */}
-        <SettingsNavigation />
-
-        {/* Content Modules */}
-        <div className="flex-1 w-full space-y-6 pb-32">
-          {/* Page Header (Now inside the scrolling content column) */}
-          <div className="border-b pb-5">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              Settings
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
-              Manage your personal profile, locale preferences, notifications, theme appearance, and security.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Outlet />
-          </div>
+    <div className="space-y-6 max-w-6xl mx-auto pb-12">
+      {/* Settings Page Header */}
+      <div className="flex items-center justify-between border-b border-border pb-4">
+        <div>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">Workspace Settings</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Configure identity, members, real-time routing, and governance options for{" "}
+            <span className="font-semibold text-foreground">{currentWorkspace?.name || "Workspace"}</span>.
+          </p>
         </div>
       </div>
-    </motion.div>
+
+      {/* Adaptive Tab Navigation Bar */}
+      <div className="flex items-center gap-1 border-b border-border overflow-x-auto pb-px">
+        {visibleTabs.map((tab) => {
+          const targetUrl = `/w/${slug}/settings/${tab.subpath}`;
+          const isActive = location.pathname.includes(`/settings/${tab.subpath}`);
+          const Icon = tab.icon;
+
+          return (
+            <Link
+              key={tab.id}
+              to={targetUrl}
+              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-all shrink-0 cursor-pointer ${
+                isActive
+                  ? "border-primary text-primary font-semibold"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              }`}
+            >
+              <Icon className={`h-3.5 w-3.5 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+              <span>{tab.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Main Settings Subroute Content Outlet */}
+      <div className="pt-2">
+        <Outlet />
+      </div>
+    </div>
   );
 }
+
+export default SettingsPage;

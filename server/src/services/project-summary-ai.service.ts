@@ -1,32 +1,11 @@
 import { Types } from "mongoose";
-import Project, { IProjectDocument } from "@/models/project.model.js";
 import Task from "@/models/task.model.js";
-import { NotFoundError, BadRequestError } from "@/utils/app-error.js";
+import { BadRequestError } from "@/utils/app-error.js";
 import { AIModelTier } from '../ai/types/index.js';
 import { aiService } from "@/ai/ai.service.js";
 import { promptRegistry } from "@/ai/prompts/registry/prompt.registry.js";
 import { GeneratedProjectSummarySchema } from "@/ai/schemas/project-summary.schema.js";
-import { updateProject } from "./project.service.js";
-
-/**
- * Ensures the project exists and belongs to the user.
- */
-async function assertProjectOwnership(
-  projectId: string,
-  userId: string
-): Promise<IProjectDocument> {
-  const project = await Project.findOne({
-    _id: new Types.ObjectId(projectId),
-    owner: new Types.ObjectId(userId),
-    isDeleted: false,
-  });
-
-  if (!project) {
-    throw new NotFoundError("Project not found.");
-  }
-
-  return project;
-}
+import { getProjectById, updateProject } from "./project.service.js";
 
 /**
  * Normalizes string arrays by trimming and removing empty values.
@@ -45,15 +24,15 @@ function normalizeAndDeduplicate(items: string[], maxLength: number = 100): stri
  */
 export async function generateSummaryForProject(
   projectId: string,
-  userId: string
+  userId: string,
+  workspaceId?: string,
 ) {
   // 1. Context Preparation
-  const project = await assertProjectOwnership(projectId, userId);
+  const project = await getProjectById(projectId, userId, workspaceId);
 
-  // Load active tasks (non-archived, non-deleted)
+  // Load active tasks (non-archived, non-deleted) for project in workspace
   const activeTasks = await Task.find({
     projectId: new Types.ObjectId(projectId),
-    owner: new Types.ObjectId(userId),
     isDeleted: false,
     archived: false
   }).select('title description status priority labels').lean();

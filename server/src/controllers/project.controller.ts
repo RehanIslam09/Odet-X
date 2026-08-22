@@ -195,9 +195,10 @@ export const remove = asyncHandler(async (req: Request, res: Response) => {
 export const generateTasks = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const id = getRequiredProjectId(req);
+  const workspaceId = req.workspace?._id?.toString();
   const { description } = req.body;
 
-  const tasks = await generateTasksForProject(id, userId, description);
+  const tasks = await generateTasksForProject(id, userId, description, workspaceId);
 
   sendSuccessResponse(res, {
     statusCode: 201,
@@ -215,8 +216,9 @@ export const generateTasks = asyncHandler(async (req: Request, res: Response) =>
 export const generateSummary = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const id = getRequiredProjectId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const project = await generateSummaryForProject(id, userId);
+  const project = await generateSummaryForProject(id, userId, workspaceId);
 
   sendSuccessResponse(res, {
     statusCode: 201,

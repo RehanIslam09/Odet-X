@@ -2,14 +2,13 @@ import { Types } from "mongoose";
 import Project from "@/models/project.model.js";
 import Task from "@/models/task.model.js";
 import User from "@/models/user.model.js";
+import Activity from "@/models/activity.model.js";
 import { provisionPersonalWorkspace } from "@/services/workspace.service.js";
 
 /**
  * Retrieves the complete Dashboard Analytics Overview for the authenticated user scoped to the active workspace.
  */
 export async function getDashboardOverview(userId: string, explicitWorkspaceId?: string) {
-  const owner = new Types.ObjectId(userId);
-
   let targetWorkspaceId: Types.ObjectId;
   if (explicitWorkspaceId) {
     targetWorkspaceId = new Types.ObjectId(explicitWorkspaceId);
@@ -28,25 +27,29 @@ export async function getDashboardOverview(userId: string, explicitWorkspaceId?:
   const dueSoonCutoff = new Date(now);
   dueSoonCutoff.setDate(dueSoonCutoff.getDate() + 7);
 
+  const fourteenDaysAgo = new Date(now);
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 13);
+  fourteenDaysAgo.setHours(0, 0, 0, 0);
+
   // Execute independent queries concurrently
   const [
     activeProjects,
     archivedProjects,
     taskSummaryResult,
     attentionTasksDocs,
-    recentProjectsDocs
+    recentProjectsDocs,
+    activityTrendDocs
   ] = await Promise.all([
     // Active Projects Count
-    Project.countDocuments({ owner, workspaceId: targetWorkspaceId, isDeleted: false, archived: false }),
+    Project.countDocuments({ workspaceId: targetWorkspaceId, isDeleted: false, archived: false }),
     
     // Archived Projects Count
-    Project.countDocuments({ owner, workspaceId: targetWorkspaceId, isDeleted: false, archived: true }),
+    Project.countDocuments({ workspaceId: targetWorkspaceId, isDeleted: false, archived: true }),
     
     // Task Summary Aggregation
     Task.aggregate([
       {
         $match: {
-          owner,
           workspaceId: targetWorkspaceId,
           isDeleted: false,
           archived: false
@@ -98,7 +101,6 @@ export async function getDashboardOverview(userId: string, explicitWorkspaceId?:
 
     // Attention Tasks (Overdue + Due Soon), limit 5
     Task.find({
-      owner,
       workspaceId: targetWorkspaceId,
       isDeleted: false,
       archived: false,
@@ -115,11 +117,30 @@ export async function getDashboardOverview(userId: string, explicitWorkspaceId?:
       .exec(),
 
     // Recent Projects (ordered by updatedAt desc), limit 4
-    Project.find({ owner, workspaceId: targetWorkspaceId, isDeleted: false, archived: false })
+    Project.find({ workspaceId: targetWorkspaceId, isDeleted: false, archived: false })
       .select("name emoji color updatedAt")
       .sort({ updatedAt: -1 })
       .limit(4)
-      .exec()
+      .exec(),
+
+    // 14-day Activity Trend & Momentum Aggregation
+    Activity.aggregate([
+      {
+        $match: {
+          workspaceId: targetWorkspaceId,
+          createdAt: { $gte: fourteenDaysAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ])
   ]);
 
   // 1. Process Task Summary
@@ -149,6 +170,39 @@ export async function getDashboardOverview(userId: string, explicitWorkspaceId?:
     };
   }
 
+  // 1.5 Calculate Deterministic Workspace Health Telemetry
+  let healthScore = 100;
+  let healthStatus = "Optimal";
+
+  const totalTasksEvaluated = taskSummary.totalActive + taskSummary.completed;
+  if (totalTasksEvaluated > 0) {
+    const overdueRatio = taskSummary.totalActive > 0 ? taskSummary.overdue / taskSummary.totalActive : 0;
+    const uncompletedRatio =
+      taskSummary.totalActive > 0 ? (taskSummary.totalActive - taskSummary.inProgress) / taskSummary.totalActive : 0;
+
+    healthScore = Math.max(
+      0,
+      Math.round(100 - overdueRatio * 50 - uncompletedRatio * 20 - (100 - taskSummary.completionPercentage) * 0.15),
+    );
+
+    if (healthScore >= 85) {
+      healthStatus = "Optimal";
+    } else if (healthScore >= 70) {
+      healthStatus = "Good";
+    } else if (healthScore >= 50) {
+      healthStatus = "Needs Attention";
+    } else {
+      healthStatus = "At Risk";
+    }
+  }
+
+  const health = {
+    score: healthScore,
+    status: healthStatus,
+    overdueCount: taskSummary.overdue,
+    completionRate: taskSummary.completionPercentage,
+  };
+
   // 2. Process Attention Tasks (Lightweight Projection)
   const attentionTasks = attentionTasksDocs.map(doc => {
     const json = doc.toJSON() as any;
@@ -172,7 +226,6 @@ export async function getDashboardOverview(userId: string, explicitWorkspaceId?:
       {
         $match: {
           projectId: { $in: recentProjectIds },
-          owner,
           workspaceId: targetWorkspaceId,
           isDeleted: false,
           archived: false // Use Dashboard semantics: non-deleted, non-archived tasks
@@ -218,13 +271,69 @@ export async function getDashboardOverview(userId: string, explicitWorkspaceId?:
     });
   }
 
+  // 4. Process 14-day Activity Trend & Analytics
+  const trendMap = new Map<string, number>();
+  activityTrendDocs.forEach((doc: { _id: string; count: number }) => {
+    trendMap.set(doc._id, doc.count);
+  });
+
+  const dailyTrend: Array<{ date: string; label: string; count: number }> = [];
+  let thisWeekCount = 0;
+  let lastWeekCount = 0;
+
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split("T")[0] ?? "";
+    const label = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    const count = trendMap.get(dateStr) ?? 0;
+
+    dailyTrend.push({ date: dateStr, label, count });
+
+    if (i < 7) {
+      thisWeekCount += count;
+    } else {
+      lastWeekCount += count;
+    }
+  }
+
+  let activeStreak = 0;
+  let currentStreakActive = true;
+  for (let i = dailyTrend.length - 1; i >= 0; i--) {
+    const dayItem = dailyTrend[i];
+    if (dayItem && dayItem.count > 0) {
+      if (currentStreakActive) activeStreak++;
+    } else if (i === dailyTrend.length - 1) {
+      continue;
+    } else {
+      currentStreakActive = false;
+    }
+  }
+
+  let momentum: "INCREASING" | "STABLE" | "DECLINING" = "STABLE";
+  if (thisWeekCount > lastWeekCount * 1.15) {
+    momentum = "INCREASING";
+  } else if (thisWeekCount < lastWeekCount * 0.85) {
+    momentum = "DECLINING";
+  }
+
+  const analytics = {
+    momentum,
+    activeStreak,
+    thisWeekActivityCount: thisWeekCount,
+    lastWeekActivityCount: lastWeekCount,
+    dailyTrend,
+  };
+
   return {
     summary: {
       projects: {
         active: activeProjects,
         archived: archivedProjects
       },
-      tasks: taskSummary
+      tasks: taskSummary,
+      health,
+      analytics
     },
     recentProjects,
     attentionTasks

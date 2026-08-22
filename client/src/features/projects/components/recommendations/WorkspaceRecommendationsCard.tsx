@@ -31,18 +31,18 @@ export function WorkspaceRecommendationsCard() {
 
   return (
     <>
-      <Card className="border border-border bg-card shadow-sm">
-        <CardHeader className="p-6 pb-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
-                <Sparkles className="h-4 w-4" />
+      <Card className="border border-border/60 bg-card shadow-2xs">
+        <CardHeader className="p-4 sm:p-5 pb-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-2.5 min-w-0 flex-1">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0 mt-0.5">
+                <Sparkles className="h-3.5 w-3.5" />
               </div>
-              <div className="min-w-0">
-                <CardTitle className="text-base sm:text-lg font-semibold truncate">
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-sm font-semibold text-foreground leading-snug break-words">
                   Project Insights
                 </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground truncate">
+                <CardDescription className="text-xs text-muted-foreground leading-normal break-words mt-0.5">
                   Proactive intelligence and advisory items across your active projects
                 </CardDescription>
               </div>
@@ -55,16 +55,16 @@ export function WorkspaceRecommendationsCard() {
                 variant="ghost"
                 size="sm"
                 onClick={() => handleOpenSheet(null)}
-                className="h-8 gap-1 px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground shrink-0"
+                className="h-7 gap-1 px-2 text-xs font-medium text-muted-foreground hover:text-foreground shrink-0 self-start sm:self-auto"
               >
-                View all {totalActive} insights
+                <span>View all {totalActive} insights</span>
                 <ArrowRight className="h-3 w-3" />
               </Button>
             )}
           </div>
         </CardHeader>
 
-        <CardContent className="p-6 pt-0 flex flex-col gap-3">
+        <CardContent className="p-4 sm:p-5 pt-0 flex flex-col gap-3">
           {/* Loading State */}
           {isLoading && (
             <div className="flex flex-col gap-3">

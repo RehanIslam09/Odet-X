@@ -16,6 +16,7 @@ export const search = asyncHandler(
     const queryInput = req.validatedQuery as SearchQueryInput;
 
     const workspaceId = req.workspace?._id?.toString();
+    const workspaceSlug = req.workspace?.slug;
 
     const results = await searchGlobalEntities({
       ownerId,
@@ -23,6 +24,7 @@ export const search = asyncHandler(
       type: queryInput.type,
       limit: queryInput.limit,
       ...(workspaceId ? { workspaceId } : {}),
+      ...(workspaceSlug ? { workspaceSlug } : {}),
     });
 
     sendSuccessResponse(res, {

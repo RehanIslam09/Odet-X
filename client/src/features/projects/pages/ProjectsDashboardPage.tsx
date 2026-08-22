@@ -7,6 +7,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { Button } from "@/components/ui/button";
 
 import { ProjectGrid } from "@/features/projects/components/ProjectGrid";
+import { ProjectBoardView } from "@/features/projects/components/ProjectBoardView";
 import { ProjectFilters } from "@/features/projects/components/ProjectFilters";
 import { CreateProjectDialog } from "@/features/projects/components/CreateProjectDialog";
 import { EditProjectDialog } from "@/features/projects/components/EditProjectDialog";
@@ -97,6 +98,7 @@ export default function ProjectsDashboardPage() {
   // ---------------------------------------------------------------------------
   // UI State
   // ---------------------------------------------------------------------------
+  const [view, setView] = useState<"list" | "board">("list");
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
@@ -198,18 +200,31 @@ export default function ProjectsDashboardPage() {
           onSearchChange={handleSearchChange}
           showArchived={showArchived}
           onShowArchivedChange={handleShowArchivedChange}
+          view={view}
+          onViewChange={setView}
         />
       </motion.div>
 
-      {/* Grid */}
-      <ProjectGrid
-        projects={projects}
-        isLoading={isLoading}
-        onCreateProject={() => setCreateOpen(true)}
-        onEdit={handleEdit}
-        onArchive={handleArchive}
-        onDelete={handleDelete}
-      />
+      {/* Content View: List Grid vs Board */}
+      {view === "board" ? (
+        <ProjectBoardView
+          projects={projects}
+          isLoading={isLoading}
+          onCreateProject={() => setCreateOpen(true)}
+          onEdit={handleEdit}
+          onArchive={handleArchive}
+          onDelete={handleDelete}
+        />
+      ) : (
+        <ProjectGrid
+          projects={projects}
+          isLoading={isLoading}
+          onCreateProject={() => setCreateOpen(true)}
+          onEdit={handleEdit}
+          onArchive={handleArchive}
+          onDelete={handleDelete}
+        />
+      )}
 
       {/* Pagination */}
       {pagination && (

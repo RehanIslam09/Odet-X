@@ -189,8 +189,26 @@ export function WorkspaceMembersTab() {
     );
   });
 
+  const isPersonal = currentWorkspace?.type === "PERSONAL" || currentWorkspace?.isPersonal === true;
+
   return (
     <div className="space-y-6">
+      {/* Task 8: Personal Workspace Alert Banner */}
+      {isPersonal && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-600 dark:text-amber-400">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Personal Workspace</p>
+              <p className="mt-1 text-xs leading-relaxed">
+                Personal workspaces are dedicated single-user environments for individual work.
+                Member invitations and collaboration controls are exclusively available in <strong>Team Workspaces</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tab Header Actions */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -200,7 +218,7 @@ export function WorkspaceMembersTab() {
           </p>
         </div>
 
-        {isOwner && (
+        {isOwner && !isPersonal && (
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1.5 cursor-pointer">

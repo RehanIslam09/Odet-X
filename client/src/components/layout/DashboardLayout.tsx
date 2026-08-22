@@ -5,15 +5,17 @@ import {
   DashboardSidebar,
 } from "@/components/layout/index.js";
 import { CommandPalette } from "@/features/commands/components/CommandPalette.js";
-import { CommandPaletteProvider } from "@/features/commands/context/CommandPaletteProvider.js";
-import { WorkspaceProvider } from "@/features/workspaces/context/WorkspaceContext.js";
 import { RealtimeProvider } from "@/realtime/RealtimeProvider.js";
 import { GlobalCopilotProvider } from "@/features/ai/context/GlobalCopilotProvider.js";
 import { BreadcrumbProvider } from "@/features/navigation/context/BreadcrumbContext.js";
 import { useGlobalKeyboardShortcuts } from "@/features/navigation/hooks/useGlobalKeyboardShortcuts.js";
+import { useWorkspaceAccentApplier } from "@/features/workspaces/hooks/useWorkspaceAccentApplier.js";
+
+import { CommandPaletteProvider } from "@/features/commands/context/CommandPaletteProvider.js";
 
 function DashboardLayoutContent() {
   useGlobalKeyboardShortcuts();
+  useWorkspaceAccentApplier();
 
   return (
     <div className="flex h-screen bg-background">
@@ -36,16 +38,14 @@ function DashboardLayoutContent() {
 
 export default function DashboardLayout() {
   return (
-    <WorkspaceProvider>
-      <RealtimeProvider>
-        <GlobalCopilotProvider>
-          <BreadcrumbProvider>
-            <CommandPaletteProvider>
-              <DashboardLayoutContent />
-            </CommandPaletteProvider>
-          </BreadcrumbProvider>
-        </GlobalCopilotProvider>
-      </RealtimeProvider>
-    </WorkspaceProvider>
+    <RealtimeProvider>
+      <GlobalCopilotProvider>
+        <BreadcrumbProvider>
+          <CommandPaletteProvider>
+            <DashboardLayoutContent />
+          </CommandPaletteProvider>
+        </BreadcrumbProvider>
+      </GlobalCopilotProvider>
+    </RealtimeProvider>
   );
 }

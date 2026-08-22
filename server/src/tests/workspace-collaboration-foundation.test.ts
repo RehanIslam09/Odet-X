@@ -126,7 +126,7 @@ async function runTests() {
     });
     expect(updatedMember?.role === "OWNER", "4.1. Invitee promoted to OWNER role");
 
-    await updateMemberRole(wsIdStr, inviteeIdStr, "MEMBER", ownerIdStr);
+    await updateMemberRole(wsIdStr, ownerIdStr, "OWNER", inviteeIdStr);
     updatedMember = await WorkspaceMember.findOne({
       workspaceId: workspace._id,
       userId: inviteeUser._id,
@@ -156,6 +156,18 @@ async function runTests() {
       userId: inviteeUser._id,
     });
     expect(newOwnerMemberDoc?.role === "OWNER", "5.2. New primary owner role set to OWNER");
+
+    const oldOwnerMemberDoc = await WorkspaceMember.findOne({
+      workspaceId: workspace._id,
+      userId: ownerUser._id,
+    });
+    expect(oldOwnerMemberDoc?.role === "MEMBER", "5.3. Former owner role demoted to MEMBER");
+
+    const ownerCount = await WorkspaceMember.countDocuments({
+      workspaceId: workspace._id,
+      role: "OWNER",
+    });
+    expect(ownerCount === 1, "5.4. Exactly 1 OWNER record exists in workspace");
 
     // -------------------------------------------------------------------------
     // 6. Revocation Flow

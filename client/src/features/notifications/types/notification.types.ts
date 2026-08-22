@@ -12,8 +12,10 @@ export interface Notification {
   id: string; // The virtual populated from MongoDB's _id
   recipientId: string;
   actorId: string | null;
+  workspaceId?: string | null;
+  workspaceSlug?: string | null;
   type: NotificationType | string; // Permit future arbitrary types
-  entityType: "project" | "task" | "system" | null;
+  entityType: "project" | "task" | "workspaceMember" | "system" | null;
   entityId: string | null;
   title: string;
   message: string;

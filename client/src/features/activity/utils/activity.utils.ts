@@ -60,9 +60,37 @@ export function getActivityDescription(activity: Activity): string {
     case "task.deleted":
       return `Deleted task ${taskTitle}`;
 
-    default:
-      // Graceful fallback for unknown future activity types
-      return `Updated ${activity.entityType}`;
+    // Member & Workspace Events
+    case "member.invited":
+      return typeof metadata.email === "string" ? `Invited ${metadata.email}` : "Invited a workspace member";
+    case "member.added":
+    case "member.joined":
+      return "Joined the workspace";
+    case "member.removed":
+      return typeof metadata.email === "string" ? `Removed ${metadata.email}` : "Left the workspace";
+    case "member.role_changed":
+      return typeof metadata.newRole === "string" ? `Changed member role to ${metadata.newRole.toLowerCase()}` : "Updated member role";
+    case "workspace.owner_transferred":
+    case "workspace.ownerTransferred":
+      return "Transferred primary workspace ownership";
+    case "workspace.updated":
+      return "Updated workspace settings";
+
+    // AI Events
+    case "ai.plan_committed":
+    case "plan.committed":
+      return `Committed AI plan for ${projectName}`;
+    case "ai.tasks_generated":
+      return `Generated tasks using AI for ${projectName}`;
+    case "ai.summary_generated":
+      return `Generated AI summary for ${projectName}`;
+    case "ai.labels_generated":
+      return `Generated AI labels for ${projectName}`;
+
+    default: {
+      const entityLabel = activity.entityType ? activity.entityType.replace(/([A-Z])/g, " $1").toLowerCase() : "item";
+      return `Updated ${entityLabel}`;
+    }
   }
 }
 

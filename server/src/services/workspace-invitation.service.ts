@@ -7,6 +7,7 @@ import WorkspaceInvitation, {
 import WorkspaceMember from "@/models/workspace-member.model.js";
 import Workspace from "@/models/workspace.model.js";
 import User from "@/models/user.model.js";
+import Notification from "@/models/notification.model.js";
 import { WorkspaceRole } from "@/constants/workspace.js";
 import {
   BadRequestError,
@@ -330,9 +331,25 @@ export async function acceptInvitation(
 ): Promise<{ workspaceId: string; workspaceSlug: string; role: WorkspaceRole }> {
   const userObjId = new Types.ObjectId(acceptingUserId);
 
-  const invitation = await WorkspaceInvitation.findOne({ token, status: "PENDING" });
+  const invitation = await WorkspaceInvitation.findOne({ token });
   if (!invitation) {
     throw new NotFoundError("Invitation token invalid or active invitation not found.");
+  }
+
+  if (invitation.status !== "PENDING") {
+    if (invitation.status === "ACCEPTED") {
+      throw new BadRequestError("This invitation has already been accepted.");
+    }
+    if (invitation.status === "DECLINED") {
+      throw new BadRequestError("This invitation has already been declined.");
+    }
+    if (invitation.status === "REVOKED") {
+      throw new BadRequestError("This invitation has been revoked.");
+    }
+    if (invitation.status === "EXPIRED") {
+      throw new BadRequestError("This invitation has expired.");
+    }
+    throw new BadRequestError("This invitation is no longer active.");
   }
 
   if (invitation.expiresAt < new Date()) {
@@ -364,6 +381,20 @@ export async function acceptInvitation(
   invitation.status = "ACCEPTED";
   invitation.acceptedAt = new Date();
   await invitation.save();
+
+  // Transition matching invitation notification to RESOLVED (readAt set, status = ACCEPTED)
+  await Notification.updateMany(
+    {
+      recipientId: userObjId,
+      "metadata.token": token,
+    },
+    {
+      $set: {
+        readAt: new Date(),
+        "metadata.status": "ACCEPTED",
+      },
+    },
+  );
 
   // Notify workspace owner
   await createNotification({
@@ -402,7 +433,7 @@ export async function acceptInvitation(
         id: membership._id.toString(),
       },
       payload: {
-        userId: acceptingUserId,
+        acceptedUserId: acceptingUserId,
         role: membership.role,
       },
     }),
@@ -413,6 +444,67 @@ export async function acceptInvitation(
     workspaceSlug: workspace.slug,
     role: membership.role,
   };
+}
+
+/**
+ * Declines a workspace invitation token.
+ */
+export async function declineInvitation(
+  token: string,
+  decliningUserId: string,
+): Promise<void> {
+  const userObjId = new Types.ObjectId(decliningUserId);
+
+  const invitation = await WorkspaceInvitation.findOne({ token });
+  if (!invitation) {
+    throw new NotFoundError("Invitation token invalid or active invitation not found.");
+  }
+
+  if (invitation.status !== "PENDING") {
+    if (invitation.status === "ACCEPTED") {
+      throw new BadRequestError("This invitation has already been accepted.");
+    }
+    if (invitation.status === "DECLINED") {
+      throw new BadRequestError("This invitation has already been declined.");
+    }
+    if (invitation.status === "REVOKED") {
+      throw new BadRequestError("This invitation has been revoked.");
+    }
+    if (invitation.status === "EXPIRED") {
+      throw new BadRequestError("This invitation has expired.");
+    }
+  }
+
+  invitation.status = "DECLINED";
+  invitation.declinedAt = new Date();
+  await invitation.save();
+
+  // Transition matching invitation notification to RESOLVED (readAt set, status = DECLINED)
+  await Notification.updateMany(
+    {
+      recipientId: userObjId,
+      "metadata.token": token,
+    },
+    {
+      $set: {
+        readAt: new Date(),
+        "metadata.status": "DECLINED",
+      },
+    },
+  );
+
+  await recordActivity({
+    owner: decliningUserId,
+    actorId: decliningUserId,
+    workspaceId: invitation.workspaceId.toString(),
+    type: "member.removed",
+    entityType: "workspaceMember",
+    entityId: invitation._id.toString(),
+    metadata: {
+      action: "INVITATION_DECLINED",
+      email: invitation.email,
+    },
+  });
 }
 
 /**
@@ -446,15 +538,17 @@ export async function updateMemberRole(
     throw new NotFoundError("Workspace member not found.");
   }
 
-  if (targetMember.role === "OWNER" && newRole !== "OWNER") {
-    const ownerCount = await WorkspaceMember.countDocuments({
-      workspaceId: wsObjId,
-      role: "OWNER",
-    });
-
-    if (ownerCount <= 1) {
-      throw new ForbiddenError("Cannot demote the sole workspace owner.");
+  if (newRole === "OWNER") {
+    if (targetUserId === requestingUserId) {
+      return;
     }
+    // Delegate to ownership transfer protocol to enforce single-owner invariant
+    await transferWorkspaceOwnership(workspaceId, targetUserId, requestingUserId);
+    return;
+  }
+
+  if (targetMember.role === "OWNER") {
+    throw new ForbiddenError("Primary workspace owner role cannot be demoted directly. Transfer ownership first.");
   }
 
   targetMember.role = newRole;
@@ -500,14 +594,32 @@ export async function transferWorkspaceOwnership(
 ): Promise<void> {
   const wsObjId = new Types.ObjectId(workspaceId);
   const newOwnerObjId = new Types.ObjectId(newOwnerUserId);
+  const reqObjId = new Types.ObjectId(requestingUserId);
 
   const workspace = await Workspace.findById(wsObjId);
   if (!workspace) {
     throw new NotFoundError("Workspace not found.");
   }
 
+  if (workspace.isPersonal) {
+    throw new ForbiddenError("Personal workspace ownership cannot be transferred.");
+  }
+
   if (workspace.ownerId.toString() !== requestingUserId) {
     throw new ForbiddenError("Primary workspace owner permission required.");
+  }
+
+  if (requestingUserId === newOwnerUserId) {
+    throw new BadRequestError("Target user is already the primary workspace owner.");
+  }
+
+  const oldOwnerMember = await WorkspaceMember.findOne({
+    workspaceId: wsObjId,
+    userId: reqObjId,
+  });
+
+  if (!oldOwnerMember) {
+    throw new NotFoundError("Current owner membership not found.");
   }
 
   const newOwnerMember = await WorkspaceMember.findOne({
@@ -519,10 +631,18 @@ export async function transferWorkspaceOwnership(
     throw new NotFoundError("Target user is not an active member of this workspace.");
   }
 
-  await Workspace.findByIdAndUpdate(wsObjId, { ownerId: newOwnerObjId });
+  // Atomic / sequential updates enforcing single-owner invariant:
+  // 1. Demote former owner to MEMBER
+  oldOwnerMember.role = "MEMBER";
+  await oldOwnerMember.save();
 
+  // 2. Promote target user to OWNER
   newOwnerMember.role = "OWNER";
   await newOwnerMember.save();
+
+  // 3. Update Workspace.ownerId pointer
+  workspace.ownerId = newOwnerObjId;
+  await workspace.save();
 
   await createNotification({
     recipientId: newOwnerUserId,
@@ -558,6 +678,7 @@ export async function transferWorkspaceOwnership(
         id: workspace._id.toString(),
       },
       payload: {
+        previousOwnerId: requestingUserId,
         newOwnerUserId,
       },
     }),

@@ -4,9 +4,9 @@ import { ArrowRight, FolderKanban } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 import { Button } from "@/components/ui/button.js";
-import { Progress } from "@/components/ui/progress.js";
 import { Badge } from "@/components/ui/badge.js";
 import { ProjectIcon } from "@/components/common/ProjectIcon.js";
+import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext.js";
 import type { DashboardRecentProject } from "@/features/dashboard/types/dashboard.types.js";
 
 interface RecentProjectsProps {
@@ -16,15 +16,18 @@ interface RecentProjectsProps {
 export const RecentProjects = memo(function RecentProjects({
   recentProjects,
 }: RecentProjectsProps) {
+  const { currentWorkspace } = useActiveWorkspace();
+  const projectsLink = currentWorkspace ? `/w/${currentWorkspace.slug}/projects` : "/projects";
+
   return (
     <div className="flex flex-col rounded-xl border border-border/60 bg-card p-4 shadow-2xs">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-500/10 text-indigo-500">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-500/10 text-indigo-500 shrink-0">
             <FolderKanban className="h-3.5 w-3.5" />
           </div>
-          <div>
-            <h2 className="text-xs font-semibold tracking-tight text-foreground uppercase">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xs font-semibold tracking-tight text-foreground uppercase truncate">
               Recent Projects
             </h2>
           </div>
@@ -37,7 +40,7 @@ export const RecentProjects = memo(function RecentProjects({
           asChild
           className="h-6 gap-1 px-2 text-[11px] text-muted-foreground cursor-pointer"
         >
-          <Link to="/projects">
+          <Link to={projectsLink}>
             <span>View All</span>
             <ArrowRight className="h-3 w-3" />
           </Link>
@@ -53,12 +56,17 @@ export const RecentProjects = memo(function RecentProjects({
             </p>
           </div>
         ) : (
-          recentProjects.slice(0, 4).map(({ project, progress }) => (
-            <Link
-              key={project.id}
-              to={`/projects/${project.id}`}
-              className="group flex items-center justify-between gap-3 rounded-lg border border-border/30 bg-muted/10 px-3 py-2 transition-all hover:border-primary/40 hover:bg-card hover:shadow-xs"
-            >
+          recentProjects.slice(0, 4).map(({ project, progress }) => {
+            const projectLink = currentWorkspace
+              ? `/w/${currentWorkspace.slug}/projects/${project.id}`
+              : `/projects/${project.id}`;
+
+            return (
+              <Link
+                key={project.id}
+                to={projectLink}
+                className="group flex items-center justify-between gap-3 rounded-lg border border-border/30 bg-muted/10 px-3 py-2 transition-all hover:border-primary/40 hover:bg-card hover:shadow-xs"
+              >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 <ProjectIcon
                   icon={project.emoji}
@@ -83,11 +91,11 @@ export const RecentProjects = memo(function RecentProjects({
                   <Badge variant="outline" className="h-4 text-[9px] font-semibold border-primary/30 text-primary bg-primary/5 px-1 py-0">
                     {progress.completionPercentage}%
                   </Badge>
-                  <Progress value={progress.completionPercentage} className="h-1 w-14" />
                 </div>
               </div>
             </Link>
-          ))
+          );
+        })
         )}
       </div>
     </div>

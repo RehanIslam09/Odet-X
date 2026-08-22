@@ -24,9 +24,26 @@ export interface DashboardTaskSummary {
   completionPercentage: number;
 }
 
+export interface DashboardHealthSummary {
+  score: number;
+  status: string;
+  overdueCount: number;
+  completionRate: number;
+}
+
+export interface DashboardAnalyticsSummary {
+  momentum: "INCREASING" | "STABLE" | "DECLINING";
+  activeStreak: number;
+  thisWeekActivityCount: number;
+  lastWeekActivityCount: number;
+  dailyTrend: Array<{ date: string; label: string; count: number }>;
+}
+
 export interface DashboardSummary {
   projects: DashboardProjectSummary;
   tasks: DashboardTaskSummary;
+  health?: DashboardHealthSummary;
+  analytics?: DashboardAnalyticsSummary;
 }
 
 export interface DashboardRecentProject {

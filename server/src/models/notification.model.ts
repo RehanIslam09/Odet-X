@@ -4,6 +4,7 @@ import { NOTIFICATION_TYPES, NotificationType } from "@/constants/notification.j
 export interface INotification {
   recipientId: Types.ObjectId;
   actorId: Types.ObjectId | null;
+  workspaceId?: Types.ObjectId | null;
   type: NotificationType;
   entityType: "project" | "task" | "workspaceMember" | "system" | null;
   entityId: Types.ObjectId | null;
@@ -26,6 +27,7 @@ const notificationSchema = new Schema<INotificationDocument>(
   {
     recipientId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     actorId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", default: null },
     type: { type: String, enum: Object.values(NOTIFICATION_TYPES), required: true },
     entityType: { type: String, enum: ["project", "task", "workspaceMember", "system"], default: null },
     entityId: { type: Schema.Types.ObjectId, default: null },

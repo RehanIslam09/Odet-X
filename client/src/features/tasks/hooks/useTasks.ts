@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { tasksApi } from "@/features/tasks/services/tasks.api.js";
 import type { TasksQueryParams } from "@/features/tasks/types/tasks.types.js";
+import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext.js";
 
 // ---------------------------------------------------------------------------
 // Query Key Factory
@@ -11,11 +12,14 @@ import type { TasksQueryParams } from "@/features/tasks/types/tasks.types.js";
 
 export const taskKeys = {
   all: ["tasks"] as const,
-  lists: () => [...taskKeys.all, "list"] as const,
-  list: (params: TasksQueryParams) =>
-    [...taskKeys.lists(), params] as const,
-  details: () => [...taskKeys.all, "detail"] as const,
-  detail: (id: string) => [...taskKeys.details(), id] as const,
+  lists: (workspaceId?: string | null) =>
+    workspaceId ? ([...taskKeys.all, "list", workspaceId] as const) : ([...taskKeys.all, "list"] as const),
+  list: (params: TasksQueryParams, workspaceId?: string | null) =>
+    [...taskKeys.lists(workspaceId), params] as const,
+  details: (workspaceId?: string | null) =>
+    workspaceId ? ([...taskKeys.all, "detail", workspaceId] as const) : ([...taskKeys.all, "detail"] as const),
+  detail: (id: string, workspaceId?: string | null) =>
+    [...taskKeys.details(workspaceId), id] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -34,8 +38,9 @@ export const taskKeys = {
  * during pagination.
  */
 export function useTasks(params: TasksQueryParams = {}) {
+  const { activeWorkspaceId } = useActiveWorkspace();
   return useQuery({
-    queryKey: taskKeys.list(params),
+    queryKey: taskKeys.list(params, activeWorkspaceId),
     queryFn: () => tasksApi.list(params),
     placeholderData: (previousData) => previousData,
   });

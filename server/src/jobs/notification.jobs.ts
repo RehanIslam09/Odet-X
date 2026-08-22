@@ -43,6 +43,7 @@ export const processTaskReminders = async (now: Date = new Date()): Promise<void
         type: NOTIFICATION_TYPES.TASK_DUE_SOON as any, // Typecast since it's mapped to string union
         entityType: "task",
         entityId: taskIdStr,
+        workspaceId: task.workspaceId ? task.workspaceId.toString() : null,
         title: "Task due soon",
         message: `The task "${task.title}" is due within 24 hours.`,
         dedupeKey,
@@ -77,6 +78,7 @@ export const processTaskReminders = async (now: Date = new Date()): Promise<void
         type: NOTIFICATION_TYPES.TASK_OVERDUE as any,
         entityType: "task",
         entityId: taskIdStr,
+        workspaceId: task.workspaceId ? task.workspaceId.toString() : null,
         title: "Task overdue",
         message: `The task "${task.title}" is now overdue.`,
         dedupeKey,

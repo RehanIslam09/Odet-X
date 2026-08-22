@@ -59,8 +59,9 @@ function getValidatedMemoryQuery(req: Request): ProjectMemoryQueryDto {
 export const create = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const projectId = getRequiredProjectId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const memory = await createProjectMemory(userId, projectId, req.body);
+  const memory = await createProjectMemory(userId, projectId, req.body, workspaceId);
 
   sendSuccessResponse(res, {
     statusCode: 201,
@@ -78,9 +79,10 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
 export const list = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const projectId = getRequiredProjectId(req);
+  const workspaceId = req.workspace?._id?.toString();
   const query = getValidatedMemoryQuery(req);
 
-  const result = await listProjectMemories(userId, projectId, query);
+  const result = await listProjectMemories(userId, projectId, query, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Project memories retrieved successfully.",
@@ -99,8 +101,9 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const projectId = getRequiredProjectId(req);
   const memoryId = getRequiredMemoryId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  const memory = await updateProjectMemory(userId, projectId, memoryId, req.body);
+  const memory = await updateProjectMemory(userId, projectId, memoryId, req.body, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Project memory updated successfully.",
@@ -118,8 +121,9 @@ export const remove = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!._id.toString();
   const projectId = getRequiredProjectId(req);
   const memoryId = getRequiredMemoryId(req);
+  const workspaceId = req.workspace?._id?.toString();
 
-  await deleteProjectMemory(userId, projectId, memoryId);
+  await deleteProjectMemory(userId, projectId, memoryId, workspaceId);
 
   sendSuccessResponse(res, {
     message: "Project memory deleted successfully.",

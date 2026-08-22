@@ -1,7 +1,7 @@
 import { Document, Model, Schema, Types, model } from "mongoose";
 import { WORKSPACE_ROLES, WorkspaceRole } from "@/constants/workspace.js";
 
-export type InvitationStatus = "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
+export type InvitationStatus = "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED" | "DECLINED";
 
 export interface IWorkspaceInvitation {
   workspaceId: Types.ObjectId;
@@ -11,6 +11,7 @@ export interface IWorkspaceInvitation {
   token: string;
   expiresAt: Date;
   acceptedAt?: Date | null;
+  declinedAt?: Date | null;
   revokedAt?: Date | null;
   status: InvitationStatus;
   createdAt: Date;
@@ -64,6 +65,11 @@ const workspaceInvitationSchema = new Schema<IWorkspaceInvitationDocument>(
       default: null,
     },
 
+    declinedAt: {
+      type: Date,
+      default: null,
+    },
+
     revokedAt: {
       type: Date,
       default: null,
@@ -71,7 +77,7 @@ const workspaceInvitationSchema = new Schema<IWorkspaceInvitationDocument>(
 
     status: {
       type: String,
-      enum: ["PENDING", "ACCEPTED", "REVOKED", "EXPIRED"],
+      enum: ["PENDING", "ACCEPTED", "REVOKED", "EXPIRED", "DECLINED"],
       default: "PENDING",
       required: true,
     },

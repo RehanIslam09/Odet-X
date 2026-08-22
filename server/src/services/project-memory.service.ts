@@ -62,8 +62,9 @@ export async function createProjectMemory(
   ownerId: string,
   projectId: string,
   data: CreateProjectMemoryDto,
+  workspaceId?: string,
 ): Promise<ProjectMemoryDto> {
-  const project = await getProjectById(projectId, ownerId);
+  const project = await getProjectById(projectId, ownerId, workspaceId);
 
   const normalizedContent = data.content.trim();
 
@@ -76,6 +77,8 @@ export async function createProjectMemory(
 
   if (project.workspaceId) {
     memoryPayload.workspaceId = project.workspaceId;
+  } else if (workspaceId && Types.ObjectId.isValid(workspaceId)) {
+    memoryPayload.workspaceId = new Types.ObjectId(workspaceId);
   }
 
   const memory = await ProjectMemory.create(memoryPayload);
@@ -87,17 +90,27 @@ export async function listProjectMemories(
   ownerId: string,
   projectId: string,
   query?: Partial<ProjectMemoryQueryDto>,
+  workspaceId?: string,
 ): Promise<PaginatedResult<ProjectMemoryDto>> {
-  await getProjectById(projectId, ownerId);
+  const project = await getProjectById(projectId, ownerId, workspaceId);
 
   const page = Math.max(1, query?.page ?? 1);
   const limit = Math.min(MAX_MEMORY_PAGE_SIZE, Math.max(1, query?.limit ?? DEFAULT_MEMORY_PAGE_SIZE));
   const skip = (page - 1) * limit;
 
-  const filter = {
-    owner: new Types.ObjectId(ownerId),
+  const targetWsId = workspaceId || (project.workspaceId ? project.workspaceId.toString() : undefined);
+  const filter: Record<string, any> = {
     projectId: new Types.ObjectId(projectId),
   };
+
+  if (targetWsId && Types.ObjectId.isValid(targetWsId)) {
+    filter.$or = [
+      { workspaceId: new Types.ObjectId(targetWsId) },
+      { owner: new Types.ObjectId(ownerId) },
+    ];
+  } else {
+    filter.owner = new Types.ObjectId(ownerId);
+  }
 
   const [total, items] = await Promise.all([
     ProjectMemory.countDocuments(filter),
@@ -126,11 +139,36 @@ export async function listProjectMemories(
 export async function getProjectMemoriesForCopilot(
   ownerId: string,
   projectId: string,
+  workspaceId?: string,
 ): Promise<CopilotMemoryRetrievalResult> {
-  const filter = {
-    owner: new Types.ObjectId(ownerId),
+  let project;
+  try {
+    project = await getProjectById(projectId, ownerId, workspaceId);
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      return {
+        memories: [],
+        totalCount: 0,
+        includedCount: 0,
+      };
+    }
+    throw err;
+  }
+
+  const targetWsId = workspaceId || (project.workspaceId ? project.workspaceId.toString() : undefined);
+
+  const filter: Record<string, any> = {
     projectId: new Types.ObjectId(projectId),
   };
+
+  if (targetWsId && Types.ObjectId.isValid(targetWsId)) {
+    filter.$or = [
+      { workspaceId: new Types.ObjectId(targetWsId) },
+      { owner: new Types.ObjectId(ownerId) },
+    ];
+  } else {
+    filter.owner = new Types.ObjectId(ownerId);
+  }
 
   const [totalCount, rawMemories] = await Promise.all([
     ProjectMemory.countDocuments(filter),
@@ -183,8 +221,9 @@ export async function updateProjectMemory(
   projectId: string,
   memoryId: string,
   data: UpdateProjectMemoryDto,
+  workspaceId?: string,
 ): Promise<ProjectMemoryDto> {
-  const project = await getProjectById(projectId, ownerId);
+  const project = await getProjectById(projectId, ownerId, workspaceId);
 
   if (!Types.ObjectId.isValid(memoryId)) {
     throw new NotFoundError("Project memory not found.");
@@ -195,13 +234,25 @@ export async function updateProjectMemory(
   const projectObjectId = new Types.ObjectId(projectId);
   const memoryObjectId = new Types.ObjectId(memoryId);
 
+  const targetWsId = workspaceId || (project.workspaceId ? project.workspaceId.toString() : undefined);
+
+  const filter: Record<string, any> = {
+    _id: memoryObjectId,
+    projectId: projectObjectId,
+    __v: data.expectedVersion,
+  };
+
+  if (targetWsId && Types.ObjectId.isValid(targetWsId)) {
+    filter.$or = [
+      { workspaceId: new Types.ObjectId(targetWsId) },
+      { owner: ownerObjectId },
+    ];
+  } else {
+    filter.owner = ownerObjectId;
+  }
+
   const updatedMemory = await ProjectMemory.findOneAndUpdate(
-    {
-      _id: memoryObjectId,
-      owner: ownerObjectId,
-      projectId: projectObjectId,
-      __v: data.expectedVersion,
-    },
+    filter,
     {
       $set: {
         content: normalizedContent,
@@ -213,11 +264,20 @@ export async function updateProjectMemory(
   );
 
   if (!updatedMemory) {
-    const existsInScope = await ProjectMemory.exists({
+    const existsFilter: Record<string, any> = {
       _id: memoryObjectId,
-      owner: ownerObjectId,
       projectId: projectObjectId,
-    });
+    };
+    if (targetWsId && Types.ObjectId.isValid(targetWsId)) {
+      existsFilter.$or = [
+        { workspaceId: new Types.ObjectId(targetWsId) },
+        { owner: ownerObjectId },
+      ];
+    } else {
+      existsFilter.owner = ownerObjectId;
+    }
+
+    const existsInScope = await ProjectMemory.exists(existsFilter);
 
     if (!existsInScope) {
       throw new NotFoundError("Project memory not found.");
@@ -233,18 +293,31 @@ export async function deleteProjectMemory(
   ownerId: string,
   projectId: string,
   memoryId: string,
+  workspaceId?: string,
 ): Promise<void> {
-  await getProjectById(projectId, ownerId);
+  const project = await getProjectById(projectId, ownerId, workspaceId);
 
   if (!Types.ObjectId.isValid(memoryId)) {
     throw new NotFoundError("Project memory not found.");
   }
 
-  const result = await ProjectMemory.deleteOne({
+  const targetWsId = workspaceId || (project.workspaceId ? project.workspaceId.toString() : undefined);
+
+  const filter: Record<string, any> = {
     _id: new Types.ObjectId(memoryId),
-    owner: new Types.ObjectId(ownerId),
     projectId: new Types.ObjectId(projectId),
-  });
+  };
+
+  if (targetWsId && Types.ObjectId.isValid(targetWsId)) {
+    filter.$or = [
+      { workspaceId: new Types.ObjectId(targetWsId) },
+      { owner: new Types.ObjectId(ownerId) },
+    ];
+  } else {
+    filter.owner = new Types.ObjectId(ownerId);
+  }
+
+  const result = await ProjectMemory.deleteOne(filter);
 
   if (result.deletedCount === 0) {
     throw new NotFoundError("Project memory not found.");

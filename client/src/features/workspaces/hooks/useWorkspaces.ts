@@ -3,6 +3,7 @@ import {
   acceptInvitationTokenApi,
   createInvitationApi,
   createWorkspaceApi,
+  declineInvitationTokenApi,
   deleteWorkspaceApi,
   fetchPendingInvitationsApi,
   fetchWorkspaceDetails,
@@ -204,7 +205,23 @@ export function useAcceptInvitation() {
   return useMutation({
     mutationFn: (token: string) => acceptInvitationTokenApi(token),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+/**
+ * Hook to decline a workspace invitation token.
+ */
+export function useDeclineInvitation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (token: string) => declineInvitationTokenApi(token),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }

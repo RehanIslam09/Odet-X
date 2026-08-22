@@ -1,12 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useActiveWorkspace } from "@/features/workspaces/context/WorkspaceContext.js";
-import { useCommandPalette } from "@/features/commands/hooks/useCommandPalette.js";
 
 export function useGlobalKeyboardShortcuts() {
   const navigate = useNavigate();
   const { currentWorkspace } = useActiveWorkspace();
-  const { openCommandPalette } = useCommandPalette();
   const pendingSequenceRef = useRef<string | null>(null);
   const sequenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -18,8 +16,8 @@ export function useGlobalKeyboardShortcuts() {
         target &&
         (target.tagName === "INPUT" ||
           target.tagName === "TEXTAREA" ||
-          target.isContentEditable ||
-          target.getAttribute("role") === "textbox");
+          Boolean(target.isContentEditable) ||
+          (typeof target.getAttribute === "function" && target.getAttribute("role") === "textbox"));
 
       if (isInput) return;
 
@@ -65,7 +63,9 @@ export function useGlobalKeyboardShortcuts() {
       // Single key '/' shortcut to focus command palette / search
       if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
-        openCommandPalette();
+        window.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }),
+        );
       }
     };
 
@@ -74,5 +74,5 @@ export function useGlobalKeyboardShortcuts() {
       window.removeEventListener("keydown", handleKeyDown);
       if (sequenceTimerRef.current) clearTimeout(sequenceTimerRef.current);
     };
-  }, [navigate, currentWorkspace, openCommandPalette]);
+  }, [navigate, currentWorkspace]);
 }
